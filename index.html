@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERCUPSA | Erciyes Üniversitesi Eczacılık Öğrencileri Birliği</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: { colors: { ercupsaRed: '#8B2323', ercupsaDark: '#1A1A1A' }, fontFamily: { sans: ['Inter', 'sans-serif'] } }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .glass-panel { background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04); }
+        .btn-primary { background-color: #8B2323; color: white; transition: all 0.3s ease; }
+        .btn-primary:hover { background-color: #6a1a1a; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(139, 35, 35, 0.2); }
+        .social-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .social-card:hover { transform: translateY(-5px); }
+        .instagram-hover:hover { color: #E1306C; }
+        .whatsapp-hover:hover { color: #25D366; }
+        .linkedin-hover:hover { color: #0077B5; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased overflow-x-hidden">
+
+    
+    
+    <!-- Header / Navbar -->
+    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <!-- Logo -->
+                <a href="index.html" class="flex items-center gap-3">
+                    <div class="h-12 w-12 rounded-full bg-white flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
+                         <img src="ercupsa.PNG" alt="ERCUPSA Logo" class="h-full w-full object-cover">
+                    </div>
+                    <div>
+                        <span class="font-bold text-xl tracking-tight text-ercupsaDark block leading-none">ERCUPSA</span>
+                        <span class="text-[10px] text-gray-500 font-semibold tracking-wider uppercase">Erciyes University</span>
+                    </div>
+                </a>
+                
+                <!-- Desktop Menu -->
+                <div class="hidden md:flex space-x-8 items-center">
+                    <a href="index.html" class="text-sm font-bold text-ercupsaRed">Ana Sayfa</a>
+<a href="ekip.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Ekibimiz (19)</a>
+<a href="etkinlikler.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Etkinlikler</a>
+<a href="galeri.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Galeri</a>
+                    <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="px-5 py-2.5 rounded-full text-sm font-medium btn-primary flex items-center gap-2">
+                        <i class="fa-brands fa-whatsapp"></i> Bize Katıl
+                    </a>
+                </div>
+
+                <!-- Mobile Hamburger Button -->
+                <div class="md:hidden flex items-center">
+                    <button id="mobile-menu-button" class="text-gray-800 hover:text-ercupsaRed focus:outline-none p-2 transition">
+                        <i class="fa-solid fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Menu Dropdown (Hidden by default) -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white/95 backdrop-blur-xl border-t border-gray-200 absolute w-full shadow-2xl transition-all duration-300">
+            <div class="px-4 pt-4 pb-8 space-y-2">
+                <a href="index.html" class="block px-4 py-3 rounded-xl text-base font-bold text-ercupsaRed bg-red-50">Ana Sayfa</a>
+<a href="ekip.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Ekibimiz (19)</a>
+<a href="etkinlikler.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Etkinlikler</a>
+<a href="galeri.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Galeri</a>
+                <div class="pt-4">
+                    <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="w-full text-center px-5 py-4 rounded-xl text-base font-bold btn-primary flex items-center justify-center gap-2 shadow-lg">
+                        <i class="fa-brands fa-whatsapp text-xl"></i> WhatsApp'a Katıl
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Script for Mobile Menu Toggle -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('mobile-menu-button');
+            const menu = document.getElementById('mobile-menu');
+            const icon = btn.querySelector('i');
+
+            btn.addEventListener('click', () => {
+                menu.classList.toggle('hidden');
+                if(menu.classList.contains('hidden')) {
+                    icon.classList.remove('fa-xmark');
+                    icon.classList.add('fa-bars');
+                } else {
+                    icon.classList.remove('fa-bars');
+                    icon.classList.add('fa-xmark');
+                }
+            });
+        });
+    </script>
+
+    
+
+    <main class="pt-32 pb-16 lg:pt-44 lg:pb-28 min-h-[85vh] flex items-center relative bg-gradient-to-b from-slate-100 to-white">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            
+            <span class="inline-block py-1.5 px-4 rounded-full bg-ercupsaRed/10 text-ercupsaRed text-xs font-bold tracking-wider mb-6 uppercase">
+                Geleceğin Eczacıları Topluluğu
+            </span>
+            
+            <h1 class="text-5xl md:text-7xl font-extrabold text-ercupsaDark tracking-tight mb-6 leading-tight">
+                ERCUPSA'ya <br class="hidden md:block"/> Hoş Geldiniz
+            </h1>
+            
+            <p class="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-12 leading-relaxed">
+                Erciyes Üniversitesi Eczacılık Öğrencileri Birliği resmi web platformu. Bilimsel gelişim, sosyal sorumluluk ve güçlü bir gelecek için buradayız.
+            </p>
+
+            <div class="flex flex-wrap justify-center gap-4 mb-16">
+                <a href="ekip.html" class="px-8 py-4 rounded-2xl bg-white text-ercupsaDark font-bold shadow-md hover:shadow-xl transition-all border border-gray-100 flex items-center gap-3">
+                    <i class="fa-solid fa-users text-ercupsaRed"></i> Ekibimizle Tanışın (19 Üye)
+                </a>
+                <a href="galeri.html" class="px-8 py-4 rounded-2xl bg-white text-ercupsaDark font-bold shadow-md hover:shadow-xl transition-all border border-gray-100 flex items-center gap-3">
+                    <i class="fa-regular fa-images text-ercupsaRed"></i> Fotoğraf Galerisi
+                </a>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
+                <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" class="social-card glass-panel rounded-3xl p-6 flex flex-col items-center gap-3 instagram-hover text-gray-700">
+                    <div class="w-14 h-14 rounded-2xl bg-pink-50 flex items-center justify-center text-[#E1306C]">
+                        <i class="fa-brands fa-instagram text-3xl"></i>
+                    </div>
+                    <span class="font-bold text-sm">Instagram</span>
+                    <span class="text-xs text-gray-400">@ercupsa</span>
+                </a>
+                <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="social-card glass-panel rounded-3xl p-6 flex flex-col items-center gap-3 whatsapp-hover text-gray-700">
+                    <div class="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center text-[#25D366]">
+                        <i class="fa-brands fa-whatsapp text-3xl"></i>
+                    </div>
+                    <span class="font-bold text-sm">WhatsApp Topluluğu</span>
+                    <span class="text-xs text-gray-400">Gruba Katıl</span>
+                </a>
+                <a href="https://www.linkedin.com/in/erciyes-university-pharmaceutical-students-association-6364a8229?utm_source=share_via&utm_content=profile&utm_medium=member_ios" target="_blank" class="social-card glass-panel rounded-3xl p-6 flex flex-col items-center gap-3 linkedin-hover text-gray-700">
+                    <div class="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-[#0077B5]">
+                        <i class="fa-brands fa-linkedin-in text-3xl"></i>
+                    </div>
+                    <span class="font-bold text-sm">LinkedIn</span>
+                    <span class="text-xs text-gray-400">ERCUPSA Resmi</span>
+                </a>
+            </div>
+            
+        </div>
+    </main>
+
+
+<section class="py-20 bg-white">
+<div class="max-w-6xl mx-auto px-4"><div class="flex items-end justify-between gap-4 mb-8"><div><span class="text-ercupsaRed text-xs font-black tracking-widest uppercase">Takvim</span><h2 class="text-3xl md:text-4xl font-black mt-2">Yaklaşan <span class="text-ercupsaRed">Etkinlikler</span></h2></div><a href="etkinlikler.html" class="text-sm font-bold text-ercupsaRed">Tüm etkinlikler →</a></div><div id="home-events" class="grid md:grid-cols-3 gap-5"></div></div>
+</section>
+    <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center">
+        <p class="text-gray-400 text-sm">&copy; 2026 Erciyes University Pharmaceutical Students Association (ERCUPSA).</p>
+    </footer>
+<script>fetch('/api/events').then(r=>r.json()).then(({events=[]})=>{const now=new Date().toISOString().slice(0,10);const list=events.filter(e=>e.date>=now).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);const el=document.getElementById('home-events');if(!el)return;el.innerHTML=list.map(e=>`<a href="etkinlikler.html" class="glass-panel rounded-3xl overflow-hidden hover:-translate-y-1 transition">${e.poster?`<img src="${e.poster}" class="w-full h-44 object-cover">`:''}<div class="p-5"><div class="text-xs font-bold text-ercupsaRed">${e.category||'Etkinlik'}</div><h3 class="font-black text-lg mt-1">${e.title}</h3><p class="text-sm text-gray-500 mt-2">${new Date(e.date+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})}${e.location?' • '+e.location:''}</p></div></a>`).join('')||'<div class="md:col-span-3 text-center text-gray-500 py-8">Yaklaşan etkinlikler yakında burada.</div>'}).catch(()=>{});</script>
+</body>
+</html>
