@@ -56,7 +56,11 @@ function authorized(req) {
 }
 
 async function readEvents() {
-  const data = await store().get(KEY, { type: 'json', consistency: 'strong' });
+  const data = await store().get(KEY, {
+    type: 'json',
+    consistency: 'strong'
+  });
+
   return Array.isArray(data) ? data : seedEvents;
 }
 
@@ -68,21 +72,36 @@ export default async (req) => {
     return Response.json({ events });
   }
 
-  if (method === 'POST' && new URL(req.url).searchParams.get('action') === 'auth') {
-    return Response.json({ ok: authorized(req) }, { status: authorized(req) ? 200 : 401 });
+  if (
+    method === 'POST' &&
+    new URL(req.url).searchParams.get('action') === 'auth'
+  ) {
+    return Response.json(
+      { ok: authorized(req) },
+      { status: authorized(req) ? 200 : 401 }
+    );
   }
 
   if (method === 'POST') {
     if (!authorized(req)) {
-      return Response.json({ error: 'Yetkisiz erişim.' }, { status: 401 });
+      return Response.json(
+        { error: 'Yetkisiz erişim.' },
+        { status: 401 }
+      );
     }
+
     const body = await req.json();
     const event = body?.event;
+
     if (!event?.title || !event?.date) {
-      return Response.json({ error: 'Etkinlik adı ve tarih zorunludur.' }, { status: 400 });
+      return Response.json(
+        { error: 'Etkinlik adı ve tarih zorunludur.' },
+        { status: 400 }
+      );
     }
 
     const events = await readEvents();
+
     const normalized = {
       id: event.id || crypto.randomUUID(),
       title: String(event.title).trim(),
@@ -98,26 +117,56 @@ export default async (req) => {
       updatedAt: new Date().toISOString()
     };
 
-    const index = events.findIndex((item) => item.id === normalized.id);
-    if (index >= 0) events[index] = normalized;
-    else events.unshift(normalized);
+    const index = events.findIndex(
+      (item) => item.id === normalized.id
+    );
+
+    if (index >= 0) {
+      events[index] = normalized;
+    } else {
+      events.unshift(normalized);
+    }
 
     await store().setJSON(KEY, events);
-    return Response.json({ ok: true, event: normalized, events });
+
+    return Response.json({
+      ok: true,
+      event: normalized,
+      events
+    });
   }
 
   if (method === 'DELETE') {
     if (!authorized(req)) {
-      return Response.json({ error: 'Yetkisiz erişim.' }, { status: 401 });
+      return Response.json(
+        { error: 'Yetkisiz erişim.' },
+        { status: 401 }
+      );
     }
+
     const url = new URL(req.url);
     const id = url.searchParams.get('id');
-    if (!id) return Response.json({ error: 'Etkinlik ID gerekli.' }, { status: 400 });
+
+    if (!id) {
+      return Response.json(
+        { error: 'Etkinlik ID gerekli.' },
+        { status: 400 }
+      );
+    }
+
     const events = await readEvents();
     const next = events.filter((item) => item.id !== id);
+
     await store().setJSON(KEY, next);
-    return Response.json({ ok: true, events: next });
+
+    return Response.json({
+      ok: true,
+      events: next
+    });
   }
 
-  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+  return Response.json(
+    { error: 'Method not allowed' },
+    { status: 405 }
+  );
 };
