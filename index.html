@@ -24,6 +24,9 @@
         .instagram-hover:hover { color: #E1306C; }
         .whatsapp-hover:hover { color: #25D366; }
         .linkedin-hover:hover { color: #0077B5; }
+        .reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s ease; }
+        .reveal.in-view { opacity: 1; transform: none; }
+        .instagram-media { width: 100% !important; min-width: 0 !important; max-width: 100% !important; margin: 0 auto !important; }
     </style>
 </head>
 <body class="text-gray-800 antialiased overflow-x-hidden">
@@ -103,64 +106,195 @@
 
     
 
-    <main class="pt-32 pb-16 lg:pt-44 lg:pb-28 min-h-[85vh] flex items-center relative bg-gradient-to-b from-slate-100 to-white">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            
+    <main class="pt-32 pb-10 lg:pt-40 lg:pb-14 relative bg-gradient-to-br from-red-50 via-rose-50/50 to-slate-50 overflow-hidden">
+        <div class="absolute -top-24 -right-16 w-96 h-96 bg-ercupsaRed/10 rounded-full blur-3xl pointer-events-none" aria-hidden="true"></div>
+        <div class="absolute top-32 -left-20 w-80 h-80 bg-red-200/30 rounded-full blur-3xl pointer-events-none" aria-hidden="true"></div>
+        <div class="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
+            <i class="fa-solid fa-pills text-ercupsaRed/[0.08] absolute text-[7rem] md:text-[10rem] -left-6 top-6 rotate-[-15deg]"></i>
+            <i class="fa-solid fa-mortar-pestle text-ercupsaRed/[0.08] absolute text-[6rem] md:text-[9rem] -right-4 top-2 rotate-[12deg]"></i>
+            <i class="fa-solid fa-capsules text-ercupsaRed/[0.07] absolute text-[5rem] md:text-[7rem] left-10 bottom-2 rotate-[8deg] hidden md:block"></i>
+            <i class="fa-solid fa-prescription-bottle-medical text-ercupsaRed/[0.07] absolute text-[5rem] md:text-[7rem] right-10 bottom-0 rotate-[-10deg] hidden md:block"></i>
+            <i class="fa-solid fa-dna text-ercupsaRed/[0.06] absolute text-[9rem] left-1/2 -translate-x-1/2 top-0 hidden lg:block"></i>
+        </div>
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
+
             <span class="inline-block py-1.5 px-4 rounded-full bg-ercupsaRed/10 text-ercupsaRed text-xs font-bold tracking-wider mb-6 uppercase">
                 Geleceğin Eczacıları Topluluğu
             </span>
-            
+
             <h1 class="text-5xl md:text-7xl font-extrabold text-ercupsaDark tracking-tight mb-6 leading-tight">
                 ERCUPSA'ya <br class="hidden md:block"/> Hoş Geldiniz
             </h1>
-            
-            <p class="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-12 leading-relaxed">
+
+            <p class="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
                 Erciyes Üniversitesi Eczacılık Öğrencileri Birliği resmi web platformu. Bilimsel gelişim, sosyal sorumluluk ve güçlü bir gelecek için buradayız.
             </p>
 
-            <div class="flex flex-wrap justify-center gap-4 mb-16">
-                <a href="ekip.html" class="px-8 py-4 rounded-2xl bg-white text-ercupsaDark font-bold shadow-md hover:shadow-xl transition-all border border-gray-100 flex items-center gap-3">
-                    <i class="fa-solid fa-users text-ercupsaRed"></i> Ekibimizle Tanışın (19 Üye)
-                </a>
-                <a href="galeri.html" class="px-8 py-4 rounded-2xl bg-white text-ercupsaDark font-bold shadow-md hover:shadow-xl transition-all border border-gray-100 flex items-center gap-3">
-                    <i class="fa-regular fa-images text-ercupsaRed"></i> Fotoğraf Galerisi
-                </a>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
-                <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" class="social-card glass-panel rounded-3xl p-6 flex flex-col items-center gap-3 instagram-hover text-gray-700">
-                    <div class="w-14 h-14 rounded-2xl bg-pink-50 flex items-center justify-center text-[#E1306C]">
-                        <i class="fa-brands fa-instagram text-3xl"></i>
-                    </div>
-                    <span class="font-bold text-sm">Instagram</span>
-                    <span class="text-xs text-gray-400">@ercupsa</span>
-                </a>
-                <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="social-card glass-panel rounded-3xl p-6 flex flex-col items-center gap-3 whatsapp-hover text-gray-700">
-                    <div class="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center text-[#25D366]">
-                        <i class="fa-brands fa-whatsapp text-3xl"></i>
-                    </div>
-                    <span class="font-bold text-sm">WhatsApp Topluluğu</span>
-                    <span class="text-xs text-gray-400">Gruba Katıl</span>
-                </a>
-                <a href="https://www.linkedin.com/in/erciyes-university-pharmaceutical-students-association-6364a8229?utm_source=share_via&utm_content=profile&utm_medium=member_ios" target="_blank" class="social-card glass-panel rounded-3xl p-6 flex flex-col items-center gap-3 linkedin-hover text-gray-700">
-                    <div class="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-[#0077B5]">
-                        <i class="fa-brands fa-linkedin-in text-3xl"></i>
-                    </div>
-                    <span class="font-bold text-sm">LinkedIn</span>
-                    <span class="text-xs text-gray-400">ERCUPSA Resmi</span>
-                </a>
-            </div>
-            
         </div>
     </main>
 
-
-<section class="py-20 bg-white">
-<div class="max-w-6xl mx-auto px-4"><div class="flex items-end justify-between gap-4 mb-8"><div><span class="text-ercupsaRed text-xs font-black tracking-widest uppercase">Takvim</span><h2 class="text-3xl md:text-4xl font-black mt-2">Yaklaşan <span class="text-ercupsaRed">Etkinlikler</span></h2></div><a href="etkinlikler.html" class="text-sm font-bold text-ercupsaRed">Tüm etkinlikler →</a></div><div id="home-events" class="grid md:grid-cols-3 gap-5"></div></div>
+<section class="pb-16 bg-gradient-to-b from-slate-50 to-white reveal">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8"><div class="flex items-end justify-between gap-4 mb-8"><div><span class="text-ercupsaRed text-xs font-black tracking-widest uppercase">Takvim</span><h2 class="text-3xl md:text-4xl font-black mt-2">Yaklaşan <span class="text-ercupsaRed">Etkinlikler</span></h2></div><a href="etkinlikler.html" class="text-sm font-bold text-ercupsaRed">Tüm etkinlikler →</a></div><div id="home-events" class="grid md:grid-cols-3 gap-5"></div></div>
 </section>
+
+<section class="py-16 bg-white reveal">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+
+        <div class="flex flex-wrap justify-center gap-4 mb-16">
+            <a href="ekip.html" class="px-8 py-4 rounded-2xl bg-white text-ercupsaDark font-bold shadow-md hover:shadow-xl transition-all border border-gray-100 flex items-center gap-3">
+                <i class="fa-solid fa-users text-ercupsaRed"></i> Ekibimizle Tanışın (19 Üye)
+            </a>
+            <a href="galeri.html" class="px-8 py-4 rounded-2xl bg-white text-ercupsaDark font-bold shadow-md hover:shadow-xl transition-all border border-gray-100 flex items-center gap-3">
+                <i class="fa-regular fa-images text-ercupsaRed"></i> Fotoğraf Galerisi
+            </a>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
+            <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" class="social-card glass-panel rounded-3xl p-6 flex flex-col items-center gap-3 instagram-hover text-gray-700">
+                <div class="w-14 h-14 rounded-2xl bg-pink-50 flex items-center justify-center text-[#E1306C]">
+                    <i class="fa-brands fa-instagram text-3xl"></i>
+                </div>
+                <span class="font-bold text-sm">Instagram</span>
+                <span class="text-xs text-gray-400">@ercupsa</span>
+            </a>
+            <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="social-card glass-panel rounded-3xl p-6 flex flex-col items-center gap-3 whatsapp-hover text-gray-700">
+                <div class="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center text-[#25D366]">
+                    <i class="fa-brands fa-whatsapp text-3xl"></i>
+                </div>
+                <span class="font-bold text-sm">WhatsApp Topluluğu</span>
+                <span class="text-xs text-gray-400">Gruba Katıl</span>
+            </a>
+            <a href="https://www.linkedin.com/in/erciyes-university-pharmaceutical-students-association-6364a8229?utm_source=share_via&utm_content=profile&utm_medium=member_ios" target="_blank" class="social-card glass-panel rounded-3xl p-6 flex flex-col items-center gap-3 linkedin-hover text-gray-700">
+                <div class="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-[#0077B5]">
+                    <i class="fa-brands fa-linkedin-in text-3xl"></i>
+                </div>
+                <span class="font-bold text-sm">LinkedIn</span>
+                <span class="text-xs text-gray-400">ERCUPSA Resmi</span>
+            </a>
+        </div>
+
+    </div>
+</section>
+
+<section class="py-16 bg-slate-50 reveal">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-end justify-between gap-4 mb-8">
+            <div>
+                <span class="text-ercupsaRed text-xs font-black tracking-widest uppercase">Kareler</span>
+                <h2 class="text-3xl md:text-4xl font-black mt-2">Son <span class="text-ercupsaRed">Anılarımız</span></h2>
+            </div>
+            <a href="galeri.html" class="text-sm font-bold text-ercupsaRed whitespace-nowrap">Galeriye git →</a>
+        </div>
+        <div id="home-photos" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+    </div>
+</section>
+
+<section id="hakkimizda" class="py-20 bg-white reveal">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+            <span class="text-ercupsaRed text-xs font-black tracking-widest uppercase">Kim Olduğumuz</span>
+            <h2 class="text-3xl md:text-4xl font-black mt-2">Hakkımızda</h2>
+        </div>
+        <div class="grid md:grid-cols-3 gap-6 mb-10">
+            <div class="glass-panel rounded-3xl p-8 reveal">
+                <div class="w-12 h-12 rounded-2xl bg-ercupsaRed/10 flex items-center justify-center text-ercupsaRed mb-4"><i class="fa-solid fa-flask text-xl"></i></div>
+                <h3 class="font-bold text-lg mb-2">Bilimsel Gelişim</h3>
+                <p class="text-sm text-gray-600 leading-relaxed">Teknik geziler ve mesleki içerikli etkinliklerle eczacılık eğitimimizi sınıfın dışına taşıyoruz.</p>
+            </div>
+            <div class="glass-panel rounded-3xl p-8 reveal [transition-delay:120ms]">
+                <div class="w-12 h-12 rounded-2xl bg-ercupsaRed/10 flex items-center justify-center text-ercupsaRed mb-4"><i class="fa-solid fa-hand-holding-heart text-xl"></i></div>
+                <h3 class="font-bold text-lg mb-2">Sosyal Sorumluluk</h3>
+                <p class="text-sm text-gray-600 leading-relaxed">Fidan dikiminden farkındalık projelerine, mesleğimizin onurunu topluma dokunarak yaşatıyoruz.</p>
+            </div>
+            <div class="glass-panel rounded-3xl p-8 reveal [transition-delay:240ms]">
+                <div class="w-12 h-12 rounded-2xl bg-ercupsaRed/10 flex items-center justify-center text-ercupsaRed mb-4"><i class="fa-solid fa-people-group text-xl"></i></div>
+                <h3 class="font-bold text-lg mb-2">Güçlü Bir Aile</h3>
+                <p class="text-sm text-gray-600 leading-relaxed">Tanışma etkinliklerinden gezilere, birbirine bağlı bir eczacılık öğrencisi topluluğu kuruyoruz.</p>
+            </div>
+        </div>
+        <p class="text-gray-600 max-w-3xl mx-auto text-center leading-relaxed">
+            ERCUPSA, Erciyes Üniversitesi Eczacılık Fakültesi'ne bağlı, fakültemizin öğrencilerini bir araya getiren resmi bir öğrenci topluluğudur. Amacımız; mesleki gelişimi desteklemek, sosyal sorumluluk bilinci kazandırmak ve fakülte hayatı boyunca güçlü bir dayanışma ağı kurmaktır.
+        </p>
+    </div>
+</section>
+
+<section class="py-16 bg-ercupsaDark reveal">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-3 gap-6 text-center">
+        <div>
+            <div class="counter text-4xl md:text-5xl font-black text-white" data-target="187">0</div>
+            <p class="text-gray-400 text-[11px] md:text-sm font-semibold uppercase tracking-wider mt-2">Aktif Üye</p>
+        </div>
+        <div>
+            <div id="eventCounter" class="counter text-4xl md:text-5xl font-black text-white" data-target="0">0</div>
+            <p class="text-gray-400 text-[11px] md:text-sm font-semibold uppercase tracking-wider mt-2">Etkinlik</p>
+        </div>
+        <div>
+            <div class="counter text-4xl md:text-5xl font-black text-white" data-target="3">0</div>
+            <p class="text-gray-400 text-[11px] md:text-sm font-semibold uppercase tracking-wider mt-2">Sosyal Medya Kanalı</p>
+        </div>
+    </div>
+</section>
+
+<section class="py-16 bg-white reveal">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <span class="text-ercupsaRed text-xs font-black tracking-widest uppercase">Sosyal Medya</span>
+        <h2 class="text-3xl md:text-4xl font-black mt-2 mb-10">Instagram'dan <span class="text-ercupsaRed">Son Paylaşımlar</span></h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
+            <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DYNe6W6Cmk4/" data-instgrm-version="14"></blockquote>
+            <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DYU7z9ECgxc/" data-instgrm-version="14"></blockquote>
+            <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DRkMhWUiLtv/" data-instgrm-version="14"></blockquote>
+            <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DP_JtyLCBAy/" data-instgrm-version="14"></blockquote>
+        </div>
+        <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" class="inline-flex items-center gap-3 mt-10 px-8 py-4 rounded-2xl btn-primary font-bold shadow-lg">
+            <i class="fa-brands fa-instagram text-xl"></i> @ercupsa'yı Takip Et
+        </a>
+    </div>
+</section>
+<script async src="//www.instagram.com/embed.js"></script>
+
     <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center">
         <p class="text-gray-400 text-sm">&copy; 2026 Erciyes University Pharmaceutical Students Association (ERCUPSA).</p>
     </footer>
-<script>fetch('/api/events').then(r=>r.json()).then(({events=[]})=>{const now=new Date().toISOString().slice(0,10);const list=events.filter(e=>e.date>=now).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);const el=document.getElementById('home-events');if(!el)return;el.innerHTML=list.map(e=>`<a href="etkinlikler.html" class="glass-panel rounded-3xl overflow-hidden hover:-translate-y-1 transition">${e.poster?`<img src="${e.poster}" class="w-full h-44 object-cover">`:''}<div class="p-5"><div class="text-xs font-bold text-ercupsaRed">${e.category||'Etkinlik'}</div><h3 class="font-black text-lg mt-1">${e.title}</h3><p class="text-sm text-gray-500 mt-2">${new Date(e.date+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})}${e.location?' • '+e.location:''}</p></div></a>`).join('')||'<div class="md:col-span-3 text-center text-gray-500 py-8">Yaklaşan etkinlikler yakında burada.</div>'}).catch(()=>{});</script>
+<script>
+fetch('/api/events').then(r=>r.json()).then(({events=[]})=>{
+    const now=new Date().toISOString().slice(0,10);
+
+    // Yaklaşan etkinlikler
+    const list=events.filter(e=>e.date>=now).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
+    const elEvents=document.getElementById('home-events');
+    if(elEvents) elEvents.innerHTML=list.map(e=>`<a href="etkinlikler.html" class="glass-panel rounded-3xl overflow-hidden hover:-translate-y-1 transition">${e.poster?`<img src="${e.poster}" class="w-full h-44 object-cover">`:''}<div class="p-5"><div class="text-xs font-bold text-ercupsaRed">${e.category||'Etkinlik'}</div><h3 class="font-black text-lg mt-1">${e.title}</h3><p class="text-sm text-gray-500 mt-2">${new Date(e.date+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})}${e.location?' • '+e.location:''}</p></div></a>`).join('')||'<div class="md:col-span-3 text-center text-gray-500 py-8">Yaklaşan etkinlikler yakında burada.</div>';
+
+    // Son anılarımız (fotoğraf şeridi) — aynı veriden besleniyor, ekstra istek yok
+    const photos=events.flatMap(e=>(e.images||[]).map(img=>({url:img.url,eventId:e.id}))).slice(-8).reverse();
+    const elPhotos=document.getElementById('home-photos');
+    if(elPhotos) elPhotos.innerHTML=photos.map(p=>`<a href="galeri.html#event-${p.eventId}" class="block aspect-square rounded-2xl overflow-hidden"><img src="${p.url}" loading="lazy" class="w-full h-full object-cover hover:scale-105 transition duration-300"></a>`).join('')||'<p class="col-span-2 md:col-span-4 text-center text-gray-500 py-6 text-sm">Fotoğraflar yakında burada.</p>';
+
+    // Sayaç şeridi — etkinlik sayısı, aynı veriden
+    const evCounter=document.getElementById('eventCounter');
+    if(evCounter) evCounter.dataset.target=events.length;
+}).catch(()=>{});
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Scroll'da belirme animasyonu
+    const io = new IntersectionObserver((entries) => {
+        entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in-view'); io.unobserve(en.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+    // Sayaç sayma animasyonu
+    function animateCounter(el){
+        const target = parseInt(el.dataset.target,10)||0;
+        const dur = 1200; const start = performance.now();
+        function tick(now){
+            const p = Math.min((now-start)/dur,1);
+            el.textContent = Math.floor(p*target);
+            if(p<1) requestAnimationFrame(tick); else el.textContent = target;
+        }
+        requestAnimationFrame(tick);
+    }
+    const counterIO = new IntersectionObserver((entries)=>{entries.forEach(en=>{if(en.isIntersecting){animateCounter(en.target);counterIO.unobserve(en.target)}})},{threshold:0.5});
+    document.querySelectorAll('.counter').forEach(el=>counterIO.observe(el));
+});
+</script>
 </body>
 </html>
