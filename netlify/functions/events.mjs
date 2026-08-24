@@ -170,3 +170,4 @@ export default async (req) => {
     { status: 405 }
   );
 };
+
