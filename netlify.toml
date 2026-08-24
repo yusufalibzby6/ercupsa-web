@@ -9,3 +9,8 @@
   from = "/api/events"
   to = "/.netlify/functions/events"
   status = 200
+
+[[redirects]]
+  from = "/form"
+  to = "/form.html"
+  status = 200

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kayıt Formu | ERCUPSA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { ercupsaRed: '#8B2323', ercupsaDark: '#1A1A1A' } } } }
+    </script>
+    <style>
+        body { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03); }
+        .btn-primary { background-color: #8B2323; color: white; transition: 0.3s; }
+        .btn-primary:hover { background-color: #6a1a1a; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased">
+
+    <!-- Header / Navbar -->
+    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <a href="index.html" class="flex items-center gap-3">
+                    <div class="h-12 w-12 rounded-full bg-white flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
+                         <img src="ercupsa.PNG" alt="ERCUPSA Logo" class="h-full w-full object-cover">
+                    </div>
+                    <div>
+                        <span class="font-bold text-xl tracking-tight text-ercupsaDark block leading-none">ERCUPSA</span>
+                        <span class="text-[10px] text-gray-500 font-semibold tracking-wider uppercase">Erciyes University</span>
+                    </div>
+                </a>
+                <div class="hidden md:flex space-x-8 items-center">
+                    <a href="index.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Ana Sayfa</a>
+<a href="hakkimizda.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Hakkımızda</a>
+<a href="ekip.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Ekibimiz (20)</a>
+<a href="etkinlikler.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Etkinlikler</a>
+<a href="galeri.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Galeri</a>
+<a href="sss.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">SSS</a>
+                </div>
+                <div class="md:hidden flex items-center">
+                    <button id="mobile-menu-button" class="text-gray-800 hover:text-ercupsaRed focus:outline-none p-2 transition">
+                        <i class="fa-solid fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="mobile-menu" class="hidden md:hidden bg-white/95 backdrop-blur-xl border-t border-gray-200 absolute w-full shadow-2xl transition-all duration-300">
+            <div class="px-4 pt-4 pb-8 space-y-2">
+                <a href="index.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Ana Sayfa</a>
+<a href="hakkimizda.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Hakkımızda</a>
+<a href="ekip.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Ekibimiz (20)</a>
+<a href="etkinlikler.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Etkinlikler</a>
+<a href="galeri.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Galeri</a>
+<a href="sss.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">SSS</a>
+            </div>
+        </div>
+    </nav>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('mobile-menu-button');
+            const menu = document.getElementById('mobile-menu');
+            const icon = btn.querySelector('i');
+            btn.addEventListener('click', () => {
+                menu.classList.toggle('hidden');
+                if(menu.classList.contains('hidden')) { icon.classList.remove('fa-xmark'); icon.classList.add('fa-bars'); }
+                else { icon.classList.remove('fa-bars'); icon.classList.add('fa-xmark'); }
+            });
+        });
+    </script>
+
+    <main class="pt-28 pb-16 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div id="formHead" class="text-center mb-6">
+            <span class="text-ercupsaRed text-xs font-black tracking-widest uppercase">Kayıt</span>
+            <h1 id="formTitle" class="text-3xl md:text-4xl font-black mt-2">Kayıt Formu</h1>
+            <p id="formSub" class="text-gray-500 mt-3 text-sm"></p>
+        </div>
+
+        <div id="formWrap" class="glass-panel rounded-3xl overflow-hidden hidden">
+            <iframe id="formFrame" class="w-full min-h-[75vh]" frameborder="0"></iframe>
+        </div>
+
+        <div id="formEmpty" class="glass-panel rounded-3xl p-10 text-center hidden">
+            <i class="fa-regular fa-calendar-xmark text-4xl text-gray-300 mb-4"></i>
+            <p class="text-gray-600 font-semibold mb-1">Şu anda açık bir kayıt formu bulunmuyor.</p>
+            <p class="text-gray-400 text-sm mb-6">Yaklaşan etkinliklerimizi kontrol edebilirsin.</p>
+            <a href="etkinlikler.html" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl btn-primary font-bold"><i class="fa-solid fa-calendar-day"></i> Etkinlikleri Gör</a>
+        </div>
+
+        <div id="formFallback" class="glass-panel rounded-3xl p-10 text-center hidden">
+            <i class="fa-solid fa-arrow-up-right-from-square text-4xl text-gray-300 mb-4"></i>
+            <p class="text-gray-600 font-semibold mb-6">Bu form site içinde gösterilemiyor, ama tek tıkla açabilirsin.</p>
+            <a id="fallbackLink" href="#" target="_blank" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl btn-primary font-bold">Formu Aç</a>
+        </div>
+    </main>
+
+    <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center">
+        <p class="text-gray-400 text-sm">&copy; 2026 Erciyes University Pharmaceutical Students Association (ERCUPSA).</p>
+    </footer>
+
+    <script>
+        function embedInfo(url){
+            try{
+                const u = new URL(url);
+                if(u.hostname.includes('docs.google.com') && u.pathname.includes('/forms/')){
+                    u.searchParams.set('embedded','true');
+                    return { src: u.toString(), ok: true };
+                }
+                if(u.hostname === 'tally.so' && u.pathname.startsWith('/r/')){
+                    const id = u.pathname.split('/r/')[1];
+                    return { src: `https://tally.so/embed/${id}?hideTitle=1&alignLeft=1&transparentBackground=1&dynamicHeight=1`, ok: true };
+                }
+            }catch(e){}
+            return { src: url, ok: false };
+        }
+
+        fetch('/api/events').then(r=>r.json()).then(({events=[]})=>{
+            const now = new Date().toISOString().slice(0,10);
+            const params = new URLSearchParams(location.search);
+            const requestedId = params.get('event');
+
+            let target = null;
+            if(requestedId){
+                target = events.find(e => e.id === requestedId && e.registrationUrl);
+            }
+            if(!target){
+                target = events
+                    .filter(e => e.date >= now && e.registrationUrl)
+                    .sort((a,b) => a.date.localeCompare(b.date))[0];
+            }
+
+            if(!target){
+                document.getElementById('formEmpty').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('formTitle').textContent = target.title;
+            document.getElementById('formSub').textContent = target.category ? target.category : '';
+
+            const info = embedInfo(target.registrationUrl);
+            if(info.ok){
+                document.getElementById('formFrame').src = info.src;
+                document.getElementById('formWrap').classList.remove('hidden');
+            } else {
+                document.getElementById('fallbackLink').href = target.registrationUrl;
+                document.getElementById('formFallback').classList.remove('hidden');
+            }
+        }).catch(()=>{
+            document.getElementById('formEmpty').classList.remove('hidden');
+        });
+    </script>
+</body>
+</html>
