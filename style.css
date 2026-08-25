@@ -1,0 +1,90 @@
+body { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
+
+.glass-panel {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+.glass {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(14px);
+    border: 1px solid #eee;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+/* Vivid gradient CTA button, used everywhere (.btn-primary and .btn) */
+.btn-primary, .btn {
+    background: linear-gradient(135deg, #A62B2B 0%, #E23E4E 100%);
+    color: white;
+    transition: 0.3s;
+    box-shadow: 0 6px 18px rgba(166, 43, 43, 0.28);
+}
+.btn-primary:hover, .btn:hover {
+    background: linear-gradient(135deg, #8B2323 0%, #C0392B 100%);
+    box-shadow: 0 10px 26px rgba(166, 43, 43, 0.4);
+    transform: translateY(-2px);
+}
+
+/* Section eyebrow / badge chips — richer than a flat tint */
+.badge-chip {
+    background: linear-gradient(90deg, rgba(166,43,43,0.16), rgba(226,62,78,0.06));
+    border: 1px solid rgba(166,43,43,0.2);
+}
+.badge-chip-dark {
+    background: linear-gradient(90deg, rgba(226,62,78,0.25), rgba(226,62,78,0.1));
+    border: 1px solid rgba(226,62,78,0.4);
+    color: #ff8a8a;
+}
+
+/* High-contrast glowing numerals for dark bands */
+.counter-glow {
+    color: #ffffff;
+    text-shadow: 0 0 30px rgba(226,62,78,0.65), 0 0 6px rgba(255,255,255,0.3);
+}
+
+/* Icon boxes on cards — solid gradient fill instead of pale tint */
+.icon-box {
+    background: linear-gradient(135deg, #A62B2B, #E23E4E);
+    color: #fff !important;
+    box-shadow: 0 6px 16px rgba(166,43,43,0.25);
+}
+
+/* Gradient underline accent beneath major headings */
+.title-accent { position: relative; }
+.title-accent::after {
+    content: '';
+    display: block;
+    width: 64px;
+    height: 4px;
+    border-radius: 999px;
+    margin: 14px auto 0;
+    background: linear-gradient(90deg, #A62B2B, #E23E4E, #F2994A);
+}
+
+/* Vivid maroon-to-black gradient band, used for high-contrast sections */
+.band-dark {
+    background: linear-gradient(135deg, #2b0f0f 0%, #1A1A1A 55%, #0d0d0d 100%);
+}
+.band-vivid {
+    background: linear-gradient(120deg, #7a1f1f 0%, #A62B2B 45%, #C0392B 100%);
+}
+
+.red { background: #8B2323; }
+.redtext { color: #8B2323; }
+.thumb { transition: .25s; }
+.thumb:hover { transform: scale(1.02); }
+
+.instagram-hover:hover { color: #E1306C; }
+.whatsapp-hover:hover { color: #25D366; }
+.linkedin-hover:hover { color: #0077B5; }
+
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.in-view { opacity: 1; transform: none; }
+
+.instagram-media { width: 100% !important; min-width: 0 !important; max-width: 100% !important; margin: 0 auto !important; }
+#home-photos { transition: opacity .3s ease; }
+
+details > summary { list-style: none; cursor: pointer; }
+details > summary::-webkit-details-marker { display: none; }
+details[open] .chev { transform: rotate(180deg); }
