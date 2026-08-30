@@ -64,7 +64,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
                 <!-- Logo -->
-                <a href="index.html" class="flex items-center gap-3">
+                <a href="index.html" id="logoLink" class="flex items-center gap-3">
                     <div class="h-12 w-12 rounded-full bg-white flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
                          <img src="ercupsa.PNG" alt="ERCUPSA Logo" class="h-full w-full object-cover">
                     </div>
@@ -82,6 +82,7 @@
 <a href="etkinlikler.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Etkinlikler</a>
 <a href="galeri.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Galeri</a>
 <a href="sss.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">SSS</a>
+<a href="test.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">🧪 Test</a>
                     <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="px-5 py-2.5 rounded-full text-sm font-medium btn-primary flex items-center gap-2">
                         <i class="fa-brands fa-whatsapp"></i> Bize Katıl
                     </a>
@@ -105,6 +106,7 @@
 <a href="etkinlikler.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Etkinlikler</a>
 <a href="galeri.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Galeri</a>
 <a href="sss.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">SSS</a>
+<a href="test.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">🧪 Test</a>
                 <div class="pt-4">
                     <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="w-full text-center px-5 py-4 rounded-xl text-base font-bold btn-primary flex items-center justify-center gap-2 shadow-lg">
                         <i class="fa-brands fa-whatsapp text-xl"></i> WhatsApp'a Katıl
@@ -161,11 +163,15 @@
                 Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu resmi web platformu. Bilimsel gelişim, sosyal sorumluluk ve güçlü bir gelecek için buradayız.
             </p>
 
+            <a href="test.html" class="badge-chip-dark inline-flex items-center gap-2 mt-6 px-4 py-2 rounded-full text-xs font-bold hover:scale-105 transition">
+                🧪 Hangi Eczacı Tipisin? Teste Gir <i class="fa-solid fa-arrow-right"></i>
+            </a>
+
         </div>
     </main>
 
 <section class="pb-16 bg-gradient-to-b from-slate-50 to-white reveal">
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8"><div class="flex items-end justify-between gap-4 mb-8"><div><span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Takvim</span><h2 class="text-3xl md:text-4xl font-black mt-2">Yaklaşan <span class="text-ercupsaRed">Etkinlikler</span></h2></div><a href="etkinlikler.html" class="text-sm font-bold text-ercupsaRed">Tüm etkinlikler →</a></div><div id="home-events" class="grid md:grid-cols-3 gap-5"></div></div>
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8"><div class="flex items-end justify-between gap-4 mb-8"><div><span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Takvim</span><h2 class="text-3xl md:text-4xl font-black mt-2">Yaklaşan <span class="text-ercupsaRed">Etkinlikler</span></h2></div><a href="etkinlikler.html" class="text-sm font-bold text-ercupsaRed">Tüm etkinlikler →</a></div><div id="countdownWrap" class="hidden mb-8 glass-panel rounded-2xl p-5 flex flex-wrap items-center justify-center gap-4 text-center"><span class="text-sm font-bold text-gray-500">⏰ <span id="countdownLabel">En yakın etkinliğe</span>:</span><div class="flex items-center gap-3" id="countdownNums"><div><span id="cdDays" class="text-2xl font-black text-ercupsaRed">0</span><span class="text-[10px] text-gray-400 block uppercase font-bold">Gün</span></div><div><span id="cdHours" class="text-2xl font-black text-ercupsaRed">0</span><span class="text-[10px] text-gray-400 block uppercase font-bold">Saat</span></div><div><span id="cdMins" class="text-2xl font-black text-ercupsaRed">0</span><span class="text-[10px] text-gray-400 block uppercase font-bold">Dakika</span></div><div><span id="cdSecs" class="text-2xl font-black text-ercupsaRed">0</span><span class="text-[10px] text-gray-400 block uppercase font-bold">Saniye</span></div></div></div><div id="home-events" class="grid md:grid-cols-3 gap-5"></div></div>
 </section>
 
 <section class="py-16 bg-gradient-to-b from-orange-50/50 via-white to-white reveal">
@@ -256,6 +262,7 @@
 
     <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center">
         <p class="text-gray-400 text-sm">&copy; 2026 Erciyes University Pharmaceutical Students Association (ERCUPSA).</p>
+        <p class="text-gray-500 text-xs mt-2">Site tasarımı: Yusuf Ali Bozbay</p>
     </footer>
 <script>
 fetch('/api/events').then(r=>r.json()).then(({events=[]})=>{
@@ -289,6 +296,29 @@ fetch('/api/events').then(r=>r.json()).then(({events=[]})=>{
     // Sayaç şeridi — etkinlik sayısı, aynı veriden
     const evCounter=document.getElementById('eventCounter');
     if(evCounter) evCounter.dataset.target=events.length;
+
+    // Canlı geri sayım — en yakın etkinliğe, aynı veriden
+    const nextEvent = list[0];
+    const cdWrap = document.getElementById('countdownWrap');
+    if(cdWrap && nextEvent){
+        cdWrap.classList.remove('hidden');
+        document.getElementById('countdownLabel').textContent = nextEvent.title;
+        const target = new Date(nextEvent.date+'T09:00:00').getTime();
+        const tick = () => {
+            const diff = target - Date.now();
+            if(diff <= 0){ cdWrap.classList.add('hidden'); clearInterval(timer); return; }
+            const d = Math.floor(diff/86400000);
+            const h = Math.floor((diff%86400000)/3600000);
+            const m = Math.floor((diff%3600000)/60000);
+            const s = Math.floor((diff%60000)/1000);
+            document.getElementById('cdDays').textContent = d;
+            document.getElementById('cdHours').textContent = String(h).padStart(2,'0');
+            document.getElementById('cdMins').textContent = String(m).padStart(2,'0');
+            document.getElementById('cdSecs').textContent = String(s).padStart(2,'0');
+        };
+        tick();
+        const timer = setInterval(tick, 1000);
+    }
 }).catch(()=>{});
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -313,5 +343,5 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.counter').forEach(el=>counterIO.observe(el));
 });
 </script>
-</body>
+<script src="fun.js"></script><script>document.addEventListener("DOMContentLoaded",()=>ercupsaInitLogoEasterEgg("#logoLink"));</script></body>
 </html>

@@ -38,7 +38,7 @@
     <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
-                <a href="index.html" class="flex items-center gap-3">
+                <a href="index.html" id="logoLink" class="flex items-center gap-3">
                     <div class="h-12 w-12 rounded-full bg-white flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
                          <img src="ercupsa.PNG" alt="ERCUPSA Logo" class="h-full w-full object-cover">
                     </div>
@@ -54,6 +54,7 @@
 <a href="etkinlikler.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Etkinlikler</a>
 <a href="galeri.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Galeri</a>
 <a href="sss.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">SSS</a>
+<a href="test.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">🧪 Test</a>
                 </div>
                 <div class="md:hidden flex items-center">
                     <button id="mobile-menu-button" class="text-gray-800 hover:text-ercupsaRed focus:outline-none p-2 transition">
@@ -70,6 +71,7 @@
 <a href="etkinlikler.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Etkinlikler</a>
 <a href="galeri.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Galeri</a>
 <a href="sss.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">SSS</a>
+<a href="test.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">🧪 Test</a>
             </div>
         </div>
     </nav>
@@ -113,6 +115,7 @@
 
     <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center">
         <p class="text-gray-400 text-sm">&copy; 2026 Erciyes University Pharmaceutical Students Association (ERCUPSA).</p>
+        <p class="text-gray-500 text-xs mt-2">Site tasarımı: Yusuf Ali Bozbay</p>
     </footer>
 
     <script>
@@ -166,5 +169,5 @@
             document.getElementById('formEmpty').classList.remove('hidden');
         });
     </script>
-</body>
+<script src="fun.js"></script><script>document.addEventListener("DOMContentLoaded",()=>ercupsaInitLogoEasterEgg("#logoLink"));</script></body>
 </html>

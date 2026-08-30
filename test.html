@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hangi Eczacı Tipisin? | ERCUPSA</title>
+<meta name="description" content="Kısa bir testle hangi eczacı tipi olduğunu keşfet! ERCUPSA'nın eğlenceli kişilik testini çöz.">
+<link rel="canonical" href="https://ercupsa.com.tr/test.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ERCUPSA">
+<meta property="og:locale" content="tr_TR">
+<meta property="og:url" content="https://ercupsa.com.tr/test.html">
+<meta property="og:title" content="Hangi Eczacı Tipisin? | ERCUPSA">
+<meta property="og:description" content="Kısa bir testle hangi eczacı tipi olduğunu keşfet! ERCUPSA'nın eğlenceli kişilik testini çöz.">
+<meta property="og:image" content="https://ercupsa.com.tr/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hangi Eczacı Tipisin? | ERCUPSA">
+<meta name="twitter:description" content="Kısa bir testle hangi eczacı tipi olduğunu keşfet! ERCUPSA'nın eğlenceli kişilik testini çöz.">
+<meta name="twitter:image" content="https://ercupsa.com.tr/og-image.jpg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" href="favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { ercupsaRed: '#8B2323', ercupsaAccent: '#E23E4E', ercupsaDark: '#1A1A1A' } } } }
+    </script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .option-btn { transition: .2s; }
+        .option-btn:hover { transform: translateY(-2px); border-color: #E23E4E; }
+        .progress-bar { transition: width .4s ease; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased">
+
+    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <a href="index.html" id="logoLink" class="flex items-center gap-3">
+                    <div class="h-12 w-12 rounded-full bg-white flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
+                         <img src="ercupsa.PNG" alt="ERCUPSA Logo" class="h-full w-full object-cover">
+                    </div>
+                    <div>
+                        <span class="font-bold text-xl tracking-tight text-ercupsaDark block leading-none">ERCUPSA</span>
+                        <span class="text-[10px] text-gray-500 font-semibold tracking-wider uppercase">Erciyes University</span>
+                    </div>
+                </a>
+                <div class="hidden md:flex space-x-8 items-center">
+                    <a href="index.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Ana Sayfa</a>
+<a href="hakkimizda.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Hakkımızda</a>
+<a href="ekip.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Ekibimiz (20)</a>
+<a href="etkinlikler.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Etkinlikler</a>
+<a href="galeri.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Galeri</a>
+<a href="sss.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">SSS</a>
+<a href="test.html" class="text-sm font-bold text-ercupsaRed">🧪 Test</a>
+                    <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="px-5 py-2.5 rounded-full text-sm font-medium btn-primary flex items-center gap-2">
+                        <i class="fa-brands fa-whatsapp"></i> Bize Katıl
+                    </a>
+                </div>
+                <div class="md:hidden flex items-center">
+                    <button id="mobile-menu-button" class="text-gray-800 hover:text-ercupsaRed focus:outline-none p-2 transition">
+                        <i class="fa-solid fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="mobile-menu" class="hidden md:hidden bg-white/95 backdrop-blur-xl border-t border-gray-200 absolute w-full shadow-2xl transition-all duration-300">
+            <div class="px-4 pt-4 pb-8 space-y-2">
+                <a href="index.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Ana Sayfa</a>
+<a href="hakkimizda.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Hakkımızda</a>
+<a href="ekip.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Ekibimiz (20)</a>
+<a href="etkinlikler.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Etkinlikler</a>
+<a href="galeri.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Galeri</a>
+<a href="sss.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">SSS</a>
+<a href="test.html" class="block px-4 py-3 rounded-xl text-base font-bold text-ercupsaRed bg-red-50">🧪 Test</a>
+                <div class="pt-4">
+                    <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="w-full text-center px-5 py-4 rounded-xl text-base font-bold btn-primary flex items-center justify-center gap-2 shadow-lg">
+                        <i class="fa-brands fa-whatsapp text-xl"></i> WhatsApp'a Katıl
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-28 pb-20 max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        <div id="intro" class="text-center">
+            <span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Eğlence</span>
+            <h1 class="text-4xl md:text-5xl font-black mt-2 title-accent">Hangi Eczacı <span class="bg-gradient-to-r from-ercupsaRed to-ercupsaAccent bg-clip-text text-transparent">Tipisin?</span></h1>
+            <p class="text-gray-500 mt-4 mb-8">5 kısa soru, 1 dakika. Sonunda hangi eczacı tipi olduğunu öğren!</p>
+            <button id="startBtn" class="px-8 py-4 rounded-2xl btn-primary font-bold shadow-lg">Teste Başla <i class="fa-solid fa-arrow-right ml-2"></i></button>
+        </div>
+
+        <div id="quiz" class="hidden">
+            <div class="w-full bg-gray-100 rounded-full h-2 mb-8 overflow-hidden">
+                <div id="progressBar" class="progress-bar bg-gradient-to-r from-ercupsaRed to-ercupsaAccent h-2 rounded-full" style="width:0%"></div>
+            </div>
+            <div id="questionWrap"></div>
+        </div>
+
+        <div id="result" class="hidden text-center"></div>
+
+    </main>
+
+    <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center">
+        <p class="text-gray-400 text-sm">&copy; 2026 Erciyes University Pharmaceutical Students Association (ERCUPSA).</p>
+        <p class="text-gray-500 text-xs mt-2">Site tasarımı: Yusuf Ali Bozbay</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('mobile-menu-button');
+            const menu = document.getElementById('mobile-menu');
+            const icon = btn.querySelector('i');
+            btn.addEventListener('click', () => {
+                menu.classList.toggle('hidden');
+                if(menu.classList.contains('hidden')) { icon.classList.remove('fa-xmark'); icon.classList.add('fa-bars'); }
+                else { icon.classList.remove('fa-bars'); icon.classList.add('fa-xmark'); }
+            });
+        });
+    </script>
+
+    <script src="fun.js"></script>
+    <script>document.addEventListener("DOMContentLoaded",()=>ercupsaInitLogoEasterEgg("#logoLink"));</script>
+
+    <script>
+    const questions = [
+        {
+            q: "Bir eczanede staj yaparken en çok hangi işi yapmak istersin?",
+            options: [
+                { text: "Yeni ilaç formülasyonları üzerine araştırma yapmak", type: "lab" },
+                { text: "Müşterilerle sohbet edip önerilerde bulunmak", type: "sosyal" },
+                { text: "Etkileşimleri ve mekanizmaları didik didik incelemek", type: "akademik" },
+                { text: "Acil bir durumda hızlıca doğru çözümü bulmak", type: "kriz" }
+            ]
+        },
+        {
+            q: "Sınav haftasında sen hangisisin?",
+            options: [
+                { text: "Notlarımı en ince ayrıntısına kadar organize ederim", type: "akademik" },
+                { text: "Arkadaşlarla grup çalışması yaparım, moral önemli", type: "sosyal" },
+                { text: "Son ana kadar pratik yapıp tekrar ederim", type: "lab" },
+                { text: "Stresliyim ama panik yapmadan planlı ilerlerim", type: "kriz" }
+            ]
+        },
+        {
+            q: "Boş vaktinde en çok ne yaparsın?",
+            options: [
+                { text: "Bilimsel içerik/belgesel izlerim", type: "akademik" },
+                { text: "Arkadaşlarla vakit geçiririm", type: "sosyal" },
+                { text: "Yeni bir şeyler denerim, karıştırırım", type: "lab" },
+                { text: "Spor yaparım, enerjik kalırım", type: "kriz" }
+            ]
+        },
+        {
+            q: "ERCUPSA etkinliklerinde en çok hangi rolü üstlenirsin?",
+            options: [
+                { text: "Organizasyon lojistiğini planlarım", type: "kriz" },
+                { text: "Katılımcılarla kaynaşmayı sağlarım", type: "sosyal" },
+                { text: "Sunum/bilgilendirme kısmını hazırlarım", type: "akademik" },
+                { text: "Yeni bir proje fikri öneririm", type: "lab" }
+            ]
+        },
+        {
+            q: "Gelecekte kendini nerede görüyorsun?",
+            options: [
+                { text: "Ar-Ge laboratuvarında", type: "lab" },
+                { text: "Kendi eczanemde, herkesi tanır hâlde", type: "sosyal" },
+                { text: "Akademide, ders anlatırken", type: "akademik" },
+                { text: "Hastanede, kritik anlarda fark yaratırken", type: "kriz" }
+            ]
+        }
+    ];
+
+    const results = {
+        lab: {
+            emoji: "🧪",
+            icon: "icons/emoji-lab.png",
+            title: "Laboratuvar Aşığı",
+            desc: "Meraklısın, detaycısın ve yeni şeyler keşfetmeyi seviyorsun. Bir formülü didik didik edip \"ya böyle olsa?\" diye sormak tam sana göre. Ar-Ge senin doğal ortamın!"
+        },
+        sosyal: {
+            emoji: "💊",
+            icon: "icons/emoji-sosyal.png",
+            title: "Sosyal Eczacı",
+            desc: "İnsanlarla bağ kurmayı, onlara yardımcı olmayı seviyorsun. Bir gün mahalledeki herkesin güvendiği, tanıdığı eczacı sen olacaksın. Empati senin süper gücün!"
+        },
+        akademik: {
+            emoji: "📚",
+            icon: "icons/emoji-akademik.png",
+            title: "Akademisyen Ruhlu",
+            desc: "Bilgiye açsın, öğrenmeyi ve öğretmeyi seviyorsun. Detaylara hakim olmak, konuyu tam anlamak seni tatmin ediyor. Belki bir gün bu işi sen anlatıyor olursun!"
+        },
+        kriz: {
+            emoji: "🚑",
+            icon: "icons/emoji-kriz.png",
+            title: "Kriz Yöneticisi",
+            desc: "Soğukkanlısın, hızlı düşünürsün, baskı altında parlarsın. Herkes panikken sen çözümü buluyorsun. Hastane eczacılığı ya da acil servis tam senlik!"
+        }
+    };
+
+    let current = 0;
+    const scores = { lab: 0, sosyal: 0, akademik: 0, kriz: 0 };
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+        document.getElementById('intro').classList.add('hidden');
+        document.getElementById('quiz').classList.remove('hidden');
+        renderQuestion();
+    });
+
+    function renderQuestion() {
+        const q = questions[current];
+        document.getElementById('progressBar').style.width = ((current) / questions.length * 100) + '%';
+        const wrap = document.getElementById('questionWrap');
+        wrap.innerHTML = `
+            <h2 class="text-xl md:text-2xl font-black mb-6 text-center">${q.q}</h2>
+            <div class="space-y-3">
+                ${q.options.map((o, i) => `<button data-i="${i}" class="option-btn w-full text-left glass-panel border-2 border-transparent rounded-2xl p-4 font-semibold">${o.text}</button>`).join('')}
+            </div>
+        `;
+        wrap.querySelectorAll('.option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const opt = q.options[parseInt(btn.dataset.i, 10)];
+                scores[opt.type]++;
+                current++;
+                if (current < questions.length) {
+                    renderQuestion();
+                } else {
+                    showResult();
+                }
+            });
+        });
+    }
+
+    function showResult() {
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('quiz').classList.add('hidden');
+        const resultEl = document.getElementById('result');
+
+        let topType = 'lab';
+        let topScore = -1;
+        Object.keys(scores).forEach(k => { if (scores[k] > topScore) { topScore = scores[k]; topType = k; } });
+        const r = results[topType];
+
+        resultEl.innerHTML = `
+            <div class="glass-panel rounded-[2rem] p-8 md:p-12 relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-40 h-40 bg-ercupsaRed/10 rounded-full blur-2xl pointer-events-none"></div>
+                <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-ercupsaAccent/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                <span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase mb-6 relative">Test Sonucun</span>
+
+                <div class="w-32 h-32 mx-auto rounded-full flex items-center justify-center text-6xl mb-5 relative shadow-xl" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
+                    ${r.emoji}
+                </div>
+
+                <h2 class="text-3xl md:text-4xl font-black mb-4 relative bg-gradient-to-r from-ercupsaRed to-ercupsaAccent bg-clip-text text-transparent">${r.title}</h2>
+                <p class="text-gray-600 max-w-lg mx-auto leading-relaxed mb-8 relative">${r.desc}</p>
+
+                <div class="border-t border-gray-200 pt-6 mb-6 relative">
+                    <p class="font-bold text-sm mb-1">📸 Sonucunu Instagram hikayende paylaş!</p>
+                    <p class="text-gray-500 text-sm mb-4">Bizi <span class="font-bold text-ercupsaRed">@ercupsa</span> etiketle, biz de seni sayfamızda paylaşalım.</p>
+                    <button id="shareBtn" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white shadow-lg" style="background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)">
+                        <i class="fa-solid fa-share-nodes"></i> Sonucumu Paylaş
+                    </button>
+                </div>
+
+                <div class="flex flex-wrap justify-center gap-3 relative">
+                    <button id="retakeBtn" class="px-6 py-3 rounded-xl bg-gray-100 font-bold"><i class="fa-solid fa-rotate-right mr-2"></i>Tekrar Çöz</button>
+                    <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="px-6 py-3 rounded-xl btn-primary font-bold"><i class="fa-brands fa-whatsapp mr-2"></i>ERCUPSA'ya Katıl</a>
+                </div>
+            </div>
+        `;
+        resultEl.classList.remove('hidden');
+        ercupsaConfetti(resultEl);
+
+        document.getElementById('retakeBtn').addEventListener('click', () => {
+            current = 0;
+            Object.keys(scores).forEach(k => scores[k] = 0);
+            resultEl.classList.add('hidden');
+            document.getElementById('quiz').classList.remove('hidden');
+            renderQuestion();
+        });
+
+        document.getElementById('shareBtn').addEventListener('click', async () => {
+            const shareBtn = document.getElementById('shareBtn');
+            const originalHtml = shareBtn.innerHTML;
+            shareBtn.disabled = true;
+            shareBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Hazırlanıyor...';
+
+            try {
+                const blob = await generateStoryImage(r);
+                const file = new File([blob], 'ercupsa-test-sonucu.png', { type: 'image/png' });
+
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'ERCUPSA - Hangi Eczacı Tipisin?',
+                        text: `Sonucum: ${r.title} ${r.emoji} — @ercupsa'yı etiketleyerek hikayende paylaş!`
+                    });
+                } else {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'ercupsa-test-sonucu.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 2000);
+                    ercupsaToast('Görsel indirildi! Instagram hikayene ekleyip @ercupsa\'yı etiketleyebilirsin 📸');
+                }
+            } catch (e) {
+                // kullanıcı paylaşımı iptal ettiyse veya bir hata oluştuysa sessizce geç
+            } finally {
+                shareBtn.disabled = false;
+                shareBtn.innerHTML = originalHtml;
+            }
+        });
+    }
+
+    function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+        const words = text.split(' ');
+        let line = '';
+        const lines = [];
+        for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+                lines.push(line.trim());
+                line = words[n] + ' ';
+            } else {
+                line = testLine;
+            }
+        }
+        lines.push(line.trim());
+        const startY = y - ((lines.length - 1) * lineHeight) / 2;
+        lines.forEach((l, i) => ctx.fillText(l, x, startY + i * lineHeight));
+    }
+
+    function loadImage(src) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = src;
+        });
+    }
+
+    async function generateStoryImage(result) {
+        const W = 1080, H = 1920;
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+
+        // Arka plan — marka gradienti
+        const bg = ctx.createLinearGradient(0, 0, W, H);
+        bg.addColorStop(0, '#2b0f0f');
+        bg.addColorStop(0.55, '#1A1A1A');
+        bg.addColorStop(1, '#0d0d0d');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, W, H);
+
+        // Dekoratif ışık lekeleri
+        ctx.save();
+        ctx.globalAlpha = 0.28;
+        ctx.filter = 'blur(2px)';
+        ctx.fillStyle = '#E23E4E';
+        ctx.beginPath(); ctx.arc(W - 150, 260, 260, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#A62B2B';
+        ctx.beginPath(); ctx.arc(120, H - 300, 220, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+
+        // Logo (varsa)
+        try {
+            const logo = await loadImage('ercupsa.PNG');
+            const logoSize = 175;
+            const logoY = 245;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(W / 2, logoY, logoSize / 2, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(logo, W / 2 - logoSize / 2, logoY - logoSize / 2, logoSize, logoSize);
+            ctx.restore();
+        } catch (e) {}
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Üst etiket
+        ctx.fillStyle = '#E23E4E';
+        ctx.font = '700 34px Arial, sans-serif';
+        ctx.fillText('E R C U P S A', W / 2, 385);
+
+        // Emoji rozeti
+        const badgeGrad = ctx.createLinearGradient(W / 2 - 150, 560, W / 2 + 150, 860);
+        badgeGrad.addColorStop(0, '#A62B2B');
+        badgeGrad.addColorStop(1, '#E23E4E');
+        ctx.fillStyle = badgeGrad;
+        ctx.beginPath();
+        ctx.arc(W / 2, 710, 160, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.font = '150px Arial, sans-serif';
+        try {
+            const emojiImg = await loadImage(result.icon);
+            const iconSize = 190;
+            ctx.drawImage(emojiImg, W / 2 - iconSize / 2, 710 - iconSize / 2, iconSize, iconSize);
+        } catch (e) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(result.emoji, W / 2, 725);
+        }
+
+        // Alt başlık
+        ctx.fillStyle = 'rgba(255,255,255,0.65)';
+        ctx.font = '700 32px Arial, sans-serif';
+        ctx.fillText('HANGİ ECZACI TİPİSİN? SONUCUM:', W / 2, 970);
+
+        // Sonuç başlığı
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 88px Arial, sans-serif';
+        wrapText(ctx, result.title, W / 2, 1090, 920, 100);
+
+        // Alt bilgi
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = '500 34px Arial, sans-serif';
+        ctx.fillText('Sen de test et 👉 ercupsa.com.tr/test.html', W / 2, 1770);
+
+        ctx.fillStyle = '#E23E4E';
+        ctx.font = '800 42px Arial, sans-serif';
+        ctx.fillText('@ercupsa', W / 2, 1830);
+
+        return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    }
+    </script>
+</body>
+</html>
