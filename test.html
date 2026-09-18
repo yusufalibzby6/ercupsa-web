@@ -47,7 +47,7 @@
                     </div>
                     <div>
                         <span class="font-bold text-xl tracking-tight text-ercupsaDark block leading-none">ERCUPSA</span>
-                        <span class="text-[10px] text-gray-500 font-semibold tracking-wider uppercase">Erciyes University</span>
+                        <span class="text-[10px] text-gray-500 font-semibold tracking-wider">ERCIYES UNIVERSITY</span>
                     </div>
                 </a>
                 <div class="hidden md:flex space-x-8 items-center">
@@ -92,7 +92,7 @@
         <div id="intro" class="text-center">
             <span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Eğlence</span>
             <h1 class="text-4xl md:text-5xl font-black mt-2 title-accent">Hangi Eczacı <span class="bg-gradient-to-r from-ercupsaRed to-ercupsaAccent bg-clip-text text-transparent">Tipisin?</span></h1>
-            <p class="text-gray-500 mt-4 mb-8">5 kısa soru, 1 dakika. Sonunda hangi eczacı tipi olduğunu öğren!</p>
+            <p class="text-gray-500 mt-4 mb-8">6 kısa soru, 1 dakika. Sonunda hangi eczacı tipi olduğunu öğren!</p>
             <button id="startBtn" class="px-8 py-4 rounded-2xl btn-primary font-bold shadow-lg">Teste Başla <i class="fa-solid fa-arrow-right ml-2"></i></button>
         </div>
 
@@ -158,12 +158,21 @@
             ]
         },
         {
-            q: "ERCUPSA etkinliklerinde en çok hangi rolü üstlenirsin?",
+            q: "Bir arkadaşın aniden senden yardım isterse ilk tepkin ne olur?",
             options: [
-                { text: "Organizasyon lojistiğini planlarım", type: "kriz" },
-                { text: "Katılımcılarla kaynaşmayı sağlarım", type: "sosyal" },
-                { text: "Sunum/bilgilendirme kısmını hazırlarım", type: "akademik" },
-                { text: "Yeni bir proje fikri öneririm", type: "lab" }
+                { text: "Hemen yanına gidip pratik bir çözüm üretirim", type: "kriz" },
+                { text: "Önce dinlerim, moral desteği veririm", type: "sosyal" },
+                { text: "Sorunu adım adım analiz ederim", type: "akademik" },
+                { text: "Farklı çözüm yollarını araştırıp denerim", type: "lab" }
+            ]
+        },
+        {
+            q: "Bir grup projesinde sana en çok hangi görev yakışır?",
+            options: [
+                { text: "Planlamayı ve zamanlamayı organize etmek", type: "kriz" },
+                { text: "Ekip içi iletişimi ve motivasyonu sağlamak", type: "sosyal" },
+                { text: "Sunumu/raporu hazırlamak", type: "akademik" },
+                { text: "Yeni fikirler ve yöntemler önermek", type: "lab" }
             ]
         },
         {
@@ -286,7 +295,17 @@
             renderQuestion();
         });
 
+        function isInAppBrowser() {
+            const ua = navigator.userAgent || '';
+            return /Instagram|FBAN|FBAV|Line\/|TikTok|MicroMessenger/i.test(ua);
+        }
+
         document.getElementById('shareBtn').addEventListener('click', async () => {
+            if (isInAppBrowser()) {
+                ercupsaToast('📱 Bu sayfa Instagram\'ın kendi tarayıcısında açık, paylaşımı kısıtlıyor. Sağ üstteki "•••" menüsünden "Tarayıcıda Aç"ı seçip tekrar dene!');
+                return;
+            }
+
             const shareBtn = document.getElementById('shareBtn');
             const originalHtml = shareBtn.innerHTML;
             shareBtn.disabled = true;
