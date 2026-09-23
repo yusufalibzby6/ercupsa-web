@@ -139,6 +139,26 @@ function ercupsaToast(message) {
     }, 3200);
 }
 
+/* Karanlık mod anahtarı */
+function ercupsaInitThemeToggle(selector) {
+    document.querySelectorAll(selector).forEach(btn => {
+        const icon = btn.querySelector('i');
+        function updateIcon() {
+            const isDark = document.documentElement.classList.contains('dark');
+            if (icon) icon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+        }
+        updateIcon();
+        btn.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('ercupsa-theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+            document.querySelectorAll(selector).forEach(b => {
+                const i = b.querySelector('i');
+                if (i) i.className = document.documentElement.classList.contains('dark') ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+            });
+        });
+    });
+}
+
 /* WhatsApp'a Katıl linklerine otomatik konfeti — her sayfada, her buton için ayrı kod gerekmez */
 document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (e) => {

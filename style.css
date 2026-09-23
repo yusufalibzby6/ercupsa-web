@@ -88,3 +88,46 @@ body { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
 details > summary { list-style: none; cursor: pointer; }
 details > summary::-webkit-details-marker { display: none; }
 details[open] .chev { transform: rotate(180deg); }
+
+/* Karanlık mod */
+html.dark body { background-color: #0f0f0f; color: #e5e5e5; }
+html.dark .glass-panel {
+    background: rgba(30, 24, 24, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+html.dark .glass {
+    background: rgba(28, 22, 22, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+html.dark nav.glass-panel,
+html.dark nav.bg-white\/90 { background: rgba(15, 15, 15, 0.9) !important; border-color: rgba(255,255,255,0.08) !important; }
+html.dark .text-ercupsaDark { color: #f2f2f2 !important; }
+html.dark .text-gray-800 { color: #e5e5e5 !important; }
+html.dark .text-gray-700 { color: #d4d4d4 !important; }
+html.dark .text-gray-600 { color: #b5b5b5 !important; }
+html.dark .text-gray-500 { color: #9a9a9a !important; }
+html.dark .text-gray-400 { color: #888 !important; }
+html.dark .bg-white { background-color: #161414 !important; }
+html.dark .bg-slate-50 { background-color: #131111 !important; }
+html.dark .bg-gray-50 { background-color: #1a1717 !important; }
+html.dark .bg-gray-100 { background-color: #201c1c !important; }
+html.dark .border-gray-200 { border-color: rgba(255,255,255,0.1) !important; }
+html.dark .border-gray-100 { border-color: rgba(255,255,255,0.08) !important; }
+html.dark .bg-red-50 { background-color: rgba(166,43,43,0.15) !important; }
+html.dark input, html.dark textarea { background-color: #201c1c; color: #eee; border-color: rgba(255,255,255,0.15) !important; }
+html.dark ::placeholder { color: #888; }
+html.dark .mobile-menu-panel { background: rgba(15,15,15,0.97) !important; }
+
+.theme-toggle { width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; transition: .2s; background: rgba(139,35,35,0.08); color: #8B2323; }
+.theme-toggle:hover { background: rgba(139,35,35,0.16); }
+html.dark .theme-toggle { background: rgba(255,255,255,0.08); color: #f2c9c9; }
+html.dark .theme-toggle:hover { background: rgba(255,255,255,0.15); }
+
+/* Karanlık modda gradient bölüm arka planları (bg-white/bg-slate-50 kuralları bunları yakalamaz, background-image kullanırlar).
+   Not: bg-gradient-to-r kasıtlı olarak dışarıda — o yazı gradient efektleri (bg-clip-text) ve ilerleme çubuğu için kullanılıyor. */
+html.dark .bg-gradient-to-b,
+html.dark .bg-gradient-to-br,
+html.dark .bg-gradient-to-bl {
+    background-image: none !important;
+    background-color: #131111 !important;
+}

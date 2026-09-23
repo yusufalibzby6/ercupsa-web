@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+<script>if(localStorage.getItem("ercupsa-theme")==="dark")document.documentElement.classList.add("dark");</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ERCUPSA | Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu</title>
@@ -19,6 +20,9 @@
 <meta name="twitter:title" content="ERCUPSA | Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu">
 <meta name="twitter:description" content="ERCUPSA, Erciyes Üniversitesi Eczacılık Fakültesi'ne bağlı resmi öğrenci topluluğudur. Etkinlikler, ekibimiz, galeri ve daha fazlası için resmi web sitemizi ziyaret edin.">
 <meta name="twitter:image" content="https://ercupsa.com.tr/og-image.jpg">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -84,13 +88,16 @@
 <a href="galeri.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Galeri</a>
 <a href="sss.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">SSS</a>
 <a href="test.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">🧪 Test</a>
+<a href="iletisim.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">İletişim</a>
+                    <button class="theme-toggle" aria-label="Karanlık mod"><i class="fa-solid fa-moon"></i></button>
                     <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="px-5 py-2.5 rounded-full text-sm font-medium btn-primary flex items-center gap-2">
                         <i class="fa-brands fa-whatsapp"></i> Bize Katıl
                     </a>
                 </div>
 
                 <!-- Mobile Hamburger Button -->
-                <div class="md:hidden flex items-center">
+                <div class="md:hidden flex items-center gap-2">
+                    <button class="theme-toggle" aria-label="Karanlık mod"><i class="fa-solid fa-moon"></i></button>
                     <button id="mobile-menu-button" class="text-gray-800 hover:text-ercupsaRed focus:outline-none p-2 transition">
                         <i class="fa-solid fa-bars text-2xl"></i>
                     </button>
@@ -108,6 +115,7 @@
 <a href="galeri.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Galeri</a>
 <a href="sss.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">SSS</a>
 <a href="test.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">🧪 Test</a>
+<a href="iletisim.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">İletişim</a>
                 <div class="pt-4">
                     <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="w-full text-center px-5 py-4 rounded-xl text-base font-bold btn-primary flex items-center justify-center gap-2 shadow-lg">
                         <i class="fa-brands fa-whatsapp text-xl"></i> WhatsApp'a Katıl
@@ -138,6 +146,46 @@
     </script>
 
     
+
+    <div id="welcomeModal" class="hidden fixed inset-0 z-[200] bg-black/70 items-center justify-center p-4">
+        <div class="glass-panel rounded-3xl max-w-sm w-full p-8 text-center relative shadow-2xl">
+            <button id="closeWelcome" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center text-lg" aria-label="Kapat">&times;</button>
+            <div class="h-16 w-16 rounded-full bg-white flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm mx-auto mb-4">
+                <img src="ercupsa.PNG" alt="ERCUPSA Logo" class="h-full w-full object-cover">
+            </div>
+            <h2 class="text-xl font-black mb-2">ERCUPSA'ya Hoş Geldin! 👋</h2>
+            <p class="text-gray-500 text-sm mb-6">Bizi sosyal medyada takip et, hiçbir gelişmeyi kaçırma!</p>
+            <div class="grid grid-cols-2 gap-3 mb-5">
+                <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" class="flex flex-col items-center gap-2 p-4 rounded-2xl" style="background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)">
+                    <i class="fa-brands fa-instagram text-2xl text-white"></i>
+                    <span class="text-white text-xs font-bold">Instagram</span>
+                </a>
+                <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="flex flex-col items-center gap-2 p-4 rounded-2xl" style="background:linear-gradient(135deg,#25D366,#128C7E)">
+                    <i class="fa-brands fa-whatsapp text-2xl text-white"></i>
+                    <span class="text-white text-xs font-bold">WhatsApp</span>
+                </a>
+            </div>
+            <button id="continueSite" class="text-sm text-gray-400 font-semibold hover:text-ercupsaRed transition">Siteye devam et →</button>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!localStorage.getItem('ercupsa-welcome-seen')) {
+                const modal = document.getElementById('welcomeModal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                const dismiss = () => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                    localStorage.setItem('ercupsa-welcome-seen', '1');
+                };
+                document.getElementById('closeWelcome').addEventListener('click', dismiss);
+                document.getElementById('continueSite').addEventListener('click', dismiss);
+                modal.addEventListener('click', (e) => { if (e.target === modal) dismiss(); });
+                document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dismiss(); });
+            }
+        });
+    </script>
 
     <main class="pt-32 pb-10 lg:pt-40 lg:pb-14 relative band-dark overflow-hidden">
         <div class="absolute -top-24 -right-16 w-96 h-96 bg-ercupsaRed/25 rounded-full blur-3xl pointer-events-none" aria-hidden="true"></div>
@@ -272,7 +320,7 @@ fetch('/api/events').then(r=>r.json()).then(({events=[]})=>{
     // Yaklaşan etkinlikler
     const list=events.filter(e=>e.date>=now).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
     const elEvents=document.getElementById('home-events');
-    if(elEvents) elEvents.innerHTML=list.map(e=>`<a href="etkinlikler.html" class="glass-panel rounded-3xl overflow-hidden hover:-translate-y-1 transition">${e.poster?`<img src="${e.poster}" class="w-full h-44 object-cover">`:''}<div class="p-5"><div class="text-xs font-bold text-ercupsaRed">${e.category||'Etkinlik'}</div><h3 class="font-black text-lg mt-1">${e.title}</h3><p class="text-sm text-gray-500 mt-2">${new Date(e.date+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})}${e.location?' • '+e.location:''}</p></div></a>`).join('')||'<div class="md:col-span-3 text-center text-gray-500 py-8">Yaklaşan etkinlikler yakında burada.</div>';
+    if(elEvents) elEvents.innerHTML=list.map(e=>`<a href="etkinlikler.html" class="glass-panel rounded-3xl overflow-hidden hover:-translate-y-1 transition">${e.poster?`<img src="${e.poster}" class="w-full aspect-[4/5] object-cover">`:''}<div class="p-5"><div class="text-xs font-bold text-ercupsaRed">${e.category||'Etkinlik'}</div><h3 class="font-black text-lg mt-1">${e.title}</h3><p class="text-sm text-gray-500 mt-2">${new Date(e.date+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})}${e.location?' • '+e.location:''}</p></div></a>`).join('')||'<div class="md:col-span-3 text-center text-gray-500 py-8">Yaklaşan etkinlikler yakında burada.</div>';
 
     // Son anılarımız — 4'erli, mümkünse döngülü (aynı veriden besleniyor, ekstra istek yok)
     const photos=events.flatMap(e=>(e.images||[]).map(img=>({url:img.url,eventId:e.id}))).reverse().slice(0,16);
@@ -344,5 +392,5 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.counter').forEach(el=>counterIO.observe(el));
 });
 </script>
-<script src="fun.js"></script><script>document.addEventListener("DOMContentLoaded",()=>ercupsaInitLogoEasterEgg("#logoLink"));</script></body>
+<script src="fun.js"></script><script>document.addEventListener("DOMContentLoaded",()=>{ercupsaInitLogoEasterEgg("#logoLink");ercupsaInitThemeToggle(".theme-toggle");});</script></body>
 </html>

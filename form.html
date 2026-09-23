@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+<script>if(localStorage.getItem("ercupsa-theme")==="dark")document.documentElement.classList.add("dark");</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kayıt Formu | ERCUPSA</title>
@@ -19,6 +20,9 @@
 <meta name="twitter:title" content="Kayıt Formu | ERCUPSA">
 <meta name="twitter:description" content="ERCUPSA etkinliklerine buradan kaydolabilirsin.">
 <meta name="twitter:image" content="https://ercupsa.com.tr/og-image.jpg">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -55,8 +59,11 @@
 <a href="galeri.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Galeri</a>
 <a href="sss.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">SSS</a>
 <a href="test.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">🧪 Test</a>
+<a href="iletisim.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">İletişim</a>
+<button class="theme-toggle" aria-label="Karanlık mod"><i class="fa-solid fa-moon"></i></button>
                 </div>
-                <div class="md:hidden flex items-center">
+                <div class="md:hidden flex items-center gap-2">
+                    <button class="theme-toggle" aria-label="Karanlık mod"><i class="fa-solid fa-moon"></i></button>
                     <button id="mobile-menu-button" class="text-gray-800 hover:text-ercupsaRed focus:outline-none p-2 transition">
                         <i class="fa-solid fa-bars text-2xl"></i>
                     </button>
@@ -72,6 +79,7 @@
 <a href="galeri.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Galeri</a>
 <a href="sss.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">SSS</a>
 <a href="test.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">🧪 Test</a>
+<a href="iletisim.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">İletişim</a>
             </div>
         </div>
     </nav>
@@ -169,5 +177,5 @@
             document.getElementById('formEmpty').classList.remove('hidden');
         });
     </script>
-<script src="fun.js"></script><script>document.addEventListener("DOMContentLoaded",()=>ercupsaInitLogoEasterEgg("#logoLink"));</script></body>
+<script src="fun.js"></script><script>document.addEventListener("DOMContentLoaded",()=>{ercupsaInitLogoEasterEgg("#logoLink");ercupsaInitThemeToggle(".theme-toggle");});</script></body>
 </html>
