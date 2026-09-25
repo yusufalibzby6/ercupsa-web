@@ -114,9 +114,13 @@ html.dark .bg-gray-100 { background-color: #201c1c !important; }
 html.dark .border-gray-200 { border-color: rgba(255,255,255,0.1) !important; }
 html.dark .border-gray-100 { border-color: rgba(255,255,255,0.08) !important; }
 html.dark .bg-red-50 { background-color: rgba(166,43,43,0.15) !important; }
+html.dark .bg-white\/95 { background-color: rgba(15,15,15,0.97) !important; }
+html.dark .bg-white\/90 { background-color: rgba(15,15,15,0.9) !important; }
 html.dark input, html.dark textarea { background-color: #201c1c; color: #eee; border-color: rgba(255,255,255,0.15) !important; }
 html.dark ::placeholder { color: #888; }
 html.dark .mobile-menu-panel { background: rgba(15,15,15,0.97) !important; }
+
+#home-events::-webkit-scrollbar { display: none; }
 
 .theme-toggle { width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; transition: .2s; background: rgba(139,35,35,0.08); color: #8B2323; }
 .theme-toggle:hover { background: rgba(139,35,35,0.16); }
