@@ -15,6 +15,7 @@ const seedEvents = [
     registrationUrl: '',
     poster: '',
     images: [],
+    published: true,
     createdAt: '2026-08-01T00:00:00.000Z'
   },
   {
@@ -28,6 +29,7 @@ const seedEvents = [
     registrationUrl: '',
     poster: '',
     images: [],
+    published: true,
     createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
@@ -41,6 +43,7 @@ const seedEvents = [
     registrationUrl: '',
     poster: '',
     images: [],
+    published: true,
     createdAt: '2026-08-01T00:00:00.000Z'
   }
 ];
@@ -69,7 +72,19 @@ export default async (req) => {
 
   if (method === 'GET') {
     const events = await readEvents();
-    return Response.json({ events });
+    const url = new URL(req.url);
+
+    if (url.searchParams.get('admin') === 'true') {
+      if (!authorized(req)) {
+        return Response.json(
+          { error: 'Yetkisiz erişim.' },
+          { status: 401 }
+        );
+      }
+      return Response.json({ events });
+    }
+
+    return Response.json({ events: events.filter((e) => e.published !== false) });
   }
 
   if (
@@ -113,6 +128,7 @@ export default async (req) => {
       registrationUrl: String(event.registrationUrl || '').trim(),
       poster: String(event.poster || '').trim(),
       images: Array.isArray(event.images) ? event.images : [],
+      published: event.published !== false,
       createdAt: event.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
