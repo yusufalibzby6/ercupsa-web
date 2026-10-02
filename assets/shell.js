@@ -21,7 +21,7 @@ document.querySelectorAll("footer").forEach((f) => {
   f.innerHTML =
     "<p>© " +
     new Date().getFullYear() +
-    ' ERCUPSA · Erciyes Üniversitesi Eczacılık Öğrenci Topluluğu</p><div class="flex flex-wrap gap-4 justify-center mt-4 text-sm"><a href="hakkimizda.html">Hakkımızda</a><a href="ekip.html">Ekibimiz</a><a href="sss.html">SSS</a><a href="iletisim.html">İletişim</a></div>';
+    ' ERCUPSA · Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu</p><div class="flex flex-wrap gap-4 justify-center mt-4 text-sm"><a href="hakkimizda.html">Hakkımızda</a><a href="ekip.html">Ekibimiz</a><a href="sss.html">SSS</a><a href="iletisim.html">İletişim</a></div>';
 });
 try {
   if (localStorage.getItem("ercupsa-theme") === "dark")

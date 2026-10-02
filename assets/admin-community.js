@@ -1,5 +1,11 @@
 import QRCode from "qrcode";
 import { $, escape, api, status } from "./common.js";
+import {
+  ticketCard,
+  ticketSheets,
+  printTickets,
+  TICKETS_PER_PAGE,
+} from "./ticket-print.js";
 let data = { members: [], submissions: [], batches: [] };
 const tabs = ["events", "members", "suggestions", "experiences", "tickets"];
 function tab(name) {
@@ -153,24 +159,32 @@ async function hash(code) {
 async function showBatch(id) {
   const d = await api("/api/community?action=batch&id=" + id);
   $("ticketOutput").dataset.batch = id;
-  const cards = [];
+  const cards = [],
+    controls = [];
   for (const code of d.codes) {
     const digest = await hash(code),
       ticket = d.tickets.find((t) => t.code_hash === digest);
     const qr = await QRCode.toDataURL(
       location.origin + "/biletler.html?ticket=" + encodeURIComponent(code),
+      { width: 320, margin: 4, errorCorrectionLevel: "M" },
     );
-    cards.push(
-      `<article class="ticket card rounded-xl p-4 text-center"><h3 class="font-bold">${escape(d.event_title)}</h3><img src="${qr}" alt="Bilet QR kodu" class="w-32 mx-auto"><p class="font-mono text-xs break-all">${code}</p><p>${ticket?.revoked ? "İptal" : ticket?.claimed_at ? "Kullanıldı" : "Kullanılmadı"}</p>${ticket && !ticket.revoked && !ticket.claimed_at ? `<button class="no-print text-red-700" data-revoke="${ticket.id}">İptal et</button>` : ""}</article>`,
+    cards.push(ticketCard({ code, qr, eventTitle: d.event_title, ticket }));
+    controls.push(
+      `<div class="ticket-controls no-print"><span>${ticket?.revoked ? "İptal" : ticket?.claimed_at ? "Kullanıldı" : "Kullanılmadı"}</span>${ticket && !ticket.revoked && !ticket.claimed_at ? `<button class="text-red-700" data-revoke="${ticket.id}">İptal et</button>` : ""}</div>`,
     );
   }
   $("ticketOutput").innerHTML =
-    '<button id="printTickets" class="no-print btn-primary rounded-xl p-3 mb-4">Yazdır / PDF olarak kaydet</button><div class="ticket-grid grid sm:grid-cols-3 gap-4">' +
-    cards.join("") +
-    "</div>";
-  $("printTickets").onclick = () => {
-    document.body.classList.add("printing-tickets");
-    window.print();
-    document.body.classList.remove("printing-tickets");
+    `<div class="no-print mb-4"><button id="printTickets" class="btn-primary rounded-xl p-3 font-bold">Çıktı oluştur</button><p class="mt-3 text-sm text-gray-500">${cards.length} bilet · ${Math.ceil(cards.length / TICKETS_PER_PAGE)} A4 sayfa. Her sayfada en fazla 10 bilet; kesim çizgileri hazır.</p></div>` +
+    ticketSheets(cards, controls);
+  $("printTickets").onclick = async () => {
+    const button = $("printTickets");
+    button.disabled = true;
+    try {
+      await printTickets(cards, d.event_title);
+    } catch {
+      status("Çıktı hazırlanamadı. Lütfen tekrar deneyin.", true);
+    } finally {
+      button.disabled = false;
+    }
   };
 }

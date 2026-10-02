@@ -206,6 +206,9 @@ test("logo is restored and public footers contain no admin entry", async ({
       "ercupsa.PNG",
     );
     await expect(page.locator("footer a[href='admin.html']")).toHaveCount(0);
+    await expect(page.locator("footer")).toContainText(
+      "Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu",
+    );
   }
 });
 test("password signup saves names and login persists without confirmation email", async ({
@@ -413,7 +416,7 @@ test("admin membership editing, moderation, 50 QR tickets and print action", asy
   await page.locator('[data-tab="tickets"]').click();
   await page.locator("#ticketCount").fill("50");
   await page.getByRole("button", { name: "Kodları oluştur" }).click();
-  await expect(page.locator(".ticket img")).toHaveCount(50);
+  await expect(page.locator(".ticket-qr")).toHaveCount(50);
   await expect(page.locator("#status")).toContainText("50 bilet oluşturuldu");
   await page.evaluate(() => {
     window.print = () => {
@@ -421,5 +424,55 @@ test("admin membership editing, moderation, 50 QR tickets and print action", asy
     };
   });
   await page.locator("#printTickets").click();
-  expect(await page.evaluate(() => window.printCalled)).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.printCalled)).toBe(true);
+  await expect(page.locator("#ticketPrintRoot .ticket-page")).toHaveCount(5);
+  await expect(page.locator("#ticketPrintRoot .ticket-logo")).toHaveCount(50);
+  await expect(
+    page.locator("#ticketPrintRoot .ticket-slogan").first(),
+  ).toContainText("hediyeleri kap!");
+  await page.pdf({
+    path: "/workspace/.onboarding-runtime/tickets-50.pdf",
+    preferCSSPageSize: true,
+    printBackground: true,
+    displayHeaderFooter: false,
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+  await expect(page.locator("body")).not.toHaveClass(/printing-tickets/);
+});
+test("A4 ticket layout keeps long titles and the final ticket complete", async ({
+  page,
+}) => {
+  await page.goto("/admin.html");
+  await page.evaluate(async () => {
+    const { ticketCard, printTickets } =
+      await import("/assets/ticket-print.js");
+    const sample = document.createElement("canvas");
+    sample.width = 10;
+    sample.height = 10;
+    const cards = Array.from({ length: 11 }, (_, i) =>
+      ticketCard({
+        code: "ERC-" + i.toString(16).padStart(24, "0"),
+        qr: sample.toDataURL(),
+        eventTitle: "W".repeat(150),
+      }),
+    );
+    window.print = () => {
+      window.printCalled = true;
+    };
+    await printTickets(cards, "Uzun başlık testi");
+  });
+  await expect(page.locator("#ticketPrintRoot .ticket-page")).toHaveCount(2);
+  expect(
+    await page
+      .locator("#ticketPrintRoot .ticket-title")
+      .evaluateAll((els) =>
+        els.every((e) => e.scrollHeight <= e.clientHeight + 1),
+      ),
+  ).toBe(true);
+  await page.pdf({
+    path: "/workspace/.onboarding-runtime/tickets-11.pdf",
+    preferCSSPageSize: true,
+    printBackground: true,
+    displayHeaderFooter: false,
+  });
 });

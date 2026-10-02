@@ -1,0 +1,201 @@
+/* A4: two columns, five rows. Measurements include borders and padding. */
+.ticket-page {
+  margin: 20px 0;
+}
+.ticket-page-label {
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 13px;
+}
+.ticket-sheet {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4mm;
+  width: 190mm;
+  max-width: 100%;
+}
+.ticket-cell {
+  min-width: 0;
+}
+.ticket {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 27mm;
+  gap: 3mm;
+  height: 49mm;
+  padding: 3mm;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 0.25mm dashed #94a3b8;
+  background: #fff;
+  color: #172033;
+  font-family: Arial, sans-serif;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.ticket-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ticket-brand {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  flex: 0 0 11mm;
+}
+.ticket-logo {
+  width: 12mm;
+  height: 11mm;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.ticket-brand strong {
+  display: block;
+  color: #982727;
+  font-size: 13px;
+  letter-spacing: 0.7px;
+}
+.ticket-brand span {
+  display: block;
+  margin-top: 1mm;
+  color: #64748b;
+  font-size: 8px;
+}
+.ticket-title {
+  margin: 2mm 0 1mm;
+  height: 18mm;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.16;
+  color: #8b2323;
+}
+.ticket-slogan {
+  margin: auto 0 0;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #475569;
+}
+.ticket-stub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-left: 0.25mm dashed #cbd5e1;
+  padding-left: 2mm;
+  box-sizing: border-box;
+}
+.ticket-qr {
+  width: 26mm;
+  height: 26mm;
+  max-width: none;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+.ticket-code {
+  margin: 1.5mm 0 1mm;
+  max-width: 25mm;
+  font: 8px/1.2 monospace;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.ticket-state {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-align: center;
+}
+.ticket-controls {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  gap: 8px;
+  font-size: 12px;
+}
+#ticketPrintRoot {
+  display: none;
+}
+@media (max-width: 620px) {
+  .ticket-sheet {
+    grid-template-columns: 1fr;
+    width: 93mm;
+  }
+}
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+@media print {
+  body.printing-tickets {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #172033 !important;
+  }
+  body.printing-tickets > :not(#ticketPrintRoot) {
+    display: none !important;
+  }
+  body.printing-tickets #ticketPrintRoot {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  #ticketPrintRoot .no-print {
+    display: none !important;
+  }
+  #ticketPrintRoot .ticket-page {
+    margin: 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: page;
+    page-break-after: always;
+  }
+  #ticketPrintRoot .ticket-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  #ticketPrintRoot .ticket-sheet {
+    width: 190mm;
+    max-width: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(5, 49mm);
+    gap: 4mm;
+  }
+  #ticketPrintRoot .ticket-cell,
+  #ticketPrintRoot .ticket {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  #ticketPrintRoot .ticket {
+    box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+/* Measure long titles at their printed width before opening the print dialog. */
+#ticketPrintRoot.preparing-print {
+  display: block;
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 190mm;
+  visibility: hidden;
+}
+#ticketPrintRoot.preparing-print .ticket-sheet {
+  width: 190mm;
+  max-width: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media print {
+  body.printing-tickets #ticketPrintRoot {
+    position: static !important;
+    visibility: visible !important;
+  }
+}
+
+.ticket-code span {
+  display: block;
+  white-space: nowrap;
+}
