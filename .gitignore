@@ -1,0 +1,12 @@
+node_modules/
+.netlify/
+.env
+.env.*
+!.env.example
+test-results/
+playwright-report/
+dist/
+assets/*.bundle.js
+assets/tailwind.css
+assets/vendor/
+assets/webfonts/

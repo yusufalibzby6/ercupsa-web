@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<script>if(localStorage.getItem("ercupsa-theme")==="dark")document.documentElement.classList.add("dark");</script>
+<script src="assets/form-inline-1.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kayıt Formu | ERCUPSA</title>
@@ -28,73 +28,17 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="icon" href="favicon.ico">
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = { theme: { extend: { colors: { ercupsaRed: '#8B2323', ercupsaAccent: '#E23E4E', ercupsaDark: '#1A1A1A' } } } }
-    </script>
+    <link rel="stylesheet" href="assets/tailwind.css">
+    <link rel="stylesheet" href="assets/vendor/fontawesome.css">
+
+
     <link rel="stylesheet" href="style.css">
-</head>
+<script type="module" src="assets/shell.js"></script></head>
 <body class="text-gray-800 antialiased">
 
     <!-- Header / Navbar -->
-    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-20">
-                <a href="index.html" id="logoLink" class="flex items-center gap-3">
-                    <div class="h-12 w-12 rounded-full bg-white flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
-                         <img src="ercupsa.PNG" alt="ERCUPSA Logo" class="h-full w-full object-cover">
-                    </div>
-                    <div>
-                        <span class="font-bold text-xl tracking-tight text-ercupsaDark block leading-none">ERCUPSA</span>
-                        <span class="text-[10px] text-gray-500 font-semibold tracking-wider">ERCIYES UNIVERSITY</span>
-                    </div>
-                </a>
-                <div class="hidden md:flex space-x-8 items-center">
-                    <a href="index.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Ana Sayfa</a>
-<a href="hakkimizda.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Hakkımızda</a>
-<a href="ekip.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Ekibimiz (20)</a>
-<a href="etkinlikler.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Etkinlikler</a>
-<a href="galeri.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Galeri</a>
-<a href="sss.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">SSS</a>
-<a href="test.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">🧪 Test</a>
-<a href="iletisim.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">İletişim</a>
-<button class="theme-toggle" aria-label="Karanlık mod"><i class="fa-solid fa-moon"></i></button>
-                </div>
-                <div class="md:hidden flex items-center gap-2">
-                    <button class="theme-toggle" aria-label="Karanlık mod"><i class="fa-solid fa-moon"></i></button>
-                    <button id="mobile-menu-button" class="text-gray-800 hover:text-ercupsaRed focus:outline-none p-2 transition">
-                        <i class="fa-solid fa-bars text-2xl"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-        <div id="mobile-menu" class="hidden md:hidden bg-white/95 backdrop-blur-xl border-t border-gray-200 absolute w-full shadow-2xl transition-all duration-300">
-            <div class="px-4 pt-4 pb-8 space-y-2">
-                <a href="index.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Ana Sayfa</a>
-<a href="hakkimizda.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Hakkımızda</a>
-<a href="ekip.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Ekibimiz (20)</a>
-<a href="etkinlikler.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Etkinlikler</a>
-<a href="galeri.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Galeri</a>
-<a href="sss.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">SSS</a>
-<a href="test.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">🧪 Test</a>
-<a href="iletisim.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">İletişim</a>
-            </div>
-        </div>
-    </nav>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const btn = document.getElementById('mobile-menu-button');
-            const menu = document.getElementById('mobile-menu');
-            const icon = btn.querySelector('i');
-            btn.addEventListener('click', () => {
-                menu.classList.toggle('hidden');
-                if(menu.classList.contains('hidden')) { icon.classList.remove('fa-xmark'); icon.classList.add('fa-bars'); }
-                else { icon.classList.remove('fa-bars'); icon.classList.add('fa-xmark'); }
-            });
-        });
-    </script>
+    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50"><a href="index.html">ERCUPSA</a><a href="etkinlikler.html">Etkinlikler</a><a href="topluluk.html">Topluluk</a><a href="uyeler.html">Aktif Üyelerimiz</a><a href="biletler.html">Biletlerim</a></nav>
+
 
     <main class="pt-28 pb-16 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div id="formHead" class="text-center mb-6">
@@ -117,65 +61,12 @@
         <div id="formFallback" class="glass-panel rounded-3xl p-10 text-center hidden">
             <i class="fa-solid fa-arrow-up-right-from-square text-4xl text-gray-300 mb-4"></i>
             <p class="text-gray-600 font-semibold mb-6">Bu form site içinde gösterilemiyor, ama tek tıkla açabilirsin.</p>
-            <a id="fallbackLink" href="#" target="_blank" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl btn-primary font-bold">Formu Aç</a>
+            <a id="fallbackLink" href="#" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl btn-primary font-bold">Formu Aç</a>
         </div>
     </main>
 
-    <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center">
-        <p class="text-gray-400 text-sm">&copy; 2026 Erciyes University Pharmaceutical Students Association (ERCUPSA).</p>
-        <p class="text-gray-500 text-xs mt-2">Site tasarımı: Yusuf Ali Bozbay</p>
-    </footer>
+    <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center"><p>ERCUPSA · Erciyes Üniversitesi Eczacılık Öğrenci Topluluğu</p><a href="iletisim.html">İletişim</a></footer>
 
-    <script>
-        function embedInfo(url){
-            try{
-                const u = new URL(url);
-                if(u.hostname.includes('docs.google.com') && u.pathname.includes('/forms/')){
-                    u.searchParams.set('embedded','true');
-                    return { src: u.toString(), ok: true };
-                }
-                if(u.hostname === 'tally.so' && u.pathname.startsWith('/r/')){
-                    const id = u.pathname.split('/r/')[1];
-                    return { src: `https://tally.so/embed/${id}?hideTitle=1&alignLeft=1&transparentBackground=1&dynamicHeight=1`, ok: true };
-                }
-            }catch(e){}
-            return { src: url, ok: false };
-        }
-
-        fetch('/api/events').then(r=>r.json()).then(({events=[]})=>{
-            const now = new Date().toISOString().slice(0,10);
-            const params = new URLSearchParams(location.search);
-            const requestedId = params.get('event');
-
-            let target = null;
-            if(requestedId){
-                target = events.find(e => e.id === requestedId && e.registrationUrl);
-            }
-            if(!target){
-                target = events
-                    .filter(e => e.date >= now && e.registrationUrl)
-                    .sort((a,b) => a.date.localeCompare(b.date))[0];
-            }
-
-            if(!target){
-                document.getElementById('formEmpty').classList.remove('hidden');
-                return;
-            }
-
-            document.getElementById('formTitle').textContent = target.title;
-            document.getElementById('formSub').textContent = target.category ? target.category : '';
-
-            const info = embedInfo(target.registrationUrl);
-            if(info.ok){
-                document.getElementById('formFrame').src = info.src;
-                document.getElementById('formWrap').classList.remove('hidden');
-            } else {
-                document.getElementById('fallbackLink').href = target.registrationUrl;
-                document.getElementById('formFallback').classList.remove('hidden');
-            }
-        }).catch(()=>{
-            document.getElementById('formEmpty').classList.remove('hidden');
-        });
-    </script>
-<script src="fun.js"></script><script>document.addEventListener("DOMContentLoaded",()=>{ercupsaInitLogoEasterEgg("#logoLink");ercupsaInitThemeToggle(".theme-toggle");});</script></body>
+    <script src="assets/form-inline-2.js"></script>
+<script src="fun.js"></script><script src="assets/form-inline-3.js"></script></body>
 </html>

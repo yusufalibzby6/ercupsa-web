@@ -1,6 +1,8 @@
+function ercupsaEscape(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 /* ERCUPSA — eğlenceli efektler: konfeti + logo easter egg */
 
 function ercupsaConfetti(originEl) {
+    if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
     const colors = ['#A62B2B', '#E23E4E', '#F2994A', '#ffffff', '#8B2323'];
     const canvas = document.createElement('canvas');
     canvas.style.position = 'fixed';
@@ -88,6 +90,7 @@ function ercupsaInitLogoEasterEgg(selector) {
 }
 
 function ercupsaEmojiRain() {
+    if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
     const emojis = ['💊', '🧪', '⚗️', '🩺', '🔬'];
     for (let i = 0; i < 26; i++) {
         const el = document.createElement('div');

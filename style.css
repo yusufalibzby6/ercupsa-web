@@ -135,3 +135,10 @@ html.dark .bg-gradient-to-bl {
     background-image: none !important;
     background-color: #131111 !important;
 }
+button:disabled { opacity:.6; cursor:wait; }
+:focus-visible { outline:3px solid #E23E4E; outline-offset:3px; }
+@media(max-width:767px) { #siteMenu:not(.hidden) {display:flex;position:absolute;top:70px;left:0;right:0;padding:1.5rem;background:#fff;flex-direction:column;align-items:flex-start;box-shadow:0 8px 20px #0002;} .dark #siteMenu{background:#111827;} }
+@media(prefers-reduced-motion:reduce){ *,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important;} }
+@media print {nav,header,footer,.no-print{display:none!important} .ticket-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.ticket{break-inside:avoid;border:1px dashed #777;padding:12px;text-align:center}.ticket img{width:110px;margin:auto} body{background:white!important;color:black!important} }
+@media print{body.printing-tickets main>*,body.printing-tickets #app>*,body.printing-tickets #ticketsTab>*{display:none!important}body.printing-tickets #app,body.printing-tickets #ticketsTab,body.printing-tickets #ticketOutput,body.printing-tickets main{display:block!important;padding:0!important}body.printing-tickets #ticketOutput .no-print{display:none!important}}
+[hidden] {display:none!important;}

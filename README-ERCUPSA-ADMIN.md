@@ -19,3 +19,7 @@ Bu sürüm, Netlify üzerinde çalışan küçük bir içerik yönetim sistemi e
 
 ## Güvenlik
 `ADMIN_PASSWORD` sadece Netlify environment variable olarak tutulur. Cloudinary API secret kesinlikle frontend'e koyulmaz. Cloudinary unsigned preset'inizi sadece görsel yüklemeye izin verecek şekilde sınırlandırın.
+
+## Yeni topluluk ve bilet sistemi
+
+Supabase, e-posta doğrulaması, üye listesi, moderasyon ve bilet kurulumu için [SUPABASE-KURULUM.md](SUPABASE-KURULUM.md) belgesini izleyin. Parolalar artık tarayıcı depolamasında tutulmaz. `npm ci`, `npm run build` ve `npm test` kullanılabilir.

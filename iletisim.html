@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<script>if(localStorage.getItem("ercupsa-theme")==="dark")document.documentElement.classList.add("dark");</script>
+<script src="assets/iletisim-inline-1.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>İletişim | ERCUPSA</title>
@@ -27,81 +27,17 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="icon" href="favicon.ico">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = { theme: { extend: { colors: { ercupsaRed: '#8B2323', ercupsaAccent: '#E23E4E', ercupsaDark: '#1A1A1A' } } } }
-    </script>
+    <link rel="stylesheet" href="assets/tailwind.css">
+    <link rel="stylesheet" href="assets/vendor/fontawesome.css">
+
+
     <link rel="stylesheet" href="style.css">
-</head>
+<script type="module" src="assets/shell.js"></script></head>
 <body class="text-gray-800 antialiased">
 
-    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-20">
-                <a href="index.html" id="logoLink" class="flex items-center gap-3">
-                    <div class="h-12 w-12 rounded-full bg-white flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
-                         <img src="ercupsa.PNG" alt="ERCUPSA Logo" class="h-full w-full object-cover">
-                    </div>
-                    <div>
-                        <span class="font-bold text-xl tracking-tight text-ercupsaDark block leading-none">ERCUPSA</span>
-                        <span class="text-[10px] text-gray-500 font-semibold tracking-wider">ERCIYES UNIVERSITY</span>
-                    </div>
-                </a>
-                <div class="hidden md:flex space-x-8 items-center">
-                    <a href="index.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Ana Sayfa</a>
-<a href="hakkimizda.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Hakkımızda</a>
-<a href="ekip.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Ekibimiz (20)</a>
-<a href="etkinlikler.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Etkinlikler</a>
-<a href="galeri.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Galeri</a>
-<a href="sss.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">SSS</a>
-<a href="test.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">🧪 Test</a>
-<a href="iletisim.html" class="text-sm font-bold text-ercupsaRed">İletişim</a>
-                    <button class="theme-toggle" aria-label="Karanlık mod"><i class="fa-solid fa-moon"></i></button>
-                    <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="px-5 py-2.5 rounded-full text-sm font-medium btn-primary flex items-center gap-2">
-                        <i class="fa-brands fa-whatsapp"></i> Bize Katıl
-                    </a>
-                </div>
-                <div class="md:hidden flex items-center gap-2">
-                    <button class="theme-toggle" aria-label="Karanlık mod"><i class="fa-solid fa-moon"></i></button>
-                    <button id="mobile-menu-button" class="text-gray-800 hover:text-ercupsaRed focus:outline-none p-2 transition">
-                        <i class="fa-solid fa-bars text-2xl"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-        <div id="mobile-menu" class="hidden md:hidden bg-white/95 backdrop-blur-xl border-t border-gray-200 absolute w-full shadow-2xl transition-all duration-300 mobile-menu-panel">
-            <div class="px-4 pt-4 pb-8 space-y-2">
-                <a href="index.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Ana Sayfa</a>
-<a href="hakkimizda.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Hakkımızda</a>
-<a href="ekip.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Ekibimiz (20)</a>
-<a href="etkinlikler.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Etkinlikler</a>
-<a href="galeri.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Galeri</a>
-<a href="sss.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">SSS</a>
-<a href="test.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">🧪 Test</a>
-<a href="iletisim.html" class="block px-4 py-3 rounded-xl text-base font-bold text-ercupsaRed bg-red-50">İletişim</a>
-                <div class="pt-4">
-                    <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="w-full text-center px-5 py-4 rounded-xl text-base font-bold btn-primary flex items-center justify-center gap-2 shadow-lg">
-                        <i class="fa-brands fa-whatsapp text-xl"></i> WhatsApp'a Katıl
-                    </a>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50"><a href="index.html">ERCUPSA</a><a href="etkinlikler.html">Etkinlikler</a><a href="topluluk.html">Topluluk</a><a href="uyeler.html">Aktif Üyelerimiz</a><a href="biletler.html">Biletlerim</a></nav>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const btn = document.getElementById('mobile-menu-button');
-            const menu = document.getElementById('mobile-menu');
-            const icon = btn.querySelector('i');
-            btn.addEventListener('click', () => {
-                menu.classList.toggle('hidden');
-                if(menu.classList.contains('hidden')) { icon.classList.remove('fa-xmark'); icon.classList.add('fa-bars'); }
-                else { icon.classList.remove('fa-bars'); icon.classList.add('fa-xmark'); }
-            });
-        });
-    </script>
+
 
     <main class="pt-32 pb-20 max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center mb-10">
@@ -145,43 +81,15 @@
         </div>
 
         <p class="text-center text-gray-400 text-sm mt-8">
-            Daha hızlı ulaşmak istersen <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="text-ercupsaRed font-bold">WhatsApp'tan</a> ya da <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" class="text-ercupsaRed font-bold">Instagram'dan</a> da yazabilirsin.
+            Daha hızlı ulaşmak istersen <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" rel="noopener noreferrer" class="text-ercupsaRed font-bold">WhatsApp'tan</a> ya da <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer" class="text-ercupsaRed font-bold">Instagram'dan</a> da yazabilirsin.
         </p>
     </main>
 
-    <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center">
-        <p class="text-gray-400 text-sm">&copy; 2026 Erciyes University Pharmaceutical Students Association (ERCUPSA).</p>
-        <p class="text-gray-500 text-xs mt-2">Site tasarımı: Yusuf Ali Bozbay</p>
-    </footer>
+    <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center"><p>ERCUPSA · Erciyes Üniversitesi Eczacılık Öğrenci Topluluğu</p><a href="iletisim.html">İletişim</a></footer>
 
-    <script>
-        document.getElementById('contactForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-            const form = e.target;
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Gönderiliyor...';
-
-            const data = new FormData(form);
-            fetch('/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams(data).toString()
-            })
-                .then(() => {
-                    form.classList.add('hidden');
-                    document.getElementById('successMsg').classList.remove('hidden');
-                    ercupsaConfetti(document.getElementById('successMsg'));
-                })
-                .catch(() => {
-                    document.getElementById('errorMsg').classList.remove('hidden');
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Gönder';
-                });
-        });
-    </script>
+    <script src="assets/iletisim-inline-2.js"></script>
 
     <script src="fun.js"></script>
-    <script>document.addEventListener("DOMContentLoaded",()=>{ercupsaInitLogoEasterEgg("#logoLink");ercupsaInitThemeToggle(".theme-toggle");});</script>
+    <script src="assets/iletisim-inline-3.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<script>if(localStorage.getItem("ercupsa-theme")==="dark")document.documentElement.classList.add("dark");</script>
+<script src="assets/ekip-inline-1.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ekibimiz | ERCUPSA</title>
@@ -28,96 +28,19 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="icon" href="favicon.ico">
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = { theme: { extend: { colors: { ercupsaRed: '#8B2323', ercupsaAccent: '#E23E4E', ercupsaDark: '#1A1A1A' } } } }
-    </script>
+    <link rel="stylesheet" href="assets/tailwind.css">
+    <link rel="stylesheet" href="assets/vendor/fontawesome.css">
+
+
     <link rel="stylesheet" href="style.css">
-</head>
+<script type="module" src="assets/shell.js"></script></head>
 <body class="text-gray-800 antialiased">
-    
+
     <!-- Header / Navbar -->
-    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-20">
-                <!-- Logo -->
-                <a href="index.html" id="logoLink" class="flex items-center gap-3">
-                    <div class="h-12 w-12 rounded-full bg-white flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
-                         <img src="ercupsa.PNG" alt="ERCUPSA Logo" class="h-full w-full object-cover">
-                    </div>
-                    <div>
-                        <span class="font-bold text-xl tracking-tight text-ercupsaDark block leading-none">ERCUPSA</span>
-                        <span class="text-[10px] text-gray-500 font-semibold tracking-wider">ERCIYES UNIVERSITY</span>
-                    </div>
-                </a>
-                
-                <!-- Desktop Menu -->
-                <div class="hidden md:flex space-x-8 items-center">
-                    <a href="index.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Ana Sayfa</a>
-<a href="hakkimizda.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Hakkımızda</a>
-<a href="ekip.html" class="text-sm font-bold text-ercupsaRed">Ekibimiz (20)</a>
-<a href="etkinlikler.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Etkinlikler</a>
-<a href="galeri.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">Galeri</a>
-<a href="sss.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">SSS</a>
-<a href="test.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">🧪 Test</a>
-<a href="iletisim.html" class="text-sm font-medium text-gray-600 hover:text-ercupsaRed transition">İletişim</a>
-                    <button class="theme-toggle" aria-label="Karanlık mod"><i class="fa-solid fa-moon"></i></button>
-                    <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="px-5 py-2.5 rounded-full text-sm font-medium btn-primary flex items-center gap-2">
-                        <i class="fa-brands fa-whatsapp"></i> Bize Katıl
-                    </a>
-                </div>
-
-                <!-- Mobile Hamburger Button -->
-                <div class="md:hidden flex items-center gap-2">
-                    <button class="theme-toggle" aria-label="Karanlık mod"><i class="fa-solid fa-moon"></i></button>
-                    <button id="mobile-menu-button" class="text-gray-800 hover:text-ercupsaRed focus:outline-none p-2 transition">
-                        <i class="fa-solid fa-bars text-2xl"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Mobile Menu Dropdown (Hidden by default) -->
-        <div id="mobile-menu" class="hidden md:hidden bg-white/95 backdrop-blur-xl border-t border-gray-200 absolute w-full shadow-2xl transition-all duration-300">
-            <div class="px-4 pt-4 pb-8 space-y-2">
-                <a href="index.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Ana Sayfa</a>
-<a href="hakkimizda.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Hakkımızda</a>
-<a href="ekip.html" class="block px-4 py-3 rounded-xl text-base font-bold text-ercupsaRed bg-red-50">Ekibimiz (20)</a>
-<a href="etkinlikler.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Etkinlikler</a>
-<a href="galeri.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">Galeri</a>
-<a href="sss.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">SSS</a>
-<a href="test.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">🧪 Test</a>
-<a href="iletisim.html" class="block px-4 py-3 rounded-xl text-base font-medium text-gray-700 hover:text-ercupsaRed hover:bg-gray-50 transition">İletişim</a>
-                <div class="pt-4">
-                    <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" class="w-full text-center px-5 py-4 rounded-xl text-base font-bold btn-primary flex items-center justify-center gap-2 shadow-lg">
-                        <i class="fa-brands fa-whatsapp text-xl"></i> WhatsApp'a Katıl
-                    </a>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50"><a href="index.html">ERCUPSA</a><a href="etkinlikler.html">Etkinlikler</a><a href="topluluk.html">Topluluk</a><a href="uyeler.html">Aktif Üyelerimiz</a><a href="biletler.html">Biletlerim</a></nav>
 
     <!-- Script for Mobile Menu Toggle -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const btn = document.getElementById('mobile-menu-button');
-            const menu = document.getElementById('mobile-menu');
-            const icon = btn.querySelector('i');
 
-            btn.addEventListener('click', () => {
-                menu.classList.toggle('hidden');
-                if(menu.classList.contains('hidden')) {
-                    icon.classList.remove('fa-xmark');
-                    icon.classList.add('fa-bars');
-                } else {
-                    icon.classList.remove('fa-bars');
-                    icon.classList.add('fa-xmark');
-                }
-            });
-        });
-    </script>
 
     <main class="pt-32 pb-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center mb-16 pt-8">
@@ -125,11 +48,11 @@
             <p class="text-gray-600 max-w-2xl mx-auto text-base md:text-lg">Birliğimizi geleceğe taşıyan, projelerimizi hayata geçiren 20 kişilik yönetim ve koordinasyon ekibimiz.</p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            
+
     <!-- Danışman Hoca -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group sm:col-span-2 md:col-span-3 lg:col-span-4">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#1A1A1A,#8B2323)">
-            <img src="danisman-hoca.jpg" alt="Danışman Hoca" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="danisman-hoca.jpg" alt="Danışman Hoca" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Arş. Gör. Dr. Kübra Uzun</h3>
         <p class="text-ercupsaDark font-bold text-xs mt-1 uppercase tracking-wider">Danışman Hoca</p>
@@ -138,79 +61,79 @@
     <!-- Üye 1 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip1.JPG" alt="Yusuf Ali Bozbay" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip1.JPG" alt="Yusuf Ali Bozbay" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Yusuf Ali Bozbay</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Başkan</p>
     </div>
-    
+
     <!-- Üye 2 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip2.jpg" alt="Göknur Çifçi" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip2.jpg" alt="Göknur Çifçi" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Göknur Çifçi</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Başkan Yardımcısı</p>
     </div>
-    
+
     <!-- Üye 3 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip3.jpg" alt="Ayşenur Durdu" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip3.jpg" alt="Ayşenur Durdu" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Ayşenur Durdu</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Yönetim Kurulu Üyesi</p>
     </div>
-    
+
     <!-- Üye 4 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip4.jpg" alt="Hayrunnisa Kaya" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip4.jpg" alt="Hayrunnisa Kaya" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Hayrunnisa Kaya</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Yönetim Kurulu Üyesi</p>
     </div>
-    
+
     <!-- Üye 5 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip5.jpg" alt="Gülnur Köroğlu" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip5.jpg" alt="Gülnur Köroğlu" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Gülnur Köroğlu</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Genel Sekreter</p>
     </div>
-    
+
     <!-- Üye 6 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip6.jpg" alt="Betül Öncü" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip6.jpg" alt="Betül Öncü" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Betül Öncü</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Sosyal Medya</p>
     </div>
-    
+
     <!-- Üye 7 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip7.jpg" alt="Rümeysa Ekici" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip7.jpg" alt="Rümeysa Ekici" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Rümeysa Ekici</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Sosyal Medya</p>
     </div>
-    
+
     <!-- Üye 8 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip8.jpg" alt="Medine Pala" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip8.jpg" alt="Medine Pala" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Medine Pala</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Tasarım</p>
     </div>
-    
+
     <!-- Üye 9 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip20.jpg" alt="Ebrar Görgüç" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip20.jpg" alt="Ebrar Görgüç" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Ebrar Görgüç</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Tasarım</p>
@@ -219,104 +142,104 @@
     <!-- Üye 10 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip9.jpg" alt="Azra İrem Öcal" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip9.jpg" alt="Azra İrem Öcal" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Azra İrem Öcal</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Sosyal Etkinlik</p>
     </div>
-    
+
     <!-- Üye 11 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip10.jpg" alt="Ceyda Şahin" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip10.jpg" alt="Ceyda Şahin" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Ceyda Şahin</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Sosyal Etkinlik</p>
     </div>
-    
+
     <!-- Üye 12 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip11.jpg" alt="Gökçe Baydemir" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip11.jpg" alt="Gökçe Baydemir" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Gökçe Baydemir</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Sosyal Etkinlik</p>
     </div>
-    
+
     <!-- Üye 13 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip12.jpg" alt="Tuğçe Çalışkan" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip12.jpg" alt="Tuğçe Çalışkan" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Tuğçe Çalışkan</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Sponsorluk</p>
     </div>
-    
+
     <!-- Üye 14 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip13.jpg" alt="Dileknaz Ergül" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip13.jpg" alt="Dileknaz Ergül" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Dileknaz Ergül</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Sponsorluk</p>
     </div>
-    
+
     <!-- Üye 15 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip14.jpg" alt="Meliha Nur Kabay" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip14.jpg" alt="Meliha Nur Kabay" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Meliha Nur Kabay</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Sosyal Sorumluluk</p>
     </div>
-    
+
     <!-- Üye 16 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip15.jpg" alt="Candan Öztürk" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip15.jpg" alt="Candan Öztürk" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Candan Öztürk</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Sosyal Sorumluluk</p>
     </div>
-    
+
     <!-- Üye 17 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip16.jpg" alt="Rana Sütçü" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip16.jpg" alt="Rana Sütçü" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Rana Sütçü</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Eğitim Proje</p>
     </div>
-    
+
     <!-- Üye 18 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip17.jpg" alt="Nisa Ece Çelebi" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip17.jpg" alt="Nisa Ece Çelebi" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Nisa Ece Çelebi</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Eğitim Proje</p>
     </div>
-    
+
     <!-- Üye 19 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip18.jpg" alt="Mir İbrahim Doğan" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip18.jpg" alt="Mir İbrahim Doğan" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Mir İbrahim Doğan</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Denetleme Kurulu</p>
     </div>
-    
+
     <!-- Üye 20 -->
     <div class="glass-panel rounded-3xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-xl group">
         <div class="w-28 h-28 rounded-full overflow-hidden mb-4 shadow-md bg-gray-100 flex items-center justify-center relative p-[3px]" style="background:linear-gradient(135deg,#A62B2B,#E23E4E)">
-            <img src="ekip19.jpg" alt="Eren Baydoğan" class="w-full h-full object-cover rounded-full border-2 border-white">
+            <img decoding="async" src="ekip19.jpg" alt="Eren Baydoğan" class="w-full h-full object-cover rounded-full border-2 border-white">
         </div>
         <h3 class="text-lg font-bold text-ercupsaDark group-hover:text-ercupsaRed transition">Eren Baydoğan</h3>
         <p class="text-ercupsaRed font-medium text-xs mt-1 uppercase tracking-wider">Sayman</p>
     </div>
-    
+
         </div>
     </main>
-    <footer class="bg-ercupsaDark text-white py-8 border-t-4 border-ercupsaRed text-center text-sm">&copy; 2026 Erciyes University Pharmaceutical Students Association (ERCUPSA). <span class="text-gray-500">| Site tasarımı: Yusuf Ali Bozbay</span></footer>
-<script src="fun.js"></script><script>document.addEventListener("DOMContentLoaded",()=>{ercupsaInitLogoEasterEgg("#logoLink");ercupsaInitThemeToggle(".theme-toggle");});</script></body>
+    <footer class="bg-ercupsaDark text-white py-8 border-t-4 border-ercupsaRed text-center text-sm"><p>ERCUPSA · Erciyes Üniversitesi Eczacılık Öğrenci Topluluğu</p><a href="iletisim.html">İletişim</a></footer>
+<script src="fun.js"></script><script src="assets/ekip-inline-2.js"></script></body>
 </html>
