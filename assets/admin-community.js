@@ -158,7 +158,7 @@ async function showBatch(id) {
     const digest = await hash(code),
       ticket = d.tickets.find((t) => t.code_hash === digest);
     const qr = await QRCode.toDataURL(
-      location.origin + "/biletler.html?code=" + encodeURIComponent(code),
+      location.origin + "/biletler.html?ticket=" + encodeURIComponent(code),
     );
     cards.push(
       `<article class="ticket card rounded-xl p-4 text-center"><h3 class="font-bold">${escape(d.event_title)}</h3><img src="${qr}" alt="Bilet QR kodu" class="w-32 mx-auto"><p class="font-mono text-xs break-all">${code}</p><p>${ticket?.revoked ? "İptal" : ticket?.claimed_at ? "Kullanıldı" : "Kullanılmadı"}</p>${ticket && !ticket.revoked && !ticket.claimed_at ? `<button class="no-print text-red-700" data-revoke="${ticket.id}">İptal et</button>` : ""}</article>`,

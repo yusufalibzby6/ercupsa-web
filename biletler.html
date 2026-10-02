@@ -1,1 +1,252 @@
-<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Biletlerim ve rozetlerim | ERCUPSA</title><meta name="description" content="ERCUPSA topluluğuna katıl, deneyimlerini paylaş ve etkinliklerini keşfet."><link rel="stylesheet" href="assets/tailwind.css"><link rel="stylesheet" href="style.css"><script type="module" src="assets/shell.js"></script><script src="fun.js" defer></script><script type="module" src="assets/tickets.bundle.js"></script></head><body class="text-gray-800"><nav class="fixed w-full z-50 glass-panel border-b"><a href="index.html">ERCUPSA</a><a href="etkinlikler.html">Etkinlikler</a><a href="topluluk.html">Topluluk</a><a href="uyeler.html">Aktif Üyelerimiz</a><a href="biletler.html">Biletlerim</a></nav><main class="pt-28 pb-20 max-w-5xl mx-auto px-4"><h1 class="text-4xl font-black text-ercupsaRed mb-4">Biletlerim ve rozetlerim</h1><p class="text-gray-600 mb-6">Katıldığın etkinliğin bilet kodunu ekle. 3 farklı etkinlikte bronz, 4 etkinlikte gümüş, 5 ve üzerinde altın rozet kazan.</p><section id="authPanel" class="glass-panel rounded-3xl p-6"><h2 class="text-xl font-bold mb-4">E-posta ile giriş yap</h2><p class="text-sm mb-4">Hesap oluşturmak ve tekrar giriş yapmak için aynı akış kullanılır. Siteyi gezmek için hesap gerekmez.</p><form id="emailForm" class="grid gap-3"><label>E-posta<input id="email" type="email" required autocomplete="email" class="block w-full border rounded-xl p-3"></label><button class="btn-primary p-3 rounded-xl">Doğrulama kodu gönder</button></form><form id="otpForm" hidden class="mt-5 grid gap-3"><label>E-postandaki kod<input id="otp" inputmode="numeric" pattern="[0-9]{6,8}" required autocomplete="one-time-code" class="block w-full border rounded-xl p-3"></label><button class="btn-primary p-3 rounded-xl">Doğrula ve giriş yap</button></form></section><section id="accountPanel" hidden><div class="flex justify-between mb-6"><h2 id="badge" class="text-2xl font-black"></h2><button id="logout" class="border p-2 rounded-xl">Çıkış yap</button></div><form id="profileForm" class="glass-panel rounded-3xl p-6 grid gap-4"><label>Ad soyad<input id="name" required maxlength="120" autocomplete="name" class="block w-full border rounded-xl p-3"></label><label class="flex gap-3"><input id="publicName" type="checkbox">Rozet kazandığımda adımın rozet panosunda görünmesine izin veriyorum.</label><button class="border rounded-xl p-3 font-bold">Bilgilerimi kaydet</button></form><form id="claimForm" class="glass-panel rounded-3xl p-6 grid gap-4 mt-5"><label>Bilet kodu<input id="ticketCode" required maxlength="40" placeholder="ERC-…" class="block w-full border rounded-xl p-3 font-mono"></label><button class="btn-primary p-3 rounded-xl">Biletimi ekle</button></form><h3 class="font-bold text-xl mt-8 mb-4">Katıldığım etkinlikler</h3><div id="attendance" class="grid gap-3"></div></section><section class="mt-12"><h2 class="text-2xl font-black mb-4">ERCUPSA rozet panosu</h2><p class="text-sm text-gray-500 mb-4">Yalnızca adını paylaşmayı seçen rozet sahipleri burada görünür.</p><div id="board" class="grid sm:grid-cols-2 gap-4"></div></section><p id="status" role="status" aria-live="polite" class="mt-5"></p></main><footer class="bg-ercupsaDark text-white py-10 text-center"><p>ERCUPSA · Erciyes Üniversitesi Eczacılık Öğrenci Topluluğu</p><a href="iletisim.html">İletişim</a></footer><script src="assets/biletler-inline-1.js"></script></body></html>
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Biletlerim ve rozetlerim | ERCUPSA</title>
+    <meta
+      name="description"
+      content="ERCUPSA topluluğuna katıl, deneyimlerini paylaş ve etkinliklerini keşfet."
+    />
+    <link rel="stylesheet" href="assets/tailwind.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="assets/shell.js"></script>
+    <script src="fun.js" defer></script>
+    <script type="module" src="assets/tickets.bundle.js"></script>
+  </head>
+  <body class="text-gray-800">
+    <nav class="fixed w-full z-50 glass-panel border-b">
+      <a href="index.html" class="flex items-center gap-3"
+        ><img
+          src="ercupsa.PNG"
+          width="48"
+          height="48"
+          alt="ERCUPSA logosu"
+        />ERCUPSA</a
+      ><a href="etkinlikler.html">Etkinlikler</a
+      ><a href="topluluk.html">Topluluk</a
+      ><a href="uyeler.html">Aktif Üyelerimiz</a
+      ><a href="biletler.html">Biletlerim</a>
+    </nav>
+    <main class="pt-28 pb-20 max-w-5xl mx-auto px-4">
+      <h1 class="text-4xl font-black text-ercupsaRed mb-4">
+        Biletlerim ve rozetlerim
+      </h1>
+      <p class="text-gray-600 mb-6">
+        Katıldığın etkinliğin bilet kodunu ekle. 3 farklı etkinlikte bronz, 4
+        etkinlikte gümüş, 5 ve üzerinde altın rozet kazan.
+      </p>
+      <section id="authPanel" class="glass-panel rounded-3xl p-6">
+        <p class="text-sm text-gray-600 mb-5">
+          Biletlerini saklamak için giriş yap veya hesap oluştur. Siteyi gezmek
+          için hesap gerekmez.
+        </p>
+        <div
+          class="flex gap-3 mb-6"
+          role="tablist"
+          aria-label="Hesap işlemleri"
+        >
+          <button
+            id="loginTab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="loginForm"
+            class="btn-primary rounded-xl px-5 py-3 font-bold"
+          >
+            Giriş yap</button
+          ><button
+            id="signupTab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="signupForm"
+            class="border rounded-xl px-5 py-3 font-bold"
+          >
+            Kayıt ol
+          </button>
+        </div>
+        <form
+          id="loginForm"
+          role="tabpanel"
+          aria-labelledby="loginTab"
+          class="grid gap-4"
+        >
+          <label for="loginEmail">E-posta</label
+          ><input
+            id="loginEmail"
+            type="email"
+            required
+            maxlength="254"
+            autocomplete="username"
+            class="border rounded-xl p-3"
+          /><label for="loginPassword">Şifre</label
+          ><input
+            id="loginPassword"
+            type="password"
+            required
+            maxlength="128"
+            autocomplete="current-password"
+            class="border rounded-xl p-3"
+          /><button class="btn-primary p-3 rounded-xl">Giriş yap</button
+          ><button
+            id="forgotLink"
+            type="button"
+            class="text-ercupsaRed text-left font-semibold"
+          >
+            Şifremi unuttum
+          </button>
+        </form>
+        <form
+          id="signupForm"
+          role="tabpanel"
+          aria-labelledby="signupTab"
+          hidden
+          class="grid gap-4"
+        >
+          <div class="grid sm:grid-cols-2 gap-4">
+            <label
+              >İsim<input
+                id="firstName"
+                required
+                maxlength="60"
+                autocomplete="given-name"
+                class="block w-full border rounded-xl p-3" /></label
+            ><label
+              >Soyisim<input
+                id="lastName"
+                required
+                maxlength="60"
+                autocomplete="family-name"
+                class="block w-full border rounded-xl p-3"
+            /></label>
+          </div>
+          <label for="signupEmail">E-posta</label
+          ><input
+            id="signupEmail"
+            type="email"
+            required
+            maxlength="254"
+            autocomplete="email"
+            class="border rounded-xl p-3"
+          /><label for="signupPassword">Şifre</label
+          ><input
+            id="signupPassword"
+            type="password"
+            required
+            minlength="8"
+            maxlength="128"
+            autocomplete="new-password"
+            class="border rounded-xl p-3"
+          />
+          <p class="text-sm text-gray-500">
+            En az 8 karakter kullan. Şifreni sıfırlayabilmek için erişebildiğin
+            bir e-posta adresi gir.
+          </p>
+          <label for="signupPasswordAgain">Şifre tekrar</label
+          ><input
+            id="signupPasswordAgain"
+            type="password"
+            required
+            minlength="8"
+            maxlength="128"
+            autocomplete="new-password"
+            class="border rounded-xl p-3"
+          /><button class="btn-primary p-3 rounded-xl">Hesap oluştur</button>
+        </form>
+        <form id="forgotForm" hidden class="grid gap-4">
+          <h2 class="text-xl font-bold">Şifreni sıfırla</h2>
+          <p class="text-sm text-gray-600">
+            E-posta adresine şifre sıfırlama bağlantısı göndereceğiz.
+          </p>
+          <label for="forgotEmail">E-posta</label
+          ><input
+            id="forgotEmail"
+            type="email"
+            required
+            maxlength="254"
+            autocomplete="email"
+            class="border rounded-xl p-3"
+          /><button class="btn-primary p-3 rounded-xl">
+            Sıfırlama bağlantısı gönder</button
+          ><button id="backToLogin" type="button" class="border rounded-xl p-3">
+            Girişe dön
+          </button>
+        </form>
+      </section>
+      <section id="resetPanel" hidden class="glass-panel rounded-3xl p-6">
+        <h2 class="text-2xl font-bold mb-5">Yeni şifreni belirle</h2>
+        <form id="resetForm" class="grid gap-4">
+          <label for="newPassword">Yeni şifre</label
+          ><input
+            id="newPassword"
+            type="password"
+            required
+            minlength="8"
+            maxlength="128"
+            autocomplete="new-password"
+            class="border rounded-xl p-3"
+          /><label for="newPasswordAgain">Yeni şifre tekrar</label
+          ><input
+            id="newPasswordAgain"
+            type="password"
+            required
+            minlength="8"
+            maxlength="128"
+            autocomplete="new-password"
+            class="border rounded-xl p-3"
+          /><button class="btn-primary p-3 rounded-xl">Şifremi güncelle</button>
+        </form>
+      </section>
+      <section id="accountPanel" hidden>
+        <div class="flex justify-between mb-6">
+          <h2 id="badge" class="text-2xl font-black"></h2>
+          <button id="logout" class="border p-2 rounded-xl">Çıkış yap</button>
+        </div>
+        <form id="profileForm" class="glass-panel rounded-3xl p-6 grid gap-4">
+          <label
+            >Ad soyad<input
+              id="name"
+              required
+              maxlength="120"
+              autocomplete="name"
+              class="block w-full border rounded-xl p-3" /></label
+          ><label class="flex gap-3"
+            ><input id="publicName" type="checkbox" />Rozet kazandığımda adımın
+            rozet panosunda görünmesine izin veriyorum.</label
+          ><button class="border rounded-xl p-3 font-bold">
+            Bilgilerimi kaydet
+          </button>
+        </form>
+        <form
+          id="claimForm"
+          class="glass-panel rounded-3xl p-6 grid gap-4 mt-5"
+        >
+          <label
+            >Bilet kodu<input
+              id="ticketCode"
+              required
+              maxlength="40"
+              placeholder="ERC-…"
+              class="block w-full border rounded-xl p-3 font-mono" /></label
+          ><button class="btn-primary p-3 rounded-xl">Biletimi ekle</button>
+        </form>
+        <h3 class="font-bold text-xl mt-8 mb-4">Katıldığım etkinlikler</h3>
+        <div id="attendance" class="grid gap-3"></div>
+      </section>
+      <section class="mt-12">
+        <h2 class="text-2xl font-black mb-4">ERCUPSA rozet panosu</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          Yalnızca adını paylaşmayı seçen rozet sahipleri burada görünür.
+        </p>
+        <div id="board" class="grid sm:grid-cols-2 gap-4"></div>
+      </section>
+      <p id="status" role="status" aria-live="polite" class="mt-5"></p>
+    </main>
+    <footer class="bg-ercupsaDark text-white py-10 text-center">
+      <p>ERCUPSA · Erciyes Üniversitesi Eczacılık Öğrenci Topluluğu</p>
+      <a href="iletisim.html">İletişim</a>
+    </footer>
+    <script src="assets/biletler-inline-1.js"></script>
+  </body>
+</html>

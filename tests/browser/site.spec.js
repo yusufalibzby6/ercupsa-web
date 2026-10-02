@@ -107,29 +107,26 @@ test("community renders hostile text safely and accepts moderated submissions", 
   await page.getByRole("button", { name: "Gönder", exact: true }).click();
   await expect(page.locator("#status")).toContainText("Gönderin alındı");
 });
-test("email OTP account flow, profile consent and ticket badge UI", async ({
-  page,
-}) => {
-  let total = 2,
-    name = "",
-    public_name = false;
-  await page.route("https://local-test.supabase.co/auth/v1/**", (route) => {
-    if (route.request().url().includes("/verify"))
-      return route.fulfill({
-        json: {
-          access_token: "test.token.value",
-          refresh_token: "test-refresh",
-          expires_in: 3600,
-          token_type: "bearer",
-          user: {
-            id: "a873ee44-1ce7-4b30-b0fc-11e90719e9b3",
-            email: "student@example.test",
-            aud: "authenticated",
-          },
-        },
-      });
-    return route.fulfill({ json: {} });
-  });
+function authSession(metadata = {}) {
+  const user = {
+    id: "a873ee44-1ce7-4b30-b0fc-11e90719e9b3",
+    email: "student@example.test",
+    aud: "authenticated",
+    user_metadata: metadata,
+  };
+  const payload = Buffer.from(
+    JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 }),
+  ).toString("base64url");
+  return {
+    access_token: "eyJhbGciOiJIUzI1NiJ9." + payload + ".dGVzdA",
+    refresh_token: "test-refresh",
+    expires_in: 3600,
+    token_type: "bearer",
+    user,
+  };
+}
+async function mockAccount(page) {
+  const state = { total: 2, name: "", public_name: false, calls: [] };
   await page.route("**/api/community*", (route) => {
     const action = new URL(route.request().url()).searchParams.get("action");
     if (action === "config")
@@ -137,51 +134,212 @@ test("email OTP account flow, profile consent and ticket badge UI", async ({
         json: { url: "https://local-test.supabase.co", key: "test-public" },
       });
     if (action === "me" && route.request().method() === "POST") {
-      ({ name, public_name } = route.request().postDataJSON());
+      Object.assign(state, route.request().postDataJSON());
       return route.fulfill({ json: { ok: true } });
     }
     if (action === "me")
       return route.fulfill({
         json: {
-          profile: name ? { name, public_name } : null,
-          total,
+          profile: state.name
+            ? { name: state.name, public_name: state.public_name }
+            : null,
+          total: state.total,
           badge:
-            total >= 5
+            state.total >= 5
               ? "Altın"
-              : total === 4
+              : state.total === 4
                 ? "Gümüş"
-                : total === 3
+                : state.total === 3
                   ? "Bronz"
                   : null,
-          attendance: Array.from({ length: total }, (_, i) => ({
+          attendance: Array.from({ length: state.total }, (_, i) => ({
             event_title: "Etkinlik " + i,
           })),
         },
       });
     if (action === "claim") {
-      total++;
+      state.total++;
       return route.fulfill({ json: { ok: true } });
     }
     return route.fulfill({ json: { board: [], members: [], experiences: [] } });
   });
+  await page.route("https://local-test.supabase.co/auth/v1/**", (route) => {
+    const req = route.request(),
+      u = new URL(req.url());
+    state.calls.push({
+      path: u.pathname,
+      query: u.search,
+      body: req.postDataJSON(),
+    });
+    if (u.pathname.endsWith("/signup"))
+      return route.fulfill({ json: authSession(req.postDataJSON().data) });
+    if (u.pathname.endsWith("/token"))
+      return route.fulfill({ json: authSession() });
+    if (u.pathname.endsWith("/logout")) return route.fulfill({ status: 204 });
+    if (u.pathname.endsWith("/user"))
+      return route.fulfill({ json: authSession().user });
+    return route.fulfill({ json: {} });
+  });
+  return state;
+}
+test("logo is restored and public footers contain no admin entry", async ({
+  page,
+}) => {
+  for (const path of [
+    "/",
+    "/etkinlikler.html",
+    "/galeri.html",
+    "/test.html",
+    "/topluluk.html",
+    "/uyeler.html",
+    "/biletler.html",
+    "/hakkimizda.html",
+    "/ekip.html",
+    "/sss.html",
+    "/iletisim.html",
+    "/form.html",
+  ]) {
+    await page.goto(path);
+    await expect(page.locator("#logoLink img")).toBeVisible();
+    await expect(page.locator("#logoLink img")).toHaveAttribute(
+      "src",
+      "ercupsa.PNG",
+    );
+    await expect(page.locator("footer a[href='admin.html']")).toHaveCount(0);
+  }
+});
+test("password signup saves names and login persists without confirmation email", async ({
+  page,
+}) => {
+  const state = await mockAccount(page),
+    errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/biletler.html");
-  await expect(page.locator("#otpForm")).not.toBeVisible();
-  await page.locator("#email").fill("student@example.test");
-  await page.getByRole("button", { name: "Doğrulama kodu gönder" }).click();
-  await expect(page.locator("#otpForm")).toBeVisible();
-  await page.locator("#otp").fill("123456");
-  await page.getByRole("button", { name: "Doğrula ve giriş yap" }).click();
+  await page.getByRole("tab", { name: "Kayıt ol" }).click();
+  await page.locator("#firstName").fill("Test");
+  await page.locator("#lastName").fill("Öğrenci");
+  await page.locator("#signupEmail").fill("student@example.test");
+  await page.locator("#signupPassword").fill("Strong-test-123");
+  await page.locator("#signupPasswordAgain").fill("Strong-test-123");
+  await page.getByRole("button", { name: "Hesap oluştur" }).click();
   await expect(page.locator("#accountPanel")).toBeVisible();
-  await page.locator("#name").fill("Test Öğrenci");
+  await expect(page.locator("#status")).toContainText("Hesabın oluşturuldu");
+  expect(state.name).toBe("Test Öğrenci");
+  expect(state.public_name).toBe(false);
+  await page.reload();
+  await expect(page.locator("#accountPanel")).toBeVisible();
+  await expect(page.locator("#name")).toHaveValue("Test Öğrenci");
   await page.locator("#publicName").check();
   await page.getByRole("button", { name: "Bilgilerimi kaydet" }).click();
-  for (const expected of ["Bronz", "Gümüş", "Altın"]) {
+  for (const badge of ["Bronz", "Gümüş", "Altın"]) {
     await page.locator("#ticketCode").fill("ERC-AAAAAAAAAAAAAAAAAAAAAAAA");
     await page.getByRole("button", { name: "Biletimi ekle" }).click();
-    await expect(page.locator("#badge")).toContainText(expected);
+    await expect(page.locator("#badge")).toContainText(badge);
   }
-  expect(name).toBe("Test Öğrenci");
-  expect(public_name).toBe(true);
+  await page.getByRole("button", { name: "Çıkış yap" }).click();
+  await expect(page.locator("#authPanel")).toBeVisible();
+  await page.locator("#loginEmail").fill("student@example.test");
+  await page.locator("#loginPassword").fill("Strong-test-123");
+  await page
+    .locator("#loginForm")
+    .getByRole("button", { name: "Giriş yap", exact: true })
+    .click();
+  await expect(page.locator("#accountPanel")).toBeVisible();
+  expect(state.calls.some((c) => c.path.endsWith("/signup"))).toBe(true);
+  expect(state.calls.some((c) => c.query.includes("grant_type=password"))).toBe(
+    true,
+  );
+  expect(
+    state.calls.some(
+      (c) => c.path.endsWith("/otp") || c.path.endsWith("/recover"),
+    ),
+  ).toBe(false);
+  expect(errors).toEqual([]);
+});
+test("password mismatch and translated login error do not sign the user in", async ({
+  page,
+}) => {
+  const state = await mockAccount(page);
+  await page.goto("/biletler.html");
+  await page.getByRole("tab", { name: "Kayıt ol" }).click();
+  await page.locator("#firstName").fill("Test");
+  await page.locator("#lastName").fill("Öğrenci");
+  await page.locator("#signupEmail").fill("student@example.test");
+  await page.locator("#signupPassword").fill("Strong-test-123");
+  await page.locator("#signupPasswordAgain").fill("Other-test-456");
+  await page.getByRole("button", { name: "Hesap oluştur" }).click();
+  await expect(page.locator("#status")).toHaveText("Şifreler eşleşmiyor.");
+  expect(state.calls.some((c) => c.path.endsWith("/signup"))).toBe(false);
+  await page.route("https://local-test.supabase.co/auth/v1/token**", (r) =>
+    r.fulfill({
+      status: 400,
+      json: { code: "invalid_credentials", msg: "Invalid login credentials" },
+    }),
+  );
+  await page.getByRole("tab", { name: "Giriş yap" }).click();
+  await page.locator("#loginEmail").fill("student@example.test");
+  await page.locator("#loginPassword").fill("wrong-password");
+  await page
+    .locator("#loginForm")
+    .getByRole("button", { name: "Giriş yap", exact: true })
+    .click();
+  await expect(page.locator("#status")).toHaveText(
+    "E-posta veya şifre yanlış.",
+  );
+  await expect(page.locator("#accountPanel")).not.toBeVisible();
+});
+test("password recovery email uses PKCE and callback allows changing password", async ({
+  page,
+}) => {
+  const state = await mockAccount(page),
+    errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/biletler.html");
+  await page.getByRole("button", { name: "Şifremi unuttum" }).click();
+  await page.locator("#forgotEmail").fill("student@example.test");
+  await page
+    .getByRole("button", { name: "Sıfırlama bağlantısı gönder" })
+    .click();
+  await expect(page.locator("#status")).toContainText("bir hesap varsa");
+  const recover = state.calls.find((c) => c.path.endsWith("/recover"));
+  expect(recover.body.code_challenge).toBeTruthy();
+  expect(recover.body.code_challenge_method).toBe("s256");
+  expect(decodeURIComponent(recover.query)).toContain(
+    "biletler.html?recovery=1",
+  );
+  await page.goto("/biletler.html?recovery=1&code=test-auth-code");
+  await expect(page.locator("#resetPanel")).toBeVisible();
+  await expect(page.locator("#accountPanel")).not.toBeVisible();
+  await page.locator("#newPassword").fill("New-password-123");
+  await page.locator("#newPasswordAgain").fill("New-password-123");
+  await page.getByRole("button", { name: "Şifremi güncelle" }).click();
+  await expect(page.locator("#status")).toContainText("Şifren güncellendi");
+  await expect(page.locator("#loginForm")).toBeVisible();
+  expect(
+    state.calls.some(
+      (c) =>
+        c.path.endsWith("/user") && c.body?.password === "New-password-123",
+    ),
+  ).toBe(true);
+  expect(errors).toEqual([]);
+});
+test("ticket QR code cannot be interpreted as a password recovery callback", async ({
+  page,
+}) => {
+  const state = await mockAccount(page);
+  await page.goto("/biletler.html");
+  await page.evaluate(() =>
+    localStorage.setItem(
+      "sb-local-test-auth-token-code-verifier",
+      JSON.stringify("test-verifier/PASSWORD_RECOVERY"),
+    ),
+  );
+  await page.goto("/biletler.html?code=ERC-AAAAAAAAAAAAAAAAAAAAAAAA");
+  await expect(page.locator("#authPanel")).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("ticket")).toBe(
+    "ERC-AAAAAAAAAAAAAAAAAAAAAAAA",
+  );
+  expect(state.calls.some((c) => c.path.endsWith("/token"))).toBe(false);
 });
 test("admin membership editing, moderation, 50 QR tickets and print action", async ({
   page,

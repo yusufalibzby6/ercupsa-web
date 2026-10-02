@@ -24,7 +24,7 @@ test("community handler integrates with SQL: moderation, profiles, ticket claim 
       return Response.json({
         id: uid,
         email: "private@example.test",
-        email_confirmed_at: new Date().toISOString(),
+        email_confirmed_at: null,
       });
     assert.equal(options.headers.apikey, "test-service-key");
     const table = url.pathname.split("/").pop();

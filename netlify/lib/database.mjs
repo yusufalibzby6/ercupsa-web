@@ -43,6 +43,7 @@ export async function user(req) {
   });
   if (!r.ok) fail(401, "Oturum süresi doldu. Tekrar giriş yap.");
   const u = await r.json();
-  if (!u.email_confirmed_at) fail(401, "E-posta doğrulaması gerekli.");
+  // Supabase validates the session. Email confirmation is a project signup setting.
+  if (!u.id || !u.email) fail(401, "Geçerli bir hesapla giriş yapmalısın.");
   return u;
 }
