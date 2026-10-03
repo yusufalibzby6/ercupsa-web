@@ -2,14 +2,6 @@ import { $, escape, api, status } from "./common.js";
 async function load() {
   try {
     const d = await api("/api/community");
-    if ($("members"))
-      $("members").innerHTML =
-        d.members
-          .map(
-            (m) =>
-              `<article class="glass-panel rounded-2xl p-6"><h2 class="text-xl font-bold">${escape(m.name)}</h2><p class="text-gray-500 mt-2">${escape(m.class)}${/^\d$/.test(m.class) ? ". sınıf" : ""}</p></article>`,
-          )
-          .join("") || "<p>Üye listesi yakında burada.</p>";
     if ($("experiences"))
       $("experiences").innerHTML =
         d.experiences

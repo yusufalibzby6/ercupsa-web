@@ -65,6 +65,70 @@ function metadataName() {
     .trim()
     .slice(0, 120);
 }
+const milestones = [
+  { name: "Bronz", color: "bronz", at: 3, id: "milestoneBronz", toward: "Bronza" },
+  { name: "Gümüş", color: "gumus", at: 4, id: "milestoneGumus", toward: "Gümüşe" },
+  { name: "Altın", color: "altin", at: 5, id: "milestoneAltin", toward: "Altına" },
+];
+function participationTotal(value) {
+  const total = Number(value);
+  return Number.isFinite(total) ? Math.max(0, Math.floor(total)) : 0;
+}
+function medal(name) {
+  const color = milestones.find((m) => m.name === name)?.color || "none";
+  return `<span class="participation-medal participation-medal--${color}" aria-hidden="true">★</span>`;
+}
+function showProgress(value) {
+  const total = participationTotal(value);
+  const current = milestones.filter((m) => total >= m.at).at(-1);
+  const next = milestones.find((m) => total < m.at);
+  $("badge").textContent = current ? `${current.name} rozetin` : "Rozet yolculuğun";
+  $("accountMedal").innerHTML = medal(current?.name);
+  $("attendanceCount").textContent = `${total} farklı etkinliğe katıldın.`;
+  $("progressMessage").textContent = next
+    ? `${next.toward} ${next.at - total} etkinlik kaldı.`
+    : "Altın rozetini kazandın. Yeni etkinliklerle anılarını biriktirmeye devam et.";
+  $("badgeProgress").value = Math.min(total, 5);
+  $("badgeProgress").setAttribute("aria-valuetext", `${Math.min(total, 5)} / 5 etkinlik. ${$("progressMessage").textContent}`);
+  for (const milestone of milestones) {
+    const el = $(milestone.id), earned = total >= milestone.at;
+    el.classList.toggle("is-earned", earned);
+    el.classList.toggle("is-current", milestone === current);
+    el.querySelector(".milestone-state").textContent = earned ? "Kazandın" : "Hedef";
+  }
+}
+function attendanceDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const label = new Intl.DateTimeFormat("tr-TR", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Istanbul",
+  }).format(date);
+  return `<p>Katılım eklendi: <time datetime="${escape(date.toISOString())}">${escape(label)}</time></p>`;
+}
+function attendanceTitle(attendance) {
+  const title = escape(attendance.event_title);
+  return typeof attendance.event_id === "string" && attendance.event_id
+    ? `<a href="${escape("form.html?event=" + encodeURIComponent(attendance.event_id))}">${title} <span aria-hidden="true">↗</span></a>`
+    : title;
+}
+function pendingCode(value) {
+  $("ticketCode").value = value;
+  $("entryTicketCode").value = value;
+  $("pendingCodeNote").hidden = !value;
+}
+$("prepareCodeForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const code = $("entryTicketCode").value.toUpperCase().replace(/\s/g, "");
+  if (!/^ERC-[A-F0-9]{24}$/.test(code)) {
+    status("Katılım kodunu kontrol et. Kod, ERC- ile başlar ve biletinde yer alır.", true);
+    $("entryTicketCode").focus();
+    return;
+  }
+  pendingCode(code);
+  status("Kodun hazır. Giriş yaptıktan sonra katılımını ekleyebilirsin.");
+  $("loginEmail").focus();
+});
 async function refresh() {
   const version = ++authVersion;
   $("authPanel").hidden = Boolean(session);
@@ -75,16 +139,15 @@ async function refresh() {
   if (version !== authVersion || !session) return;
   $("name").value = d.profile?.name || metadataName();
   $("publicName").checked = d.profile?.public_name || false;
-  $("badge").textContent =
-    `${d.badge ? d.badge + " rozet" : "Rozet yolculuğun"} · ${d.total} etkinlik`;
+  showProgress(d.total);
   $("attendance").innerHTML =
     d.attendance
       .map(
         (a) =>
-          `<article class="glass-panel p-4 rounded-xl">${escape(a.event_title)}</article>`,
+          `<article class="participation-attendance"><span class="participation-attendance-mark" aria-hidden="true">✓</span><div><h4>${attendanceTitle(a)}</h4>${attendanceDate(a.created_at)}</div></article>`,
       )
       .join("") ||
-    "<p>Henüz bilet eklemedin. Etkinlik biletini ekleyerek başlayabilirsin.</p>";
+    '<div class="participation-empty"><p>Henüz bir katılım eklemedin. Etkinlikte verilen QR kodu veya bilet koduyla ilk anını kaydet.</p><a href="etkinlikler.html">Etkinlikleri keşfet →</a></div>';
 }
 function form(id, fn) {
   $(id).addEventListener("submit", async (e) => {
@@ -146,7 +209,7 @@ form("signupForm", async () => {
     body: JSON.stringify({ name: fullName, public_name: false }),
   });
   await refresh();
-  status("Hesabın oluşturuldu. Biletini ekleyebilirsin.");
+  status("Hesabın oluşturuldu. Katılımını ekleyebilirsin.");
 });
 form("forgotForm", async () => {
   const redirect = new URL("biletler.html", location.href);
@@ -200,10 +263,14 @@ form("claimForm", async () => {
     method: "POST",
     body: JSON.stringify({ code: $("ticketCode").value }),
   });
-  $("ticketCode").value = "";
+  pendingCode("");
+  const params = new URLSearchParams(location.search);
+  params.delete("ticket");
+  if (params.get("code")?.startsWith("ERC-")) params.delete("code");
+  history.replaceState({}, "", location.pathname + (params.size ? "?" + params : "") + location.hash);
   await refresh();
   await board();
-  status("Biletin eklendi.");
+  status("Katılımın eklendi. Rozet ilerlemen güncellendi.");
 });
 $("logout").addEventListener("click", async () => {
   try {
@@ -224,23 +291,20 @@ async function board() {
       d.board
         .map(
           (p) =>
-            `<article class="glass-panel rounded-2xl p-5"><strong>${escape(p.name)}</strong><p>${escape(p.badge)} rozet · ${Number(p.total)} etkinlik</p></article>`,
+            `<article class="participation-board-card">${medal(p.badge)}<div><strong>${escape(p.name)}</strong><p>${escape(p.badge)} rozet · ${participationTotal(p.total)} farklı etkinlik</p></div></article>`,
         )
-        .join("") || "<p>İlk rozet sahiplerimiz yakında burada.</p>";
+        .join("") || '<p class="participation-empty">İlk rozet sahiplerimiz yakında burada. Adını paylaşmak tamamen senin tercihin.</p>';
   } catch (error) {
     $("board").textContent = error.message;
   }
 }
 async function init() {
   try {
-    const c = await api("/api/community?action=config");
-    if (!c.url || !c.key)
-      throw new Error("Hesap bölümü henüz kullanıma açılmadı.");
     // Ticket QR codes and Supabase PKCE callbacks must not share the code parameter.
     const params = new URLSearchParams(location.search);
     const ticket = params.get("ticket") || params.get("code");
     if (ticket?.startsWith("ERC-")) {
-      $("ticketCode").value = ticket;
+      pendingCode(ticket);
       if (params.get("code") === ticket) {
         params.delete("code");
         params.set("ticket", ticket);
@@ -251,6 +315,9 @@ async function init() {
         );
       }
     }
+    const c = await api("/api/community?action=config");
+    if (!c.url || !c.key)
+      throw new Error("Hesap bölümü henüz kullanıma açılmadı.");
     client = createClient(c.url, c.key, {
       auth: {
         persistSession: true,

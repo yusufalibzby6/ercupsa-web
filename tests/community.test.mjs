@@ -162,6 +162,9 @@ test("community handler integrates with SQL: moderation, profiles, ticket claim 
     );
     assert.equal((await request("public")).data.experiences.length, 0);
     const list = (await request("admin", "GET", undefined, "admin")).data;
+    assert.equal(list.members.length, 1);
+    assert.equal(list.members[0].name, "İzinli Üye");
+    assert.deepEqual((await request("public")).data.members, []);
     await request(
       "moderate",
       "POST",

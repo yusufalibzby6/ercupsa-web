@@ -4,21 +4,21 @@
 <script src="assets/form-inline-1.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kayıt Formu | ERCUPSA</title>
-<meta name="description" content="ERCUPSA etkinliklerine buradan kaydolabilirsin.">
+    <title>Etkinlik Detayları ve Kayıt | ERCUPSA</title>
+<meta name="description" content="ERCUPSA etkinliklerinin tarih, saat ve konum bilgilerini keşfet; kayıt formuna ulaş.">
 <link rel="canonical" href="https://ercupsa.com.tr/form.html">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="ERCUPSA">
 <meta property="og:locale" content="tr_TR">
 <meta property="og:url" content="https://ercupsa.com.tr/form.html">
-<meta property="og:title" content="Kayıt Formu | ERCUPSA">
-<meta property="og:description" content="ERCUPSA etkinliklerine buradan kaydolabilirsin.">
+<meta property="og:title" content="Etkinlik Detayları ve Kayıt | ERCUPSA">
+<meta property="og:description" content="ERCUPSA etkinliklerinin tarih, saat ve konum bilgilerini keşfet; kayıt formuna ulaş.">
 <meta property="og:image" content="https://ercupsa.com.tr/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Kayıt Formu | ERCUPSA">
-<meta name="twitter:description" content="ERCUPSA etkinliklerine buradan kaydolabilirsin.">
+<meta name="twitter:title" content="Etkinlik Detayları ve Kayıt | ERCUPSA">
+<meta name="twitter:description" content="ERCUPSA etkinliklerinin tarih, saat ve konum bilgilerini keşfet; kayıt formuna ulaş.">
 <meta name="twitter:image" content="https://ercupsa.com.tr/og-image.jpg">
 <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
 <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
@@ -37,36 +37,65 @@
 <body class="text-gray-800 antialiased">
 
     <!-- Header / Navbar -->
-    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50"><a href="index.html" class="flex items-center gap-3"><img src="ercupsa.PNG" width="48" height="48" alt="ERCUPSA logosu">ERCUPSA</a><a href="etkinlikler.html">Etkinlikler</a><a href="topluluk.html">Topluluk</a><a href="uyeler.html">Aktif Üyelerimiz</a><a href="biletler.html">Biletlerim</a></nav>
+    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50"><a href="index.html" class="flex items-center gap-3"><img src="ercupsa.PNG" width="48" height="48" alt="ERCUPSA logosu">ERCUPSA</a><a href="etkinlikler.html">Etkinlikler</a><a href="topluluk.html">Topluluk</a><a href="biletler.html">Biletlerim</a></nav>
 
 
-    <main class="pt-28 pb-16 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div id="formHead" class="text-center mb-6">
-            <span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Kayıt</span>
-            <h1 id="formTitle" class="text-3xl md:text-4xl font-black mt-2">Kayıt Formu</h1>
+    <main class="pt-28 pb-16 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <a href="etkinlikler.html" class="inline-flex items-center gap-2 text-sm font-bold text-ercupsaRed mb-6"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Tüm etkinlikler</a>
+        <div id="formHead" class="mb-8">
+            <span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Etkinlik</span>
+            <h1 id="formTitle" class="text-3xl md:text-4xl font-black mt-3">Etkinlik detayları</h1>
             <p id="formSub" class="text-gray-500 mt-3 text-sm"></p>
         </div>
 
-        <div id="formWrap" class="glass-panel rounded-3xl overflow-hidden hidden">
-            <iframe id="formFrame" class="w-full min-h-[75vh]" frameborder="0"></iframe>
-        </div>
+        <section id="eventDetails" class="hidden mb-8" aria-label="Etkinlik bilgileri">
+            <div class="event-detail-layout glass-panel rounded-3xl overflow-hidden">
+                <img id="eventPoster" class="hidden event-detail-poster" decoding="async" alt="">
+                <div class="p-6 md:p-8">
+                    <p id="eventDescription" class="text-gray-600 leading-relaxed whitespace-pre-wrap mb-6"></p>
+                    <dl class="event-facts">
+                        <div><dt><i class="fa-regular fa-calendar" aria-hidden="true"></i> Tarih</dt><dd id="eventDate"></dd></div>
+                        <div><dt><i class="fa-regular fa-clock" aria-hidden="true"></i> Saat</dt><dd id="eventTime"></dd></div>
+                        <div id="eventLocationWrap" class="hidden"><dt><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Konum</dt><dd id="eventLocation"></dd></div>
+                    </dl>
+                    <div class="event-detail-actions">
+                        <a id="calendarLink" class="hidden event-secondary-action" href="#"><i class="fa-regular fa-calendar-plus" aria-hidden="true"></i> Takvimime ekle</a>
+                        <a id="mapsLink" class="hidden event-secondary-action" href="#" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-route" aria-hidden="true"></i> Yol tarifi al</a>
+                        <button id="shareEvent" type="button" class="event-secondary-action"><i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i> Etkinliği paylaş</button>
+                        <a id="eventGalleryLink" class="hidden event-secondary-action" href="#"><i class="fa-regular fa-images" aria-hidden="true"></i> Etkinlik fotoğrafları</a>
+                    </div>
+                    <p id="eventShareStatus" class="text-sm text-gray-500 mt-3 break-words" role="status" aria-live="polite"></p>
+                </div>
+            </div>
+            <div class="event-follow-card rounded-2xl p-5 mt-5">
+                <p id="eventFollowMessage" class="text-sm text-gray-600 mb-3">Yeni duyurularımız ve etkinliklerden anılarımız için bizi takip et.</p>
+                <div class="flex flex-wrap gap-4 text-sm font-bold text-ercupsaRed">
+                    <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-instagram" aria-hidden="true"></i> Instagram</a>
+                    <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp duyuruları</a>
+                </div>
+            </div>
+        </section>
 
-        <div id="formEmpty" class="glass-panel rounded-3xl p-10 text-center hidden">
-            <i class="fa-regular fa-calendar-xmark text-4xl text-gray-300 mb-4"></i>
-            <p class="text-gray-600 font-semibold mb-1">Şu anda açık bir kayıt formu bulunmuyor.</p>
-            <p class="text-gray-400 text-sm mb-6">Yaklaşan etkinliklerimizi kontrol edebilirsin.</p>
-            <a href="etkinlikler.html" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl btn-primary font-bold"><i class="fa-solid fa-calendar-day"></i> Etkinlikleri Gör</a>
-        </div>
+        <section id="registrationSection" class="hidden" aria-labelledby="registrationHeading">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+                <h2 id="registrationHeading" class="text-2xl font-black">Kayıt formu</h2>
+                <a id="registrationLink" href="#" target="_blank" rel="noopener noreferrer" class="btn-primary inline-flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm">Formu yeni sekmede aç <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+            </div>
+            <div id="formWrap" class="glass-panel rounded-3xl overflow-hidden hidden">
+                <iframe id="formFrame" title="Etkinlik kayıt formu" class="w-full min-h-[75vh]" frameborder="0" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+            </div>
+        </section>
 
-        <div id="formFallback" class="glass-panel rounded-3xl p-10 text-center hidden">
-            <i class="fa-solid fa-arrow-up-right-from-square text-4xl text-gray-300 mb-4"></i>
-            <p class="text-gray-600 font-semibold mb-6">Bu form site içinde gösterilemiyor, ama tek tıkla açabilirsin.</p>
-            <a id="fallbackLink" href="#" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl btn-primary font-bold">Formu Aç</a>
+        <div id="formEmpty" class="glass-panel rounded-3xl p-10 text-center hidden" role="status">
+            <i class="fa-regular fa-calendar text-4xl text-gray-300 mb-4" aria-hidden="true"></i>
+            <p id="formEmptyMessage" class="text-gray-600 font-semibold mb-6"></p>
+            <a href="etkinlikler.html" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl btn-primary font-bold"><i class="fa-solid fa-calendar-day" aria-hidden="true"></i> Etkinlikleri keşfet</a>
         </div>
     </main>
 
     <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center"><p>ERCUPSA · Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu</p><a href="iletisim.html">İletişim</a></footer>
 
+    <script src="assets/events-common.js"></script>
     <script src="assets/form-inline-2.js"></script>
 <script src="fun.js"></script><script src="assets/form-inline-3.js"></script></body>
 </html>

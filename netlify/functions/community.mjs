@@ -40,15 +40,14 @@ export default guarded(async (req) => {
       key: process.env.SUPABASE_ANON_KEY || "",
     });
   if (req.method === "GET" && action === "public") {
-    const [members, experiences, board] = await Promise.all([
-      db("members?select=id,name,class&order=name"),
+    const [experiences, board] = await Promise.all([
       db(
         "submissions?kind=eq.experience&status=eq.approved&select=id,title,content,created_at&order=created_at.desc&limit=100",
       ),
       db("rpc/badge_board", { method: "POST", data: {} }),
     ]);
     return response({
-      members,
+      members: [],
       experiences,
       board: board.map((p) => ({ ...p, badge: badge(Number(p.total)) })),
     });

@@ -3,13 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Biletlerim ve rozetlerim | ERCUPSA</title>
+    <title>Katılımlarım ve rozetlerim | ERCUPSA</title>
     <meta
       name="description"
-      content="ERCUPSA topluluğuna katıl, deneyimlerini paylaş ve etkinliklerini keşfet."
+      content="ERCUPSA etkinliklerinde verilen QR kodunu okut, katılımlarını kaydet ve bronz, gümüş, altın rozetlerini biriktir."
     />
     <link rel="stylesheet" href="assets/tailwind.css" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="assets/participation.css" />
     <script type="module" src="assets/shell.js"></script>
     <script src="fun.js" defer></script>
     <script type="module" src="assets/tickets.bundle.js"></script>
@@ -25,21 +26,49 @@
         />ERCUPSA</a
       ><a href="etkinlikler.html">Etkinlikler</a
       ><a href="topluluk.html">Topluluk</a
-      ><a href="uyeler.html">Aktif Üyelerimiz</a
       ><a href="biletler.html">Biletlerim</a>
     </nav>
     <main class="pt-28 pb-20 max-w-5xl mx-auto px-4">
-      <h1 class="text-4xl font-black text-ercupsaRed mb-4">
-        Biletlerim ve rozetlerim
-      </h1>
-      <p class="text-gray-600 mb-6">
-        Katıldığın etkinliğin bilet kodunu ekle. 3 farklı etkinlikte bronz, 4
-        etkinlikte gümüş, 5 ve üzerinde altın rozet kazan.
-      </p>
+      <header class="participation-hero">
+        <div>
+          <p class="participation-eyebrow">Her etkinlik bir anı</p>
+          <h1>Katılımlarım ve rozetlerim</h1>
+          <p class="participation-intro">
+            ERCUPSA ile yaşadığın deneyimleri biriktir. Etkinlikte verilen
+            QR kodu veya katılım koduyla geçmişini kaydet, rozet yolculuğunu takip et.
+          </p>
+          <a href="etkinlikler.html" class="participation-link">Etkinlikleri keşfet <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="participation-rewards">
+          <div class="participation-medal-preview" aria-hidden="true">
+            <span class="participation-medal participation-medal--bronz">★</span>
+            <span class="participation-medal participation-medal--altin">★</span>
+            <span class="participation-medal participation-medal--gumus">★</span>
+          </div>
+          <p>3 etkinlikte bronz · 4 etkinlikte gümüş · 5 etkinlikte altın</p>
+          <strong>Sürpriz hediyeler sizi bekliyor.</strong>
+        </div>
+      </header>
+      <section class="participation-guide" aria-labelledby="guideHeading">
+        <h2 id="guideHeading">Katılımını nasıl eklersin?</h2>
+        <ol>
+          <li><span class="participation-step" aria-hidden="true">1</span><div><h3>QR’ı okut veya kodu gir</h3><p>Etkinlikte verilen QR’ı telefonunun kamerasıyla okut. Dilersen biletindeki kodu elle gir.</p></div></li>
+          <li><span class="participation-step" aria-hidden="true">2</span><div><h3>Hesabına giriş yap</h3><p>İlk kez kullanıyorsan bir site hesabı oluştur. Hesabın yalnızca katılımlarını ve rozetlerini saklar.</p></div></li>
+          <li><span class="participation-step" aria-hidden="true">3</span><div><h3>Katılımını ekle</h3><p>“Katılımımı ekle” butonuna bas. Her farklı etkinlik seni bir sonraki rozete yaklaştırır.</p></div></li>
+        </ol>
+        <p class="participation-note">Bu sayfa etkinlik başvurusu için kullanılmaz. Başvurular etkinlik sayfasındaki Google Form üzerinden yapılır.</p>
+      </section>
+      <p id="status" role="status" aria-live="polite" class="participation-status"></p>
       <section id="authPanel" class="glass-panel rounded-3xl p-6">
+        <form id="prepareCodeForm" class="participation-code-entry">
+          <div><label for="entryTicketCode">Katılım kodun varsa buraya yaz</label><p>QR’ı okuttuysan kodun otomatik hazırlanır.</p></div>
+          <div class="participation-code-row"><input id="entryTicketCode" maxlength="40" placeholder="ERC-…" autocomplete="off" spellcheck="false" class="border rounded-xl p-3 font-mono" /><button type="submit" class="border rounded-xl p-3 font-bold">Kodu hazırla</button></div>
+        </form>
+        <p id="pendingCodeNote" hidden class="participation-pending" role="status">Kodun hazır. Giriş yaptıktan sonra “Katılımımı ekle” butonuyla kaydedebilirsin.</p>
+        <h2 class="text-2xl font-bold mb-3">Katılımlarını hesabında sakla</h2>
         <p class="text-sm text-gray-600 mb-5">
-          Biletlerini saklamak için giriş yap veya hesap oluştur. Siteyi gezmek
-          için hesap gerekmez.
+          Giriş yap veya bir site hesabı oluştur. Siteyi gezmek ve etkinliklere
+          başvurmak için burada hesap açman gerekmez.
         </p>
         <div
           class="flex gap-3 mb-6"
@@ -199,11 +228,37 @@
         </form>
       </section>
       <section id="accountPanel" hidden>
-        <div class="flex justify-between mb-6">
-          <h2 id="badge" class="text-2xl font-black"></h2>
-          <button id="logout" class="border p-2 rounded-xl">Çıkış yap</button>
-        </div>
+        <section class="participation-progress-card" aria-labelledby="badge">
+          <div class="participation-account-heading"><div id="accountMedal" aria-hidden="true"></div><div><p class="participation-eyebrow">Senin rozet yolculuğun</p><h2 id="badge"></h2><p id="attendanceCount"></p></div><button id="logout" class="border p-2 rounded-xl">Çıkış yap</button></div>
+          <p id="progressMessage" class="participation-progress-message"></p>
+          <progress id="badgeProgress" value="0" max="5" aria-label="Altın rozete ilerleme" aria-describedby="progressMessage"></progress>
+          <div class="participation-milestones" aria-label="Rozet hedefleri">
+            <div id="milestoneBronz"><span class="participation-medal participation-medal--bronz" aria-hidden="true">★</span><strong>Bronz</strong><span>3 farklı etkinlik</span><small class="milestone-state">Hedef</small></div>
+            <div id="milestoneGumus"><span class="participation-medal participation-medal--gumus" aria-hidden="true">★</span><strong>Gümüş</strong><span>4 farklı etkinlik</span><small class="milestone-state">Hedef</small></div>
+            <div id="milestoneAltin"><span class="participation-medal participation-medal--altin" aria-hidden="true">★</span><strong>Altın</strong><span>5 farklı etkinlik</span><small class="milestone-state">Hedef</small></div>
+          </div>
+        </section>
+        <div class="participation-account-grid">
+        <form
+          id="claimForm"
+          class="glass-panel rounded-3xl p-6 grid gap-4"
+        >
+          <h2 class="text-xl font-bold">Yeni katılımını ekle</h2>
+          <p class="text-sm text-gray-600">Etkinlikte sana verilen biletteki kodu kullan. QR’ı okuttuysan aşağıdaki alan otomatik dolar.</p>
+          <label for="ticketCode">Katılım kodu</label><input
+              id="ticketCode"
+              required
+              maxlength="40"
+              placeholder="ERC-…"
+              autocomplete="off"
+              spellcheck="false"
+              aria-describedby="claimHelp"
+              class="block w-full border rounded-xl p-3 font-mono" />
+          <button class="btn-primary p-3 rounded-xl">Katılımımı ekle</button>
+          <p id="claimHelp" class="text-sm text-gray-500">Aynı etkinlik için yalnızca bir katılım kaydedilir.</p>
+        </form>
         <form id="profileForm" class="glass-panel rounded-3xl p-6 grid gap-4">
+          <h2 class="text-xl font-bold">Profil ve görünürlük</h2>
           <label
             >Ad soyad<input
               id="name"
@@ -218,30 +273,18 @@
             Bilgilerimi kaydet
           </button>
         </form>
-        <form
-          id="claimForm"
-          class="glass-panel rounded-3xl p-6 grid gap-4 mt-5"
-        >
-          <label
-            >Bilet kodu<input
-              id="ticketCode"
-              required
-              maxlength="40"
-              placeholder="ERC-…"
-              class="block w-full border rounded-xl p-3 font-mono" /></label
-          ><button class="btn-primary p-3 rounded-xl">Biletimi ekle</button>
-        </form>
+        </div>
         <h3 class="font-bold text-xl mt-8 mb-4">Katıldığım etkinlikler</h3>
-        <div id="attendance" class="grid gap-3"></div>
+        <p class="text-sm text-gray-600 mb-4">Biriktirdiğin deneyimler burada. Her farklı etkinlik rozet ilerlemene eklenir.</p>
+        <div id="attendance" class="participation-history"></div>
       </section>
       <section class="mt-12">
         <h2 class="text-2xl font-black mb-4">ERCUPSA rozet panosu</h2>
         <p class="text-sm text-gray-500 mb-4">
           Yalnızca adını paylaşmayı seçen rozet sahipleri burada görünür.
         </p>
-        <div id="board" class="grid sm:grid-cols-2 gap-4"></div>
+        <div id="board" class="participation-board"></div>
       </section>
-      <p id="status" role="status" aria-live="polite" class="mt-5"></p>
     </main>
     <footer class="bg-ercupsaDark text-white py-10 text-center">
       <p>ERCUPSA · Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu</p>

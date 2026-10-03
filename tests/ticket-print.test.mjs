@@ -35,7 +35,7 @@ test("ticket pages contain at most ten distinct, complete tickets with logo, tit
   }
   const html = cards(1)[0];
   assert.match(html, /ercupsa.PNG/);
-  assert.match(html, /hediyeleri kap!/);
+  assert.match(html, /Sürpriz hediyeler sizi bekliyor./);
   assert.match(html, /&lt;script&gt;/);
   assert.ok(!html.includes("<script>"));
 });

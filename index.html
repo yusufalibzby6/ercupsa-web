@@ -59,21 +59,21 @@
 
 
     <!-- Header / Navbar -->
-    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50"><a href="index.html" class="flex items-center gap-3"><img src="ercupsa.PNG" width="48" height="48" alt="ERCUPSA logosu">ERCUPSA</a><a href="etkinlikler.html">Etkinlikler</a><a href="topluluk.html">Topluluk</a><a href="uyeler.html">Aktif Üyelerimiz</a><a href="biletler.html">Biletlerim</a></nav>
+    <nav class="fixed w-full z-50 glass-panel border-b border-gray-200/50"><a href="index.html" class="flex items-center gap-3"><img src="ercupsa.PNG" width="48" height="48" alt="ERCUPSA logosu">ERCUPSA</a><a href="etkinlikler.html">Etkinlikler</a><a href="topluluk.html">Topluluk</a><a href="biletler.html">Biletlerim</a></nav>
 
     <!-- Script for Mobile Menu Toggle -->
 
 
 
 
-    <div id="welcomeModal" class="hidden fixed inset-0 z-[200] bg-black/70 items-center justify-center p-4">
+    <div id="welcomeModal" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle" aria-describedby="welcomeDescription" class="hidden fixed inset-0 z-[200] bg-black/70 items-center justify-center p-4">
         <div class="glass-panel rounded-3xl max-w-sm w-full p-8 text-center relative shadow-2xl">
             <button id="closeWelcome" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center text-lg" aria-label="Kapat">&times;</button>
             <div class="h-16 w-16 rounded-full bg-white flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm mx-auto mb-4">
                 <img decoding="async" src="ercupsa.PNG" alt="ERCUPSA Logo" class="h-full w-full object-cover">
             </div>
-            <h2 class="text-xl font-black mb-2">ERCUPSA'ya Hoş Geldin! 👋</h2>
-            <p class="text-gray-500 text-sm mb-6">Bizi sosyal medyada takip et, hiçbir gelişmeyi kaçırma!</p>
+            <h2 id="welcomeTitle" class="text-xl font-black mb-2">ERCUPSA'ya Hoş Geldin! 👋</h2>
+            <p id="welcomeDescription" class="text-gray-500 text-sm mb-6">Bizi sosyal medyada takip et, hiçbir gelişmeyi kaçırma!</p>
             <div class="grid grid-cols-2 gap-3 mb-5">
                 <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer" class="flex flex-col items-center gap-2 p-4 rounded-2xl" style="background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)">
                     <i class="fa-brands fa-instagram text-2xl text-white"></i>
@@ -107,12 +107,21 @@
             </span>
 
             <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
-                <span class="text-ercupsaAccent">ERCUPSA'ya</span> <br class="hidden md:block"/> <span class="text-white">Hoş Geldiniz</span>
+                <span class="text-ercupsaAccent">Birlikte öğreniyor,</span><br/><span class="text-white">iz bırakıyoruz.</span>
             </h1>
 
             <p class="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
-                Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu resmi web platformu. Bilimsel gelişim, sosyal sorumluluk ve güçlü bir gelecek için buradayız.
+                ERCUPSA ile mesleki buluşmaları, teknik gezileri ve sosyal sorumluluk çalışmalarımızı keşfet. Etkinliklerimizden anılar burada; yeni duyurularımız Instagram ve WhatsApp’ta.
             </p>
+
+            <div class="home-primary-actions">
+                <a id="discoverEvents" href="etkinlikler.html" class="btn-primary rounded-2xl px-7 py-4 font-bold inline-flex items-center gap-2"><i class="fa-regular fa-calendar" aria-hidden="true"></i> Etkinlikleri keşfet</a>
+                <a href="galeri.html" class="home-gallery-action"><i class="fa-regular fa-images" aria-hidden="true"></i> Neler yaptık?</a>
+            </div>
+            <div class="home-social-actions" aria-label="Duyurularımızı takip et">
+                <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-instagram" aria-hidden="true"></i> Instagram’da takip et</a>
+                <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp duyuruları</a>
+            </div>
 
             <a href="test.html" class="badge-chip-dark inline-flex items-center gap-2 mt-6 px-4 py-2 rounded-full text-xs font-bold hover:scale-105 transition">
                 🧪 Hangi Eczacı Tipisin? Teste Gir <i class="fa-solid fa-arrow-right"></i>
@@ -121,8 +130,8 @@
         </div>
     </main>
 
-<section class="pb-16 bg-gradient-to-b from-slate-50 to-white reveal">
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8"><div class="flex items-end justify-between gap-4 mb-8"><div><span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Takvim</span><h2 class="text-3xl md:text-4xl font-black mt-2">Yaklaşan <span class="text-ercupsaRed">Etkinlikler</span></h2></div><a href="etkinlikler.html" class="text-sm font-bold text-ercupsaRed">Tüm etkinlikler →</a></div><div id="countdownWrap" class="hidden mb-8 glass-panel rounded-2xl p-5 flex flex-wrap items-center justify-center gap-4 text-center"><span class="text-sm font-bold text-gray-500">⏰ <span id="countdownLabel">En yakın etkinliğe</span>:</span><div class="flex items-center gap-3" id="countdownNums"><div><span id="cdDays" class="text-2xl font-black text-ercupsaRed">0</span><span class="text-[10px] text-gray-400 block uppercase font-bold">Gün</span></div><div><span id="cdHours" class="text-2xl font-black text-ercupsaRed">0</span><span class="text-[10px] text-gray-400 block uppercase font-bold">Saat</span></div><div><span id="cdMins" class="text-2xl font-black text-ercupsaRed">0</span><span class="text-[10px] text-gray-400 block uppercase font-bold">Dakika</span></div><div><span id="cdSecs" class="text-2xl font-black text-ercupsaRed">0</span><span class="text-[10px] text-gray-400 block uppercase font-bold">Saniye</span></div></div></div><div id="home-events" class="flex md:grid md:grid-cols-3 gap-5 overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-4 px-4 md:mx-0 md:px-0 pb-2 md:pb-0" style="scrollbar-width:none;-ms-overflow-style:none"></div></div>
+<section class="pt-12 pb-16 bg-gradient-to-b from-slate-50 to-white reveal">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8"><div class="flex items-end justify-between gap-4 mb-8"><div><span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Takvim</span><h2 class="text-3xl md:text-4xl font-black mt-2">Yaklaşan <span class="text-ercupsaRed">Etkinlikler</span></h2></div><a href="etkinlikler.html" class="text-sm font-bold text-ercupsaRed">Tüm etkinlikler →</a></div><div id="home-events" class="flex md:grid md:grid-cols-3 gap-5 overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-4 px-4 md:mx-0 md:px-0 pb-2 md:pb-0" style="scrollbar-width:none;-ms-overflow-style:none"></div></div>
 </section>
 
 <section class="py-16 bg-gradient-to-b from-orange-50/50 via-white to-white reveal">
@@ -130,13 +139,15 @@
 
         <div class="flex flex-wrap justify-center gap-4 mb-16">
             <a href="ekip.html" class="px-8 py-4 rounded-2xl bg-white text-ercupsaDark font-bold shadow-md hover:shadow-xl transition-all border border-gray-100 flex items-center gap-3">
-                <i class="fa-solid fa-users text-ercupsaRed"></i> Ekibimizle Tanışın (20 Üye)
+                <i class="fa-solid fa-users text-ercupsaRed"></i> Ekibimizle Tanışın (21 Üye)
             </a>
             <a href="galeri.html" class="px-8 py-4 rounded-2xl bg-white text-ercupsaDark font-bold shadow-md hover:shadow-xl transition-all border border-gray-100 flex items-center gap-3">
                 <i class="fa-regular fa-images text-ercupsaRed"></i> Fotoğraf Galerisi
             </a>
         </div>
 
+        <h2 class="text-2xl md:text-3xl font-black mb-3">Duyurularımızı kaçırma</h2>
+        <p class="text-gray-500 mb-8">Etkinliklerimizden kareler Instagram’da, yeni buluşmalarımız WhatsApp’ta.</p>
         <div class="grid grid-cols-3 gap-3 sm:gap-6 max-w-3xl mx-auto">
             <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer" class="social-card glass-panel rounded-2xl sm:rounded-3xl p-3 sm:p-6 flex flex-col items-center gap-2 sm:gap-3 instagram-hover text-gray-700">
                 <div class="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-pink-50 flex items-center justify-center text-[#E1306C]">
@@ -180,7 +191,7 @@
 <section class="py-16 band-dark reveal">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-3 gap-6 text-center">
         <div>
-            <div class="counter counter-glow text-4xl md:text-5xl font-black" data-target="187">0</div>
+            <div class="counter-glow text-4xl md:text-5xl font-black">187</div>
             <p class="text-gray-400 text-[11px] md:text-sm font-semibold uppercase tracking-wider mt-2">Aktif Üye</p>
         </div>
         <div>
@@ -212,6 +223,7 @@
 <script async src="//www.instagram.com/embed.js"></script>
 
     <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center"><p>ERCUPSA · Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu</p><a href="iletisim.html">İletişim</a></footer>
+<script src="assets/events-common.js"></script>
 <script src="assets/index-inline-3.js"></script>
 <script src="assets/index-inline-4.js"></script></body>
 </html>

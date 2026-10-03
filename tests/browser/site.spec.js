@@ -10,7 +10,7 @@ test("navigation and quiz work without external CDN; back navigation and retake"
   await page.goto("/test.html");
   await expect(
     page.getByRole("link", { name: "Aktif Üyelerimiz" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Teste Başla" }).click();
   await expect(page.locator("#questionCounter")).toHaveText("Soru 1 / 10");
   await page.locator(".option-btn").first().click();
@@ -30,7 +30,12 @@ test("navigation and quiz work without external CDN; back navigation and retake"
 test("new public pages are accessible and gracefully explain missing setup", async ({
   page,
 }) => {
-  for (const path of ["/topluluk.html", "/uyeler.html", "/biletler.html"]) {
+  await page.route("**/api/community*", route => {
+    if (new URL(route.request().url()).searchParams.get("action") === "config")
+      return route.fulfill({ json: { url: "", key: "" } });
+    return route.fulfill({ status: 503, json: { error: "Bu bölüm henüz kullanıma açılmadı." } });
+  });
+  for (const path of ["/topluluk.html", "/biletler.html"]) {
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(path);
@@ -92,11 +97,6 @@ test("community renders hostile text safely and accepts moderated submissions", 
       },
     });
   });
-  await page.goto("/uyeler.html");
-  await expect(page.locator("#members")).toContainText(
-    "<img src=x onerror=alert(1)>",
-  );
-  await expect(page.locator("#members img")).toHaveCount(0);
   await page.goto("/topluluk.html");
   await expect(page.locator("#experiences")).toContainText(
     "<script>alert(1)</script>",
@@ -191,7 +191,6 @@ test("logo is restored and public footers contain no admin entry", async ({
     "/galeri.html",
     "/test.html",
     "/topluluk.html",
-    "/uyeler.html",
     "/biletler.html",
     "/hakkimizda.html",
     "/ekip.html",
@@ -236,7 +235,7 @@ test("password signup saves names and login persists without confirmation email"
   await page.getByRole("button", { name: "Bilgilerimi kaydet" }).click();
   for (const badge of ["Bronz", "Gümüş", "Altın"]) {
     await page.locator("#ticketCode").fill("ERC-AAAAAAAAAAAAAAAAAAAAAAAA");
-    await page.getByRole("button", { name: "Biletimi ekle" }).click();
+    await page.getByRole("button", { name: "Katılımımı ekle" }).click();
     await expect(page.locator("#badge")).toContainText(badge);
   }
   await page.getByRole("button", { name: "Çıkış yap" }).click();
@@ -362,6 +361,7 @@ test("admin membership editing, moderation, 50 QR tickets and print action", asy
     batches: [],
   };
   let batch;
+  await page.route("**/api/ticket-design*", route => route.fulfill({ json: { design: null } }));
   await page.route("**/api/community*", (route) => {
     const u = new URL(route.request().url()),
       action = u.searchParams.get("action"),
@@ -384,6 +384,7 @@ test("admin membership editing, moderation, 50 QR tickets and print action", asy
         );
       batch = {
         id: "b1",
+        event_id: b.event_id,
         codes,
         event_title: "Test etkinliği",
         tickets: codes.map((c, i) => ({
@@ -429,7 +430,7 @@ test("admin membership editing, moderation, 50 QR tickets and print action", asy
   await expect(page.locator("#ticketPrintRoot .ticket-logo")).toHaveCount(50);
   await expect(
     page.locator("#ticketPrintRoot .ticket-slogan").first(),
-  ).toContainText("hediyeleri kap!");
+  ).toContainText("Sürpriz hediyeler sizi bekliyor.");
   await page.pdf({
     path: "/workspace/.onboarding-runtime/tickets-50.pdf",
     preferCSSPageSize: true,

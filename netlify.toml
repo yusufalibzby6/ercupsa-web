@@ -7,8 +7,19 @@
   node_bundler = "esbuild"
 
 [[redirects]]
+  from = "/uyeler.html"
+  to = "/etkinlikler.html"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/api/events"
   to = "/.netlify/functions/events"
+  status = 200
+
+[[redirects]]
+  from = "/api/ticket-design"
+  to = "/.netlify/functions/ticket-design"
   status = 200
 
 [[redirects]]
