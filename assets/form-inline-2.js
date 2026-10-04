@@ -34,12 +34,12 @@ fetch('/api/events').then(response => {
   document.getElementById('formTitle').textContent = target.title;
   document.getElementById('formSub').textContent = target.category || 'Etkinlik';
   document.getElementById('eventDescription').textContent = target.description || '';
-  document.getElementById('eventDate').textContent = formatDate(target.date);
-  document.getElementById('eventTime').textContent = start(target) !== null ? `${target.time} · Türkiye saati` : 'Saat duyurusu için sosyal hesaplarımızı takip et.';
-  if (target.location) {
-    document.getElementById('eventLocation').textContent = target.location;
-    document.getElementById('eventLocationWrap').classList.remove('hidden');
-    document.getElementById('mapsLink').href = mapUrl(target.location);
+  document.getElementById('eventDate').textContent = formatDate(target.date) || 'Tarih bilgisi paylaşılmadı.';
+  document.getElementById('eventTime').textContent = start(target) !== null ? `${target.time} · Türkiye saati` : 'Saat bilgisi paylaşılmadı.';
+  const eventLocation = String(target.location || '').trim();
+  document.getElementById('eventLocation').textContent = eventLocation || 'Konum bilgisi paylaşılmadı.';
+  if (eventLocation) {
+    document.getElementById('mapsLink').href = mapUrl(eventLocation);
     document.getElementById('mapsLink').classList.remove('hidden');
   }
   const poster = safeUrl(target.poster);
@@ -52,12 +52,22 @@ fetch('/api/events').then(response => {
   const detailUrl = new URL(`form.html?event=${encodeURIComponent(target.id)}`, location.href).href;
   const calendarText = calendar(target, detailUrl);
   if (calendarText) {
-    const objectUrl = URL.createObjectURL(new Blob([calendarText], { type: 'text/calendar;charset=utf-8' }));
     const link = document.getElementById('calendarLink');
-    link.href = objectUrl;
     link.download = `ercupsa-${target.id}.ics`;
     link.classList.remove('hidden');
-    window.addEventListener('pagehide', () => URL.revokeObjectURL(objectUrl), { once: true });
+    let objectUrl = '';
+    const releaseCalendar = () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      objectUrl = '';
+    };
+    const prepareCalendar = () => {
+      releaseCalendar();
+      objectUrl = URL.createObjectURL(new Blob([calendarText], { type: 'text/calendar;charset=utf-8' }));
+      link.href = objectUrl;
+    };
+    prepareCalendar();
+    window.addEventListener('pagehide', releaseCalendar);
+    window.addEventListener('pageshow', event => { if (event.persisted) prepareCalendar(); });
   }
   if (target.images?.length) {
     document.getElementById('eventGalleryLink').href = `galeri.html#event-${encodeURIComponent(target.id)}`;
@@ -79,14 +89,18 @@ fetch('/api/events').then(response => {
 
   const registrationUrl = safeUrl(target.registrationUrl);
   // Google Forms decides whether submissions are accepted. A start time is not a closing time.
-  if (!pastDay && registrationUrl) {
+  if (formatDate(target.date) && !pastDay && registrationUrl) {
     document.getElementById('registrationLink').href = registrationUrl;
     document.getElementById('registrationSection').classList.remove('hidden');
+    document.getElementById('eventRegisterLink').classList.remove('hidden');
     const embed = embedInfo(registrationUrl);
     if (embed) {
       document.getElementById('formFrame').src = embed;
       document.getElementById('formFrame').title = `${target.title} kayıt formu`;
       document.getElementById('formWrap').classList.remove('hidden');
+    }
+    if (location.hash === '#registrationSection') {
+      requestAnimationFrame(() => document.getElementById('registrationSection').scrollIntoView());
     }
   } else {
     document.getElementById('eventFollowMessage').textContent = pastDay

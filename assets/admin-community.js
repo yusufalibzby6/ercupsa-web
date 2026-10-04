@@ -7,12 +7,12 @@ import {
   TICKETS_PER_PAGE,
 } from "./ticket-print.js";
 import { readTicketDesign, validateStoredDesign, releaseTicketArtwork } from "./ticket-template.js";
-let data = { members: [], submissions: [], batches: [] };
+let data = { submissions: [], batches: [] };
 let events = [], design = null, designEventId = "", designState = "idle";
 let designBusy = false, batchBusy = false, fileReading = false, candidate = null, candidateFile = null;
 let designLoadVersion = 0, fileReadVersion = 0, batchLoadVersion = 0, cardsVersion = 0;
 let designPromise = null, openedBatch = null;
-const tabs = ["events", "members", "suggestions", "experiences", "tickets"];
+const tabs = ["events", "suggestions", "experiences", "tickets"];
 function tab(name) {
   for (const t of tabs) $(t + "Tab").hidden = t !== name;
 }
@@ -204,13 +204,6 @@ async function load() {
 }
 document.addEventListener("admin-ready", load);
 function render() {
-  $("memberList").innerHTML =
-    data.members
-      .map(
-        (m) =>
-          `<article class="card rounded-xl p-4 flex justify-between gap-3"><div>${escape(m.name)} · ${escape(m.class)}</div><div><button data-member="${m.id}">Düzenle</button> <button data-delete="${m.id}" class="text-red-700">Sil</button></div></article>`,
-      )
-      .join("") || "<p>Henüz üye eklenmedi.</p>";
   for (const [kind, target] of [
     ["suggestion", "suggestionList"],
     ["experience", "experienceList"],
@@ -230,51 +223,10 @@ function render() {
     )
     .join("");
 }
-$("memberForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const btn = e.target.querySelector("button");
-  btn.disabled = true;
-  try {
-    await api("/api/community?action=member", {
-      method: "POST",
-      body: JSON.stringify({
-        id: $("memberId").value || undefined,
-        name: $("memberName").value,
-        class: $("memberClass").value,
-      }),
-    });
-    e.target.reset();
-    status("Üye kaydedildi.");
-    await load();
-  } catch (e) {
-    status(e.message, true);
-  } finally {
-    btn.disabled = false;
-  }
-});
-$("memberReset").onclick = () => {
-  $("memberForm").reset();
-  $("memberId").value = "";
-};
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   try {
-    if (b.dataset.member) {
-      const m = data.members.find((m) => m.id === b.dataset.member);
-      $("memberId").value = m.id;
-      $("memberName").value = m.name;
-      $("memberClass").value = m.class;
-    }
-    if (
-      b.dataset.delete &&
-      confirm("Üye listeden kaldırılacak. Devam edilsin mi?")
-    ) {
-      await api("/api/community?action=member&id=" + b.dataset.delete, {
-        method: "DELETE",
-      });
-      await load();
-    }
     if (b.dataset.moderate) {
       await api("/api/community?action=moderate", {
         method: "POST",

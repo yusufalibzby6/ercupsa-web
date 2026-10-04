@@ -343,7 +343,7 @@ test("ticket QR code cannot be interpreted as a password recovery callback", asy
   );
   expect(state.calls.some((c) => c.path.endsWith("/token"))).toBe(false);
 });
-test("admin membership editing, moderation, 50 QR tickets and print action", async ({
+test("admin has no member section and supports moderation, 50 QR tickets and print action", async ({
   page,
 }) => {
   const { createHash } = await import("node:crypto");
@@ -367,11 +367,6 @@ test("admin membership editing, moderation, 50 QR tickets and print action", asy
       action = u.searchParams.get("action"),
       method = route.request().method();
     if (action === "admin") return route.fulfill({ json: db });
-    if (action === "member") {
-      const b = route.request().postDataJSON();
-      db.members = [{ id: "m1", ...b }];
-      return route.fulfill({ json: { ok: true } });
-    }
     if (action === "moderate") {
       db.submissions[0].status = route.request().postDataJSON().status;
       return route.fulfill({ json: { ok: true } });
@@ -404,13 +399,8 @@ test("admin membership editing, moderation, 50 QR tickets and print action", asy
   await page.locator("#password").fill(process.env.ADMIN_PASSWORD);
   await page.locator("#loginBtn").click();
   await expect(page.locator("#app")).toBeVisible();
-  await page.locator('[data-tab="members"]').click();
-  await page.locator("#memberName").fill("Yeni Üye");
-  await page.locator("#memberClass").selectOption("3");
-  await page.getByRole("button", { name: "Üyeyi kaydet" }).click();
-  await expect(page.locator("#memberList")).toContainText("Yeni Üye · 3");
-  await page.locator("[data-member]").click();
-  await expect(page.locator("#memberName")).toHaveValue("Yeni Üye");
+  await expect(page.locator('[data-tab="members"]')).toHaveCount(0);
+  await expect(page.locator("#membersTab, #memberForm, #memberList")).toHaveCount(0);
   await page.locator('[data-tab="experiences"]').click();
   await page.getByRole("button", { name: "Onayla ve yayımla" }).click();
   await expect(page.locator("#experienceList")).toContainText("Yayımlandı");
