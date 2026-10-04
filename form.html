@@ -4,21 +4,21 @@
 <script src="assets/form-inline-1.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Etkinlik Detayları ve Kayıt | ERCUPSA</title>
-<meta name="description" content="ERCUPSA etkinliklerinin tarih, saat ve konum bilgilerini keşfet; kayıt formuna ulaş.">
+    <title>Kayıt Formları | ERCUPSA</title>
+<meta name="description" content="ERCUPSA etkinliklerinin kayıt formlarını keşfet; katılmak istediğin etkinliğin formuna kendi bağlantısından ulaş.">
 <link rel="canonical" href="https://ercupsa.com.tr/form.html">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="ERCUPSA">
 <meta property="og:locale" content="tr_TR">
 <meta property="og:url" content="https://ercupsa.com.tr/form.html">
-<meta property="og:title" content="Etkinlik Detayları ve Kayıt | ERCUPSA">
-<meta property="og:description" content="ERCUPSA etkinliklerinin tarih, saat ve konum bilgilerini keşfet; kayıt formuna ulaş.">
+<meta property="og:title" content="Kayıt Formları | ERCUPSA">
+<meta property="og:description" content="ERCUPSA etkinliklerinin kayıt formlarını keşfet; katılmak istediğin etkinliğin formuna kendi bağlantısından ulaş.">
 <meta property="og:image" content="https://ercupsa.com.tr/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Etkinlik Detayları ve Kayıt | ERCUPSA">
-<meta name="twitter:description" content="ERCUPSA etkinliklerinin tarih, saat ve konum bilgilerini keşfet; kayıt formuna ulaş.">
+<meta name="twitter:title" content="Kayıt Formları | ERCUPSA">
+<meta name="twitter:description" content="ERCUPSA etkinliklerinin kayıt formlarını keşfet; katılmak istediğin etkinliğin formuna kendi bağlantısından ulaş.">
 <meta name="twitter:image" content="https://ercupsa.com.tr/og-image.jpg">
 <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
 <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
@@ -41,12 +41,26 @@
 
 
     <main class="pt-28 pb-16 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <a href="etkinlikler.html" class="inline-flex items-center gap-2 text-sm font-bold text-ercupsaRed mb-6"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Tüm etkinlikler</a>
+        <a id="formBackLink" href="etkinlikler.html" class="inline-flex items-center gap-2 text-sm font-bold text-ercupsaRed mb-6"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> <span>Tüm etkinlikler</span></a>
         <div id="formHead" class="mb-8">
-            <span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Etkinlik</span>
-            <h1 id="formTitle" class="text-3xl md:text-4xl font-black mt-3">Etkinlik detayları</h1>
-            <p id="formSub" class="text-gray-500 mt-3 text-sm"></p>
+            <span id="formEyebrow" class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Etkinlikler</span>
+            <h1 id="formTitle" class="text-3xl md:text-4xl font-black mt-3">Kayıt formları</h1>
+            <p id="formSub" class="text-gray-500 mt-3 text-sm">Katılmak istediğin etkinliği seç. Her etkinliğin kayıt formuna kendi bağlantısından ulaşabilirsin.</p>
         </div>
+
+        <div id="formLoading" class="glass-panel rounded-3xl p-8 text-center" role="status" aria-live="polite">
+            <p class="text-gray-600">Kayıt formları yükleniyor…</p>
+        </div>
+
+        <div id="formError" class="glass-panel rounded-3xl p-8 text-center hidden" role="alert">
+            <p class="text-gray-600 font-semibold mb-5">Etkinlik bilgileri şu anda yüklenemedi. Yeniden deneyebilirsin.</p>
+            <button id="formRetry" type="button" class="btn-primary inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Tekrar dene</button>
+        </div>
+
+        <section id="formCatalog" class="hidden" aria-labelledby="formCatalogHeading">
+            <h2 id="formCatalogHeading" class="text-xl font-bold mb-5">Etkinlik seç</h2>
+            <div id="formCatalogList" class="form-catalog-grid"></div>
+        </section>
 
         <section id="eventDetails" class="hidden mb-8" aria-label="Etkinlik bilgileri">
             <div class="event-detail-layout glass-panel rounded-3xl overflow-hidden">

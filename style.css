@@ -169,3 +169,17 @@ html.dark .event-facts dt { color:#a1a1aa; }
 html.dark .event-secondary-action { color:#f2c9c9; border-color:#f2c9c933; }
 html.dark .event-follow-card { background:#ffffff05; border-color:#ffffff15; }
 @media(max-width:640px) { .event-detail-layout { flex-direction:column; } .event-detail-poster { width:100%; max-width:100%; max-height:540px; object-fit:contain; background:#8b232307; } .event-card-facts { grid-template-columns:1fr; gap:12px; } .home-primary-actions>a { justify-content:center; width:100%; } }
+
+/* Separate registration forms for every upcoming event. */
+#formTitle { overflow-wrap:anywhere; }
+.form-catalog-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
+.form-catalog-card { display:flex; flex-direction:column; min-width:0; border-radius:24px; overflow:hidden; }
+.form-catalog-poster { width:100%; height:260px; object-fit:contain; background:#8b232307; }
+.form-catalog-body { display:flex; flex-direction:column; flex:1; padding:24px; min-width:0; }
+.form-catalog-category { color:#8b2323; font-size:.75rem; font-weight:800; margin-bottom:8px; overflow-wrap:anywhere; }
+.form-catalog-title { font-size:1.3rem; line-height:1.35; font-weight:900; overflow-wrap:anywhere; }
+.form-catalog-facts { margin:22px 0 24px; }
+.form-catalog-action { justify-content:center; align-self:stretch; margin-top:auto; }
+html.dark .form-catalog-category { color:#f2c9c9; }
+html.dark .form-catalog-poster { background:#ffffff05; }
+@media(max-width:640px) { .form-catalog-grid { grid-template-columns:1fr; gap:20px; } .form-catalog-body { padding:22px; } .form-catalog-poster { height:240px; } }

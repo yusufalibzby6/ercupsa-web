@@ -1,13 +1,14 @@
 const links = [
   ["index.html", "Ana Sayfa"],
   ["etkinlikler.html", "Etkinlikler"],
+  ["form.html", "Formlar"],
   ["galeri.html", "Galeri"],
   ["test.html", "Test"],
   ["topluluk.html", "Topluluk"],
   ["biletler.html", "Biletlerim"],
 ];
 const page = location.pathname.split("/").pop() || "index.html";
-const current = page === "form.html" ? "etkinlikler.html" : page;
+const current = page;
 document.querySelectorAll("nav").forEach((nav) => {
   nav.innerHTML = `<div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4"><a href="index.html" id="logoLink" class="flex items-center gap-3 shrink-0 text-ercupsaRed"><span class="h-12 w-12 rounded-full bg-white overflow-hidden border shadow-sm"><img src="ercupsa.PNG" width="48" height="48" alt="ERCUPSA logosu" class="w-full h-full object-cover"></span><span class="font-black text-xl">ERCUPSA</span></a><button type="button" id="siteMenuButton" aria-expanded="false" aria-controls="siteMenu" class="md:hidden border rounded-xl p-2">Menü</button><div id="siteMenu" class="hidden md:flex flex-wrap items-center gap-4">${links.map(([url, label]) => `<a href="${url}" ${url === current ? 'aria-current="page"' : ""} class="text-sm font-semibold ${url === current ? "text-ercupsaRed" : ""}">${label}</a>`).join("")}<button class="theme-toggle border rounded-xl px-2 py-1" aria-label="Temayı değiştir">◐</button></div></div>`;
   const btn = nav.querySelector("#siteMenuButton");

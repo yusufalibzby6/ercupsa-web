@@ -25,6 +25,16 @@ async function load() {
   render();
   document.dispatchEvent(new CustomEvent("events-loaded", { detail: events }));
 }
+function hasRegistrationLink(event) {
+  if (!event.published) return false;
+  const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Istanbul" }).format(new Date());
+  if (event.date < today) return false;
+  try {
+    return ["https:", "http:"].includes(new URL(event.registrationUrl).protocol);
+  } catch {
+    return false;
+  }
+}
 function render() {
   const q = $("eventSearch").value.toLocaleLowerCase("tr");
   $("eventsList").innerHTML =
@@ -32,7 +42,7 @@ function render() {
       .filter((e) => e.title.toLocaleLowerCase("tr").includes(q))
       .map(
         (e) =>
-          `<article class="card p-5 rounded-3xl flex flex-wrap justify-between gap-4"><div class="flex gap-4">${image(e.poster)}<div><p class="text-sm">${escape(e.category)} · ${escape(e.date)} · ${e.published ? "Yayında" : "Taslak"}</p><h3 class="font-bold text-xl">${escape(e.title)}</h3><p>${escape(e.location)} ${escape(e.time)}</p><p>${e.images.length} fotoğraf</p></div></div><div class="flex flex-wrap gap-2 items-center"><button data-action="publish" data-id="${escape(e.id)}" class="border rounded-xl p-2">${e.published ? "Yayından kaldır" : "Yayınla"}</button><button data-action="edit" data-id="${escape(e.id)}" class="border rounded-xl p-2">Düzenle</button><button data-action="ticket" data-id="${escape(e.id)}" class="border rounded-xl p-2">Bilet oluştur</button><button data-action="delete" data-id="${escape(e.id)}" class="text-red-700 p-2">Sil</button></div></article>`,
+          `<article class="card p-5 rounded-3xl flex flex-wrap justify-between gap-4"><div class="flex gap-4">${image(e.poster)}<div><p class="text-sm">${escape(e.category)} · ${escape(e.date)} · ${e.published ? "Yayında" : "Taslak"}</p><h3 class="font-bold text-xl">${escape(e.title)}</h3><p>${escape(e.location)} ${escape(e.time)}</p><p>${e.images.length} fotoğraf</p></div></div><div class="flex flex-wrap gap-2 items-center"><button data-action="publish" data-id="${escape(e.id)}" class="border rounded-xl p-2">${e.published ? "Yayından kaldır" : "Yayınla"}</button><button data-action="edit" data-id="${escape(e.id)}" class="border rounded-xl p-2">Düzenle</button>${hasRegistrationLink(e) ? `<button data-action="copy-registration" data-id="${escape(e.id)}" class="border rounded-xl p-2">Kayıt linkini kopyala</button>` : ""}<button data-action="ticket" data-id="${escape(e.id)}" class="border rounded-xl p-2">Bilet oluştur</button><button data-action="delete" data-id="${escape(e.id)}" class="text-red-700 p-2">Sil</button></div></article>`,
       )
       .join("") || "<p>Etkinlik bulunamadı.</p>";
 }
@@ -82,6 +92,15 @@ $("eventsList").addEventListener("click", async (ev) => {
   const e = events.find((e) => e.id === b.dataset.id);
   b.disabled = true;
   try {
+    if (b.dataset.action === "copy-registration") {
+      const url = new URL(`form.html?event=${encodeURIComponent(e.id)}#registrationSection`, location.href).href;
+      try {
+        await navigator.clipboard.writeText(url);
+        status("Kayıt bağlantısı kopyalandı.");
+      } catch {
+        status(`Kayıt bağlantısı: ${url}`);
+      }
+    }
     if (b.dataset.action === "edit") edit(e);
     if (b.dataset.action === "ticket")
       document.dispatchEvent(new CustomEvent("ticket-event", { detail: e }));

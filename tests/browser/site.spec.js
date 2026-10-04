@@ -430,6 +430,32 @@ test("admin has no member section and supports moderation, 50 QR tickets and pri
   await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
   await expect(page.locator("body")).not.toHaveClass(/printing-tickets/);
 });
+test("admin copies separate registration links for current published events and exposes a fallback", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-04T19:00:00+03:00") });
+  const events = [
+    { id: "first", title: "İlk etkinlik", date: "2026-10-04", time: "18:00", registrationUrl: "https://docs.google.com/forms/d/e/first/viewform", published: true },
+    { id: "second", title: "İkinci etkinlik", date: "2026-10-12", registrationUrl: "https://docs.google.com/forms/d/e/second/viewform", published: true },
+    { id: "draft", title: "Taslak", date: "2026-10-12", registrationUrl: "https://docs.google.com/forms/d/e/draft/viewform", published: false },
+    { id: "past", title: "Geçmiş", date: "2026-10-03", registrationUrl: "https://docs.google.com/forms/d/e/past/viewform", published: true },
+    { id: "without-form", title: "Formsuz", date: "2026-10-12", registrationUrl: "", published: true },
+  ].map(event => ({ category: "Etkinlik", time: "", location: "", description: "", images: [], ...event }));
+  await page.route("**/api/events*", route => route.fulfill({ json: { events } }));
+  await page.route("**/api/community*", route => route.fulfill({ json: { submissions: [], batches: [] } }));
+  await page.route("**/api/ticket-design*", route => route.fulfill({ json: { design: null } }));
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/admin.html");
+  await expect(page.locator("#app")).toBeVisible();
+  await expect(page.locator('[data-action="copy-registration"]')).toHaveCount(2);
+  for (const id of ["first", "second"]) {
+    await page.locator(`[data-action="copy-registration"][data-id="${id}"]`).click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`http://127.0.0.1:8888/form.html?event=${id}#registrationSection`);
+    await expect(page.locator("#status")).toHaveText("Kayıt bağlantısı kopyalandı.");
+  }
+  await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error("Clipboard unavailable"); }; });
+  await page.locator('[data-action="copy-registration"][data-id="second"]').click();
+  await expect(page.locator("#status")).toHaveText("Kayıt bağlantısı: http://127.0.0.1:8888/form.html?event=second#registrationSection");
+});
+
 test("A4 ticket layout keeps long titles and the final ticket complete", async ({
   page,
 }) => {
