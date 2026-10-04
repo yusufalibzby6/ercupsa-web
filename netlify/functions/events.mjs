@@ -1,5 +1,6 @@
 import { getStore } from "@netlify/blobs";
 import { randomUUID, createHash } from "node:crypto";
+import { hydrateRegistrationFlags } from "../lib/registrations.mjs";
 import {
   guarded,
   response,
@@ -112,7 +113,7 @@ export default guarded(async (req) => {
     });
   if (req.method === "GET") {
     if (url.searchParams.get("admin") === "true") requireAdmin(req);
-    const events = await readEvents();
+    const events = await hydrateRegistrationFlags(await readEvents(), getStore);
     return response({
       events:
         url.searchParams.get("admin") === "true"

@@ -1,4 +1,5 @@
 import QRCode from "qrcode";
+import "./admin-registrations.js";
 import { $, escape, api, status } from "./common.js";
 import {
   ticketCard,
@@ -12,7 +13,7 @@ let events = [], design = null, designEventId = "", designState = "idle";
 let designBusy = false, batchBusy = false, fileReading = false, candidate = null, candidateFile = null;
 let designLoadVersion = 0, fileReadVersion = 0, batchLoadVersion = 0, cardsVersion = 0;
 let designPromise = null, openedBatch = null;
-const tabs = ["events", "suggestions", "experiences", "tickets"];
+const tabs = ["events", "registrations", "suggestions", "experiences", "tickets"];
 function tab(name) {
   for (const t of tabs) $(t + "Tab").hidden = t !== name;
 }
@@ -39,6 +40,7 @@ document.addEventListener("ticket-event", (e) => {
   $("ticketEvent").value = e.detail.id;
   changeTicketEvent();
 });
+document.addEventListener("registration-event", () => tab("registrations"));
 $("ticketEvent").addEventListener("change", changeTicketEvent);
 function designStatus(message, error = false) {
   $("ticketDesignStatus").textContent = message;

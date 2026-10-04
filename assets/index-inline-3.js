@@ -2,12 +2,13 @@ fetch('/api/events').then(response => {
   if (!response.ok) throw new Error('Etkinlikler yüklenemedi.');
   return response.json();
 }).then(({ events = [] }) => {
-  const { isPast, compare, formatDate, safeUrl } = ercupsaEvents;
+  const { isPast, compare, formatDate, safeUrl, registrationAvailable } = ercupsaEvents;
   const list = events.filter(event => !isPast(event)).sort(compare).slice(0, 3);
   const elEvents = document.getElementById('home-events');
   if (elEvents) elEvents.innerHTML = list.map(event => {
     const poster = safeUrl(event.poster);
-    return `<a href="form.html?event=${encodeURIComponent(event.id)}" class="glass-panel rounded-3xl overflow-hidden hover:-translate-y-1 transition flex-shrink-0 w-[78vw] sm:w-[60vw] md:w-auto snap-center">${poster ? `<img decoding="async" src="${ercupsaEscape(poster)}" alt="${ercupsaEscape(event.title)} etkinlik afişi" loading="lazy" class="w-full aspect-[4/5] object-cover">` : ''}<div class="p-5"><div class="text-xs font-bold text-ercupsaRed">${ercupsaEscape(event.category || 'Etkinlik')}</div><h3 class="font-black text-lg mt-1">${ercupsaEscape(event.title)}</h3><p class="text-sm text-gray-500 mt-2">${ercupsaEscape(formatDate(event.date))}${event.time ? ` · ${ercupsaEscape(event.time)}` : ''}${event.location ? ` • ${ercupsaEscape(event.location)}` : ''}</p><span class="inline-block mt-4 text-sm font-bold text-ercupsaRed">Etkinliği keşfet →</span></div></a>`;
+    const canRegister = registrationAvailable(event);
+    return `<a href="form.html?event=${encodeURIComponent(event.id)}${canRegister ? '#registrationSection' : ''}" class="glass-panel rounded-3xl overflow-hidden hover:-translate-y-1 transition flex-shrink-0 w-[78vw] sm:w-[60vw] md:w-auto snap-center">${poster ? `<img decoding="async" src="${ercupsaEscape(poster)}" alt="${ercupsaEscape(event.title)} etkinlik afişi" loading="lazy" class="w-full aspect-[4/5] object-cover">` : ''}<div class="p-5"><div class="text-xs font-bold text-ercupsaRed">${ercupsaEscape(event.category || 'Etkinlik')}</div><h3 class="font-black text-lg mt-1">${ercupsaEscape(event.title)}</h3><p class="text-sm text-gray-500 mt-2">${ercupsaEscape(formatDate(event.date))}${event.time ? ` · ${ercupsaEscape(event.time)}` : ''}${event.location ? ` • ${ercupsaEscape(event.location)}` : ''}</p><span class="inline-block mt-4 text-sm font-bold text-ercupsaRed">${canRegister ? 'Etkinliğe kaydol' : 'Etkinliği keşfet'} →</span></div></a>`;
   }).join('') || '<div class="w-full text-center text-gray-500 py-8">Yeni buluşmalarımız için Instagram ve WhatsApp duyurularımızı takip et.</div>';
 
   const photos = [...events].sort((a, b) => compare(b, a)).flatMap(event => (event.images || []).map(img => ({

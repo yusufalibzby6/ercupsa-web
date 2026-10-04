@@ -26,6 +26,10 @@ window.ercupsaEvents = (() => {
       return ['https:', 'http:'].includes(url.protocol) ? url.href : '';
     } catch { return ''; }
   };
+  // A saved native form owns registration even when disabled; do not fall back to an old external link.
+  const registrationAvailable = event => Boolean(event && event.published !== false && validDate(event.date)
+    && event.date >= dateToday() && (event.registrationMode === 'native'
+      ? event.registrationEnabled === true : safeUrl(event.registrationUrl)));
   const mapUrl = location => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(location)}`;
   const icsEscape = value => String(value || '').replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/;/g, '\\;').replace(/,/g, '\\,');
   // Fold at 75 bytes as required by iCalendar, including UTF-8 Turkish characters.
@@ -52,5 +56,5 @@ window.ercupsaEvents = (() => {
       `DESCRIPTION:${icsEscape(event.description)}`, `LOCATION:${icsEscape(event.location)}`,
       `URL:${url}`, 'END:VEVENT', 'END:VCALENDAR'].map(fold).join('\r\n') + '\r\n';
   };
-  return { today: dateToday, start, isPast, compare, formatDate, safeUrl, mapUrl, calendar };
+  return { today: dateToday, start, isPast, compare, formatDate, safeUrl, registrationAvailable, mapUrl, calendar };
 })();

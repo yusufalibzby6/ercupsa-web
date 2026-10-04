@@ -1,5 +1,5 @@
 (() => {
-  const { today, compare, formatDate, start, safeUrl, mapUrl, calendar } = ercupsaEvents;
+  const { today, compare, formatDate, start, safeUrl, registrationAvailable, mapUrl, calendar } = ercupsaEvents;
   const parameters = new URLSearchParams(location.search);
   const hasSelectedEvent = parameters.has('event');
   const requestedId = parameters.get('event');
@@ -45,8 +45,7 @@
   }
 
   function renderCatalog(events, todayDate) {
-    const available = events.filter(event => formatDate(event.date) && event.date >= todayDate
-      && safeUrl(event.registrationUrl)).sort(compare);
+    const available = events.filter(event => registrationAvailable(event)).sort(compare);
     if (!available.length) {
       element('formEmptyMessage').textContent = 'Şu anda paylaşılmış bir kayıt formu bulunmuyor. Yeni duyurular için etkinliklerimize göz atabilirsin.';
       show('formEmpty');
@@ -104,7 +103,7 @@
     show('formCatalog');
   }
 
-  function renderEvent(target, todayDate) {
+  async function renderEvent(target, todayDate) {
     const pastDay = target.date < todayDate;
     document.title = `${target.title} | ERCUPSA`;
     element('formTitle').textContent = target.title;
@@ -163,6 +162,37 @@
     };
     show('eventDetails');
 
+    if (target.registrationMode === 'native') {
+      document.body.classList.add('native-registration-page');
+      element('formEyebrow').textContent = 'Etkinlik kaydı';
+      element('formSub').textContent = [formatDate(target.date), start(target) !== null ? target.time : '', eventLocation].filter(Boolean).join(' · ');
+      // The shared event URL opens the form first. Event information remains available on demand.
+      const registration = element('registrationSection');
+      const details = element('eventDetails');
+      let optionalDetails = document.getElementById('nativeEventDetails');
+      if (!optionalDetails) {
+        optionalDetails = document.createElement('details');
+        optionalDetails.id = 'nativeEventDetails';
+        optionalDetails.className = 'native-event-details';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Etkinlik bilgileri, takvim ve yol tarifi';
+        optionalDetails.append(summary);
+        details.before(registration);
+        optionalDetails.append(details);
+        registration.after(optionalDetails);
+      }
+      hide('registrationLink');
+      hide('formWrap');
+      element('formFrame').removeAttribute('src');
+      show('nativeFormWrap');
+      show('registrationSection');
+      await ercupsaRegistration.mount({ event: target, container: element('nativeFormWrap') });
+      if (location.hash === '#registrationSection') {
+        requestAnimationFrame(() => registration.scrollIntoView());
+      }
+      return;
+    }
+
     const registrationUrl = safeUrl(target.registrationUrl);
     // Google Forms decides whether submissions are accepted. A start time is not a closing time.
     if (formatDate(target.date) && !pastDay && registrationUrl) {
@@ -201,7 +231,7 @@
       const todayDate = today();
       if (hasSelectedEvent) {
         const target = events.find(event => event.id === requestedId);
-        if (target) renderEvent(target, todayDate);
+        if (target) await renderEvent(target, todayDate);
         else {
           element('formEmptyMessage').textContent = 'Bu etkinlik bulunamadı. Diğer kayıt formlarına göz atabilirsin.';
           show('formEmpty');

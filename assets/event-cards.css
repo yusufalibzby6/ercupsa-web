@@ -1,0 +1,56 @@
+/* Compact event cards: keep the entire poster visible beside the event facts. */
+#events { gap:20px; }
+.event-card { display:grid; grid-template-columns:232px minmax(0,1fr); border-radius:24px; overflow:hidden; }
+.event-card-poster { display:flex; align-items:center; justify-content:center; align-self:stretch; min-width:0; background:linear-gradient(145deg,#a62b2b0a,#e23e4e04); border-right:1px solid #a62b2b0c; }
+.event-card-poster img { display:block; width:100%; height:100%; min-height:220px; max-height:304px; padding:14px; object-fit:contain; }
+.event-card-body { min-width:0; padding:22px 26px; }
+.event-card-heading { min-width:0; }
+.event-card-category { display:inline-block; max-width:100%; padding:4px 10px; margin-bottom:9px; border-radius:999px; font-size:11px; font-weight:800; color:#a62b2b; text-overflow:ellipsis; white-space:nowrap; overflow:hidden; }
+.event-card h2 { margin:0; font-size:1.35rem; line-height:1.3; font-weight:900; overflow-wrap:anywhere; }
+.event-card h2 a,.event-card-description,.event-card-facts dd { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+.event-card h2 a:hover { color:#a62b2b; }
+.event-card-description { margin:10px 0 0; color:#64748b; font-size:.875rem; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
+.event-card .event-card-facts { grid-template-columns:minmax(0,.9fr) minmax(0,1fr) minmax(0,1.25fr); gap:14px; margin-top:16px; padding-top:15px; border-top:1px solid #e2e8f0; }
+.event-card .event-facts dt { font-size:.7rem; gap:6px; }
+.event-card .event-facts dd { font-size:.82rem; line-height:1.5; }
+.event-card .event-detail-actions { gap:8px; margin-top:17px; }
+.event-card .event-primary-action,.event-card .event-secondary-action { padding:9px 11px; font-size:.75rem; border-radius:10px; line-height:1.4; }
+.event-card--no-poster { grid-template-columns:minmax(0,1fr); }
+.event-card--past .event-card-poster { background:#f1f5f9; }
+.event-list-state { display:flex; flex-direction:column; align-items:center; gap:12px; padding:48px 20px; text-align:center; color:#64748b; }
+.event-list-state.hidden { display:none; }
+.event-list-state>i { font-size:1.8rem; color:#a62b2b; }
+.event-list-state h2 { font-weight:800; color:#334155; }
+.event-filterbar { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-bottom:28px; }
+.event-filterbar .filter { font-size:.85rem; }
+html.dark .event-card-poster { background:linear-gradient(145deg,#a62b2b16,#ffffff03); border-color:#ffffff0d; }
+html.dark .event-card--past .event-card-poster { background:#ffffff04; }
+html.dark .event-card-description,html.dark .event-list-state { color:#b8c2cf; }
+html.dark .event-card .event-card-facts { border-color:#ffffff16; }
+html.dark .event-card-category,html.dark .event-card h2 a:hover { color:#ff9a9a; }
+html.dark .event-list-state h2 { color:#e2e8f0; }
+@media (max-width:900px) {
+  .event-card { grid-template-columns:190px minmax(0,1fr); }
+  .event-card-body { padding:20px; }
+  .event-card-poster img { padding:10px; }
+  .event-card--no-poster { grid-template-columns:minmax(0,1fr); }
+}
+@media (max-width:600px) {
+  #events { gap:16px; }
+  .event-card { grid-template-columns:96px minmax(0,1fr); gap:12px; padding:16px; border-radius:20px; }
+  .event-card-body { display:contents; }
+  .event-card-poster { grid-column:1; grid-row:1 / span 2; align-self:start; border:1px solid #a62b2b0c; border-radius:12px; min-height:128px; }
+  .event-card-poster img { height:128px; min-height:0; max-height:128px; padding:5px; }
+  .event-card-heading { grid-column:2; align-self:end; }
+  .event-card-category { font-size:10px; padding:3px 8px; margin-bottom:6px; }
+  .event-card h2 { font-size:1.07rem; }
+  .event-card-description { grid-column:2; align-self:start; margin:0; font-size:.77rem; line-height:1.55; }
+  .event-card .event-card-facts { grid-column:1 / -1; grid-template-columns:minmax(0,1fr) minmax(0,1fr); margin-top:0; gap:11px; padding-top:12px; }
+  .event-card-location { grid-column:1 / -1; }
+  .event-card .event-facts dd { font-size:.78rem; }
+  .event-card .event-detail-actions { grid-column:1 / -1; margin-top:0; gap:7px; }
+  .event-card .event-primary-action,.event-card .event-secondary-action { padding:9px 10px; font-size:.71rem; }
+  .event-card--no-poster { grid-template-columns:minmax(0,1fr); }
+  .event-card--no-poster .event-card-heading,.event-card--no-poster .event-card-description { grid-column:1; }
+}
+@media (prefers-reduced-motion:reduce) { .event-card a { transition:none; } .event-list-state .fa-spin { animation:none; } }

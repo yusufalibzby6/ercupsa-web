@@ -23,3 +23,7 @@ Bu sürüm, Netlify üzerinde çalışan küçük bir içerik yönetim sistemi e
 ## Yeni topluluk ve bilet sistemi
 
 Supabase, e-posta doğrulaması, üye listesi, moderasyon ve bilet kurulumu için [SUPABASE-KURULUM.md](SUPABASE-KURULUM.md) belgesini izleyin. Parolalar artık tarayıcı depolamasında tutulmaz. `npm ci`, `npm run build` ve `npm test` kullanılabilir.
+
+## Etkinlik kayıt formları
+
+Site içi form hazırlama, sınıf ve telefon alanları, zorunlu sorular, özel dekontlar ve etkinlik karşılaştırması için [KAYIT-SISTEMI.md](KAYIT-SISTEMI.md) belgesini izleyin. Bu özellik mevcut Netlify kurulumuyla çalışır.
