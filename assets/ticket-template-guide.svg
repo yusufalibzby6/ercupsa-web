@@ -1,1 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1116" height="588" viewBox="0 0 1116 588"><rect width="1116" height="588" fill="#fff"/><rect x="12" y="12" width="720" height="564" rx="14" fill="#faf6f6" stroke="#8b2323" stroke-width="2" stroke-dasharray="10 6"/><path d="M744 0v588" stroke="#94a3b8" stroke-width="2" stroke-dasharray="10 6"/><rect x="792" y="60" width="288" height="288" fill="#fff" stroke="#64748b" stroke-width="3" stroke-dasharray="10 6"/><g font-family="Arial,sans-serif" text-anchor="middle"><g fill="#8b2323"><text x="372" y="212" font-size="34" font-weight="bold">TASARIM ALANINIZ</text><text x="372" y="260" font-size="24">744 × 588 px · 62 × 49 mm</text><text x="372" y="317" font-size="20">Bu alanı istediğiniz gibi düzenleyin.</text><text x="372" y="356" font-size="20">Tüm tuval: 1116 × 588 px · 93 × 49 mm</text><text x="372" y="401" font-size="18">PNG / JPEG olarak dışa aktarın; en fazla 3 MB.</text></g><g fill="#475569"><text x="936" y="179" font-size="28" font-weight="bold">QR ALANI</text><text x="936" y="220" font-size="19">288 × 288 px</text><text x="936" y="256" font-size="16">x: 792 · y: 60</text><text x="930" y="407" font-size="19" font-weight="bold">BİLET KODU</text><text x="930" y="460" font-size="18">BİLET DURUMU</text><text x="930" y="531" font-size="16">Sağ 372 px alanı boş bırakın.</text><text x="930" y="557" font-size="16">Bu alan site tarafından eklenir.</text></g></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1116" height="588" viewBox="0 0 1116 588">
+  <rect width="1116" height="588" fill="#faf6f6"/>
+  <rect x="12" y="12" width="1092" height="564" rx="14" fill="none" stroke="#8b2323" stroke-width="2" stroke-dasharray="10 6"/>
+  <rect x="792" y="60" width="288" height="288" fill="#fff" stroke="#64748b" stroke-width="3" stroke-dasharray="10 6"/>
+  <g font-family="Arial,sans-serif" text-anchor="middle">
+    <g fill="#8b2323">
+      <text x="390" y="154" font-size="34" font-weight="bold">BİLETİN TAMAMI SİZİN</text>
+      <text x="390" y="205" font-size="26">1116 × 588 px · 93 × 49 mm</text>
+      <text x="390" y="258" font-size="21">Renk, görsel ve yazıları tüm bilete yayın.</text>
+      <text x="390" y="298" font-size="21">Yalnızca QR karesini boş bırakın.</text>
+      <text x="558" y="420" font-size="22" font-weight="bold">Site tasarımınızın üzerine yalnızca QR kodunu ekler.</text>
+      <text x="558" y="462" font-size="19">Özel tasarımda bilet kodu veya durum yazısı eklenmez.</text>
+      <text x="558" y="508" font-size="19">Rehber yazılarını ve çizgilerini kaldırın; PNG / JPEG olarak dışa aktarın.</text>
+      <text x="558" y="546" font-size="18">Tuval boyutunu koruyun: 1116 × 588 px · En fazla 3 MB.</text>
+    </g>
+    <g fill="#475569">
+      <text x="936" y="165" font-size="28" font-weight="bold">QR ALANI</text>
+      <text x="936" y="207" font-size="20">288 × 288 px</text>
+      <text x="936" y="246" font-size="18">x: 792 · y: 60</text>
+      <text x="936" y="285" font-size="17">Otomatik eklenir.</text>
+    </g>
+  </g>
+</svg>

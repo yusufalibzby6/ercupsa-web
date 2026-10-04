@@ -175,7 +175,7 @@ async function saveDesign(method) {
     });
     clearCandidate();
     await loadSelectedDesign();
-    designStatus(method === "POST" ? "Tasarım kaydedildi. Bu etkinliğin tüm biletleri aynı tasarımı kullanır; her QR kodu farklıdır." : "Standart ERCUPSA tasarımına dönüldü.");
+    designStatus(method === "POST" ? "Tasarım kaydedildi. Görseliniz biletin tamamını kaplar; üzerine her bilete farklı QR kodu eklenir." : "Standart ERCUPSA tasarımına dönüldü.");
   } catch (error) {
     // A timeout may happen after storage succeeded. Do not print an older cached image.
     designState = "error";

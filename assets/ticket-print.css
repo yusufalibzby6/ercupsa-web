@@ -95,6 +95,12 @@
   inset: 0 auto 0 0;
   border-left: 0.25mm dashed #cbd5e1;
 }
+.ticket-custom .ticket-stub {
+  background: transparent;
+}
+.ticket-custom .ticket-stub::before {
+  display: none;
+}
 .ticket-qr,
 .ticket-preview-qr {
   position: absolute;
@@ -105,6 +111,7 @@
   max-width: none;
   flex-shrink: 0;
   image-rendering: pixelated;
+  background: #fff;
 }
 .ticket-code {
   position: absolute;

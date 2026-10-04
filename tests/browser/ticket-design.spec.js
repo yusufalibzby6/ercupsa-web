@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { PNG } from "pngjs";
 
 const events = [
   { id: "e1", title: "Tasarım atölyesi", date: "2026-10-20", time: "18:00", published: true, images: [] },
@@ -82,7 +83,62 @@ async function raster(page, width = 1116, height = 588, noisy = false) {
   return Buffer.from(url.split(",")[1], "base64");
 }
 
-test("custom event artwork uploads, keeps fifty unique fixed-position QR codes, and prints eleven complete tickets on two A4 pages", async ({ page }) => {
+async function expectFullArtworkWithFixedQr(ticket) {
+  await expect(ticket.locator(".ticket-code, .ticket-state")).toHaveCount(0);
+  await ticket.locator(".ticket-artwork").evaluate(image => image.decode());
+  await ticket.locator(".ticket-qr, .ticket-preview-qr").evaluate(image => image.decode());
+  const geometry = await ticket.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const qr = element.querySelector(".ticket-qr, .ticket-preview-qr").getBoundingClientRect();
+    const artwork = element.querySelector(".ticket-artwork").getBoundingClientRect();
+    return {
+      width: rect.width,
+      height: rect.height,
+      qrX: qr.x - rect.x,
+      qrY: qr.y - rect.y,
+      qrWidth: qr.width,
+      qrHeight: qr.height,
+      artworkX: artwork.x - rect.x,
+      artworkY: artwork.y - rect.y,
+      artworkWidth: artwork.width,
+      artworkHeight: artwork.height,
+    };
+  });
+  const mm = 96 / 25.4;
+  for (const [actual, expected] of [
+    [geometry.width, 93], [geometry.height, 49],
+    [geometry.qrX, 66], [geometry.qrY, 5],
+    [geometry.qrWidth, 24], [geometry.qrHeight, 24],
+    [geometry.artworkX, 0], [geometry.artworkY, 0],
+    [geometry.artworkWidth, 93], [geometry.artworkHeight, 49],
+  ]) expect(actual).toBeCloseTo(expected * mm, 1);
+
+  // Check the rendered result, including the former seam and automatic-text area.
+  // A white stub or a divider would obscure the uploaded red artwork here.
+  const png = PNG.sync.read(await ticket.screenshot());
+  const pixelAt = (xMm, yMm) => {
+    const x = Math.floor(xMm * png.width / 93);
+    const y = Math.floor(yMm * png.height / 49);
+    const offset = (y * png.width + x) * 4;
+    return [...png.data.subarray(offset, offset + 4)];
+  };
+  const red = [139, 35, 35, 255];
+  for (const y of [2, 4, 8, 12, 16, 22, 28, 34, 40, 46]) {
+    expect(pixelAt(62, y), `old divider at y=${y}mm`).toEqual(red);
+  }
+  for (const x of [63, 65, 70, 78, 85, 92]) {
+    for (const y of [2, 34, 40, 46]) {
+      expect(pixelAt(x, y), `artwork at x=${x}mm, y=${y}mm`).toEqual(red);
+    }
+  }
+  // The preview has a decorative dashed edge; real QR codes have a white quiet zone.
+  const inset = await ticket.locator(".ticket-preview-qr").count() ? 2 : 0.5;
+  for (const [x, y] of [[66 + inset, 5 + inset], [90 - inset, 5 + inset], [66 + inset, 29 - inset], [90 - inset, 29 - inset]]) {
+    expect(pixelAt(x, y), `QR quiet zone at x=${x}mm, y=${y}mm`).toEqual([255, 255, 255, 255]);
+  }
+}
+
+test("full ticket artwork stays continuous behind fifty unique fixed-position QR codes and eleven tickets print on two A4 pages", async ({ page }) => {
   const state = await fixture(page);
   await page.locator("#ticketDesignFile").setInputFiles({ name: "wrong.png", mimeType: "image/png", buffer: await raster(page, 100, 100) });
   await expect(page.locator("#ticketDesignStatus")).toContainText("100 × 100");
@@ -93,21 +149,15 @@ test("custom event artwork uploads, keeps fifty unique fixed-position QR codes, 
   await page.locator("#ticketDesignSave").click();
   await expect(page.locator("#createBatch")).toBeEnabled();
   expect(state.requests.some(r => r.method === "POST" && r.eventId === "e1" && r.mime === "image/png")).toBe(true);
+  await expectFullArtworkWithFixedQr(page.locator("#ticketDesignPreview .ticket"));
   await page.locator("#ticketCount").fill("50");
   await page.locator("#createBatch").click();
   await expect(page.locator("#ticketOutput .ticket-custom")).toHaveCount(50);
   await expect(page.locator("#ticketOutput .ticket-title")).toHaveCount(0);
   const qrSources = await page.locator("#ticketOutput .ticket-qr").evaluateAll(images => images.map(i => i.src));
   expect(new Set(qrSources).size).toBe(50);
-  const geometry = await page.locator("#ticketOutput .ticket").first().evaluate(ticket => {
-    const rect = ticket.getBoundingClientRect();
-    const qr = ticket.querySelector(".ticket-qr").getBoundingClientRect();
-    const stub = ticket.querySelector(".ticket-stub").getBoundingClientRect();
-    return { width: rect.width, height: rect.height, qrX: qr.x - rect.x, qrY: qr.y - rect.y, qrSize: qr.width, stubX: stub.x - rect.x, stubColor: getComputedStyle(ticket.querySelector(".ticket-stub")).backgroundColor };
-  });
-  const mm = 96 / 25.4;
-  for (const [actual, expected] of [[geometry.width, 93], [geometry.height, 49], [geometry.qrX, 66], [geometry.qrY, 5], [geometry.qrSize, 24], [geometry.stubX, 62]]) expect(actual).toBeCloseTo(expected * mm, 1);
-  expect(geometry.stubColor).toBe("rgb(255, 255, 255)");
+  await expect(page.locator("#ticketOutput .ticket-code, #ticketOutput .ticket-state")).toHaveCount(0);
+  await expectFullArtworkWithFixedQr(page.locator("#ticketOutput .ticket").first());
   await page.locator("#ticketCount").fill("11");
   await page.locator("#createBatch").click();
   await expect(page.locator("#ticketOutput .ticket-custom")).toHaveCount(11);
@@ -116,6 +166,7 @@ test("custom event artwork uploads, keeps fifty unique fixed-position QR codes, 
   await expect.poll(() => page.evaluate(() => window.printCalled)).toBe(true);
   await expect(page.locator("#ticketPrintRoot .ticket-page")).toHaveCount(2);
   await expect(page.locator("#ticketPrintRoot .ticket-artwork")).toHaveCount(11);
+  await expect(page.locator("#ticketPrintRoot .ticket-code, #ticketPrintRoot .ticket-state")).toHaveCount(0);
   expect(await page.locator("#ticketPrintRoot img").evaluateAll(images => images.every(i => i.complete && i.naturalWidth > 0))).toBe(true);
   await page.pdf({ path: "/workspace/.onboarding-runtime/custom-tickets-11.pdf", preferCSSPageSize: true, printBackground: true, displayHeaderFooter: false });
   await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
@@ -123,6 +174,13 @@ test("custom event artwork uploads, keeps fifty unique fixed-position QR codes, 
   await page.locator("#ticketDesignReset").click();
   await expect(page.locator("#ticketOutput .ticket-custom")).toHaveCount(0);
   await expect(page.locator("#ticketOutput .ticket-logo")).toHaveCount(11);
+  await expect(page.locator("#ticketOutput .ticket-title")).toHaveCount(11);
+  await expect(page.locator("#ticketOutput .ticket-code")).toHaveCount(11);
+  await expect(page.locator("#ticketOutput .ticket-code").first()).toHaveText("ERC-000000000000000000000000");
+  await expect(page.locator("#ticketOutput .ticket-state")).toHaveCount(11);
+  await expect(page.locator("#ticketOutput .ticket-state").first()).toHaveText("KATILIM BİLETİ");
+  await expect(page.locator("#ticketOutput .ticket-stub").first()).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  expect(await page.locator("#ticketOutput .ticket-stub").first().evaluate(stub => getComputedStyle(stub, "::before").borderLeftStyle)).toBe("dashed");
   await expect(page.locator("#ticketOutput .ticket-slogan").first()).toHaveText("Sürpriz hediyeler sizi bekliyor.");
   expect(state.requests.some(r => r.method === "DELETE" && r.eventId === "e1")).toBe(true);
 });

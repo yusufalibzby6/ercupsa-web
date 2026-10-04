@@ -17,7 +17,7 @@ export function ticketCard({ code, qr, eventTitle, ticket, design = null, previe
       <h3 class="ticket-title">${escape(eventTitle)}</h3>
       <p class="ticket-slogan">${SLOGAN}</p>
     </div>`}
-    <div class="ticket-stub"><img class="${preview ? "ticket-preview-qr" : "ticket-qr"}" src="${escape(qr)}" alt="${preview ? "QR kodunun sabit konumu; gerçek kod baskıda otomatik eklenir" : "Bu bilete özel QR kodu"}"><p class="ticket-code"><span>${escape(code.slice(0, 16))}</span><span>${escape(code.slice(16))}</span></p><span class="ticket-state">${state}</span></div>
+    <div class="ticket-stub"><img class="${preview ? "ticket-preview-qr" : "ticket-qr"}" src="${escape(qr)}" alt="${preview ? "QR kodunun sabit konumu; gerçek kod baskıda otomatik eklenir" : "Bu bilete özel QR kodu"}">${artwork ? "" : `<p class="ticket-code"><span>${escape(code.slice(0, 16))}</span><span>${escape(code.slice(16))}</span></p><span class="ticket-state">${state}</span>`}</div>
   </article>`;
 }
 
