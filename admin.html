@@ -5,7 +5,7 @@
 <title>ERCUPSA Yönetim Paneli</title>
 <link rel="stylesheet" href="assets/tailwind.css">
 <link rel="stylesheet" href="assets/ticket-print.css">
-<link rel="stylesheet" href="assets/admin-registrations.css">
+<link rel="stylesheet" href="assets/admin-registrations.css?v=quota-1">
 <script src="https://upload-widget.cloudinary.com/latest/global/all.js"></script>
 <link rel="stylesheet" href="assets/vendor/fontawesome.css">
 <style>body{font-family:Inter,system-ui,sans-serif;background:#f8fafc}.red{background:#8B2323}.redtext{color:#8B2323}.card{background:#fff;border:1px solid #e5e7eb;box-shadow:0 10px 30px rgba(0,0,0,.05)}</style>
@@ -38,6 +38,7 @@
       <fieldset id="registrationConfigFields" disabled>
         <div class="registration-config-top">
           <label class="registration-check"><input id="registrationEnabled" type="checkbox">Kayıt formunu erişime aç</label>
+          <label for="registrationMaxRegistrations">Kayıt üst sınırı<input id="registrationMaxRegistrations" type="number" min="1" max="10000" step="1" placeholder="Örneğin 40" aria-describedby="registrationMaxHelp"><span id="registrationMaxHelp" class="registration-muted">Boş bırakırsanız sınırsız kayıt alınır. Toplam kayıt bu sayıya ulaşınca form otomatik kapanır.</span></label>
           <label for="registrationDescription">Formun üst açıklaması<textarea id="registrationDescription" rows="4" maxlength="5000" placeholder="Etkinlik bilgisi, ücret, ödeme bilgileri ve katılımcıya iletmek istedikleriniz…"></textarea></label>
         </div>
         <div class="registration-panel-heading"><h4>Sorular</h4><button id="registrationAddField" type="button">+ Soru ekle</button></div>
@@ -56,11 +57,12 @@
     <div class="registration-panel-heading"><h3 id="registrationEntriesHeading">Etkinlik kayıtları</h3><div class="registration-actions"><button id="registrationReload" type="button">Kayıtları yenile</button><button id="registrationExport" type="button">CSV indir</button></div></div>
     <p class="registration-muted">Bu sayılar form gönderen kişileri gösterir. Etkinliğe gerçekten gelen kişi sayısı ve QR bilet katılımları ayrı tutulur.</p>
     <div id="registrationSummary" class="registration-stats" aria-label="Kayıt sayıları"></div>
+    <p id="registrationCapacityInfo" class="registration-capacity-info" role="status" aria-live="polite"></p>
+    <p class="registration-muted">Yanlış bir kaydı silebilirsiniz. Silinen kaydın cevapları ve dekontu kaldırılır; yer açıldığında erişime açık güncel form yeniden kayıt alır.</p>
     <div id="registrationClassBreakdown" class="registration-class-breakdown" aria-label="Sınıflara göre kayıt sayıları"></div>
     <div class="registration-filters">
       <label for="registrationSearch">Kayıt ara<input id="registrationSearch" type="search" placeholder="Ad, telefon veya cevap ara"></label>
       <label for="registrationClassFilter">Sınıf<select id="registrationClassFilter"><option value="">Tüm sınıflar</option></select></label>
-      <label for="registrationStatusFilter">Kayıt durumu<select id="registrationStatusFilter"><option value="">Tüm durumlar</option><option value="pending">Bekliyor</option><option value="approved">Onaylandı</option><option value="rejected">Reddedildi</option></select></label>
     </div>
     <p id="registrationFilterCount" class="registration-muted" role="status" aria-live="polite"></p>
     <div id="registrationEntries" class="registration-entries"><p class="registration-empty">Bir etkinlik seçin.</p></div>
@@ -68,7 +70,7 @@
   </section>
   <section class="registration-panel" aria-labelledby="registrationComparisonHeading">
     <div class="registration-panel-heading"><h3 id="registrationComparisonHeading">Etkinlikleri karşılaştır</h3><button id="registrationCompareReload" type="button">Karşılaştırmayı yenile</button></div>
-    <p class="registration-muted">Birden fazla etkinlik seçerek toplam kayıtları, onay durumlarını ve hangi sınıftan kaç kişi kayıt olduğunu karşılaştırın. Filtreler bu toplamları etkilemez.</p>
+    <p class="registration-muted">Birden fazla etkinlik seçerek toplam kayıtları ve hangi sınıftan kaç kişi kayıt olduğunu karşılaştırın. Filtreler bu toplamları etkilemez.</p>
     <div id="registrationCompareEvents" class="registration-compare-events"></div>
     <p id="registrationComparisonFeedback" class="registration-feedback" role="status" aria-live="polite"></p>
     <div id="registrationComparison"></div>
@@ -82,4 +84,4 @@
   <img id="registrationReceiptImage" alt="Katılımcının yüklediği dekont" hidden>
   <a id="registrationReceiptDownload" download hidden>Dekontu indir</a>
 </dialog>
-<script type="module" src="assets/admin.js"></script><script type="module" src="assets/admin-community.bundle.js"></script></body></html>
+<script type="module" src="assets/admin.js"></script><script type="module" src="assets/admin-community.bundle.js?v=quota-1"></script></body></html>

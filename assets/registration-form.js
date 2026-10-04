@@ -1,6 +1,7 @@
 /* Native event registrations. Answers and receipts are submitted only to the private registration API. */
 window.ercupsaRegistration = (() => {
   const receiptLimit = 4 * 1024 * 1024;
+  const fullMessage = 'İlginiz için teşekkür ederiz. Kontenjanımız dolmuştur. Bir sonraki etkinliklerimize bekleriz.';
   const supportedTypes = new Set(['text', 'textarea', 'email', 'tel', 'select', 'radio', 'checkboxes']);
   const choiceTypes = new Set(['select', 'radio', 'checkboxes']);
   const endpoint = (action, eventId) => `/api/registrations?action=${encodeURIComponent(action)}&event_id=${encodeURIComponent(eventId)}`;
@@ -32,6 +33,19 @@ window.ercupsaRegistration = (() => {
     message.append(node('h3', '', 'Bu etkinlik için kayıt alınmıyor'),
       node('p', '', 'Yeni kayıt duyuruları için etkinliklerimizi ve sosyal medya hesaplarımızı takip edebilirsin.'));
     container.replaceChildren(message);
+  }
+
+  function full(container, focus = false) {
+    const message = node('div', 'registration-full');
+    message.id = 'nativeRegistrationFull';
+    message.setAttribute('role', 'status');
+    message.tabIndex = -1;
+    message.append(node('p', '', fullMessage));
+    const back = node('a', 'event-secondary-action', 'Diğer etkinlikleri keşfet');
+    back.href = 'etkinlikler.html';
+    message.append(back);
+    container.replaceChildren(message);
+    if (focus) message.focus();
   }
 
   function validateConfig(config) {
@@ -259,6 +273,7 @@ window.ercupsaRegistration = (() => {
         let result;
         try { result = await response.json(); } catch {}
         if (!response.ok || result?.ok !== true) {
+          if (response.status === 409 && result?.code === 'REGISTRATION_FULL') return full(container, true);
           if (response.status === 409 || response.status === 404) {
             throw new Error(typeof result?.error === 'string' ? result.error
               : 'Bu etkinlik için artık kayıt alınmıyor. Girdiğin bilgiler gönderilemedi.');
@@ -301,9 +316,10 @@ window.ercupsaRegistration = (() => {
     container.replaceChildren(loading);
     try {
       const response = await timedFetch(endpoint('form', event.id));
-      if (response.status === 404 || response.status === 409) return unavailable(container);
       let data;
       try { data = await response.json(); } catch {}
+      if ((response.ok && data?.full === true) || (response.status === 409 && data?.code === 'REGISTRATION_FULL')) return full(container);
+      if (response.status === 404 || response.status === 409) return unavailable(container);
       if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Kayıt formu şu anda yüklenemedi. Tekrar deneyebilirsin.');
       if (!data) throw new Error('Kayıt formu bilgileri okunamadı. Tekrar deneyebilirsin.');
       if (!data.available || !data.form?.enabled) return unavailable(container);

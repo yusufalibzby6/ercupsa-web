@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 const today = new Date("2026-10-04T19:00:00+03:00");
+const fullMessage = "İlginiz için teşekkür ederiz. Kontenjanımız dolmuştur. Bir sonraki etkinliklerimize bekleriz.";
 const receiptBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=", "base64");
 const classOptions = ["Hazırlık", "1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf", "5. Sınıf", "Mezun", "Diğer"];
 const coreFields = [
@@ -26,15 +27,16 @@ const events = [
 function formConfig(eventId, custom = false) {
   return {
     eventId, enabled: eventId !== "native-disabled",
-    description: eventId === "native-today" ? "Kayıt öncesinde okuyun: dekontunuzu hazırlayın.\nEtkinliğe girişte onaylı kaydınızı kontrol edeceğiz." : "İkinci etkinliğin açıklaması.",
+    description: eventId === "native-today" ? "Kayıt öncesinde okuyun: dekontunuzu hazırlayın.\nEtkinliğe girişte kaydınızı kontrol edeceğiz." : "İkinci etkinliğin açıklaması.",
+    maxRegistrations: null,
     fields: structuredClone([...coreFields, ...(custom ? questions : [])]),
     receipt: { enabled: true, required: custom },
   };
 }
 
-function entry(id, classYear, status, hasReceipt = false, eventId = "native-today") {
+function entry(id, classYear, hasReceipt = false, eventId = "native-today") {
   return {
-    id, eventId, name: `Test katılımcısı ${id}`, classYear, phone: "05551234567", status,
+    id, eventId, name: `Test katılımcısı ${id}`, classYear, phone: "05551234567",
     createdAt: "2026-10-04T12:00:00Z",
     answers: { full_name: `Test katılımcısı ${id}`, class_year: classYear, phone: "05551234567", notes: "Test yanıtı" },
     fields: [...coreFields, questions[3]],
@@ -47,9 +49,6 @@ function summarize(entries) {
   for (const value of entries) byClass.set(value.classYear, (byClass.get(value.classYear) || 0) + 1);
   return {
     total: entries.length,
-    pending: entries.filter(value => value.status === "pending").length,
-    approved: entries.filter(value => value.status === "approved").length,
-    rejected: entries.filter(value => value.status === "rejected").length,
     byClass: [...byClass].map(([classYear, count]) => ({ classYear, count })),
   };
 }
@@ -58,10 +57,10 @@ async function fixture(page, { custom = false } = {}) {
   const state = {
     forms: new Map(events.filter(event => event.registrationMode === "native").map(event => [event.id, formConfig(event.id, custom && event.id === "native-today")])),
     entries: new Map([
-      ["native-today", [entry("first", "2. Sınıf", "pending", true), entry("second", "1. Sınıf", "approved"), entry("third", "2. Sınıf", "rejected")]],
-      ["native-next", [entry("fourth", "3. Sınıf", "approved", false, "native-next")]],
+      ["native-today", [entry("first", "2. Sınıf", true), entry("second", "1. Sınıf"), entry("third", "2. Sınıf")]],
+      ["native-next", [entry("fourth", "3. Sınıf", false, "native-next")]],
     ]),
-    submissions: [], saves: [], statuses: [], receiptReads: [], requests: [], submitFailures: [], formFailures: [],
+    submissions: [], saves: [], deletions: [], receiptReads: [], requests: [], submitFailures: [], formFailures: [], deleteFailures: [],
   };
   await page.clock.install({ time: today });
   await page.route("https://**/*", route => route.abort());
@@ -80,7 +79,11 @@ async function fixture(page, { custom = false } = {}) {
       if (state.formFailures.length) return route.fulfill({ status: state.formFailures.shift(), json: { error: "Kayıt formuna geçici olarak ulaşılamıyor." } });
       const form = state.forms.get(eventId) || null;
       const event = events.find(value => value.id === eventId);
-      return route.fulfill({ json: { form, available: !!form?.enabled && event?.published && event.date >= "2026-10-04" } });
+      const open = !!form?.enabled && event?.published && event.date >= "2026-10-04";
+      const full = !!open && form.maxRegistrations !== null && (state.entries.get(eventId)?.length || 0) >= form.maxRegistrations;
+      const publicForm = form ? structuredClone(form) : null;
+      if (publicForm) delete publicForm.maxRegistrations;
+      return route.fulfill({ json: { form: publicForm, available: !!open && !full, full, ...(full ? { message: fullMessage } : {}) } });
     }
     if (action === "submit") {
       const data = await new Request("http://fixture.test", { method: "POST", headers: { "content-type": request.headers()["content-type"] }, body: request.postDataBuffer() }).formData();
@@ -92,7 +95,7 @@ async function fixture(page, { custom = false } = {}) {
       });
       if (state.submitFailures.length) {
         const failure = state.submitFailures.shift();
-        return route.fulfill({ status: typeof failure === "number" ? failure : failure.status, json: { error: typeof failure === "number" ? "Kayıt henüz doğrulanamadı. Lütfen tekrar deneyin." : failure.error } });
+        return route.fulfill({ status: typeof failure === "number" ? failure : failure.status, json: { error: typeof failure === "number" ? "Kayıt henüz doğrulanamadı. Lütfen tekrar deneyin." : failure.error, ...(failure.code ? { code: failure.code } : {}) } });
       }
       return route.fulfill({ json: { ok: true, reference: "test-reference" } });
     }
@@ -110,11 +113,11 @@ async function fixture(page, { custom = false } = {}) {
     if (action === "summary") {
       return route.fulfill({ json: { events: events.map(event => ({ eventId: event.id, title: event.title, ...summarize(state.entries.get(event.id) || []) })) } });
     }
-    if (action === "status") {
+    if (action === "delete") {
       const body = request.postDataJSON();
-      state.statuses.push({ eventId, ...body });
-      const value = state.entries.get(eventId)?.find(value => value.id === body.id);
-      if (value) value.status = body.status;
+      state.deletions.push({ eventId, ...body });
+      if (state.deleteFailures.length) return route.fulfill({ status: state.deleteFailures.shift(), json: { error: "Kayıt silinemedi. Lütfen tekrar deneyin." } });
+      state.entries.set(eventId, (state.entries.get(eventId) || []).filter(value => value.id !== body.id));
       return route.fulfill({ json: { ok: true } });
     }
     if (action === "receipt") {
@@ -232,6 +235,37 @@ test("a conflicting retry shows the backend's descriptive reason and keeps edite
   expect(state.submissions[0].answers.full_name).toBe("Yerel test katılımcısı");
 });
 
+test("a full form shows the thank-you message and other events without inputs or public counts", async ({ page }) => {
+  const state = await fixture(page);
+  state.forms.get("native-today").maxRegistrations = 3;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/form.html?event=native-today#registrationSection");
+  await expect(page.locator("#nativeRegistrationFull p")).toHaveText(fullMessage);
+  await expect(page.locator("#nativeRegistrationFull")).toBeInViewport();
+  await expect(page.locator("#nativeRegistrationForm")).toHaveCount(0);
+  await expect(page.locator("#registrationSection input")).toHaveCount(0);
+  await expect(page.locator("#registrationSuccess")).toHaveCount(0);
+  await expect(page.locator("#nativeRegistrationFull a")).toHaveAttribute("href", "etkinlikler.html");
+  await expect(page.locator("#nativeRegistrationFull")).not.toContainText(/\d|toplam kayıt|kalan yer/i);
+  expect(state.submissions).toHaveLength(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test("when the last place fills while a form is open, submitting replaces inputs with the full message and never claims success", async ({ page }) => {
+  const state = await fixture(page);
+  state.forms.get("native-today").maxRegistrations = 4;
+  state.submitFailures.push({ status: 409, error: fullMessage, code: "REGISTRATION_FULL" });
+  await page.goto("/form.html?event=native-today#registrationSection");
+  await fillCore(page);
+  await page.locator("#registrationReceipt").setInputFiles({ name: "dekont.png", mimeType: "image/png", buffer: receiptBytes });
+  await page.locator("#registrationSubmit").click();
+  await expect(page.locator("#nativeRegistrationFull p")).toHaveText(fullMessage);
+  await expect(page.locator("#nativeRegistrationFull")).toBeFocused();
+  await expect(page.locator("#nativeRegistrationForm")).toHaveCount(0);
+  await expect(page.locator("#registrationSuccess")).toHaveCount(0);
+  expect(state.submissions).toHaveLength(1);
+});
+
 test("Forms offers every enabled native or legacy event, preserves same-day access, and never falls back from a closed native form", async ({ page }) => {
   const state = await fixture(page);
   await page.goto("/form.html");
@@ -290,6 +324,7 @@ test("an admin configures the top description, optional core fields and required
   expect(saved.fields.find(field => field.id === "phone").required).toBe(false);
   expect(saved.fields.find(field => field.id === id)).toMatchObject({ label: "Katılım oturumu", type: "select", options: ["Sabah", "Akşam"], required: true });
   expect(saved.receipt).toEqual({ enabled: true, required: true });
+  expect(saved.maxRegistrations).toBeNull();
   await page.locator("#registrationEvent").selectOption("native-next");
   await expect(page.locator("#registrationDescription")).toHaveValue("İkinci etkinliğin açıklaması.");
   await expect(page.locator('[data-registration-field="phone"] [data-field-prop="required"]')).toBeChecked();
@@ -297,6 +332,24 @@ test("an admin configures the top description, optional core fields and required
   await page.locator("#registrationEvent").selectOption("native-today");
   await expect(page.locator("#registrationDescription")).toHaveValue(saved.description);
   await expect(page.locator(`[data-registration-field="${id}"] [data-field-prop="label"]`)).toHaveValue("Katılım oturumu");
+});
+
+test("an admin sets a per-event upper limit, retains it while switching events, and can return to unlimited registrations", async ({ page }) => {
+  const state = await fixture(page);
+  await openAdmin(page);
+  await page.locator("#registrationMaxRegistrations").fill("40");
+  await page.locator("#registrationSave").click();
+  await expect(page.locator("#registrationFeedback")).toContainText(/kaydedildi/i);
+  expect(state.saves).toHaveLength(1);
+  expect(state.saves[0].maxRegistrations).toBe(40);
+  await page.locator("#registrationEvent").selectOption("native-next");
+  await expect(page.locator("#registrationMaxRegistrations")).toHaveValue("");
+  await page.locator("#registrationEvent").selectOption("native-today");
+  await expect(page.locator("#registrationMaxRegistrations")).toHaveValue("40");
+  await page.locator("#registrationMaxRegistrations").fill("");
+  await page.locator("#registrationSave").click();
+  await expect.poll(() => state.saves.length).toBe(2);
+  expect(state.saves[1].maxRegistrations).toBeNull();
 });
 
 test("an admin reloads clean form settings from the server while unsaved edits survive switching events", async ({ page }) => {
@@ -316,7 +369,7 @@ test("an admin reloads clean form settings from the server while unsaved edits s
   expect(state.saves).toHaveLength(0);
 });
 
-test("an admin filters registrations by class and status, reviews a private receipt, approves a registration and compares class distributions", async ({ page }) => {
+test("an admin filters registrations by class, reviews a private receipt and compares class distributions without review statuses", async ({ page }) => {
   const state = await fixture(page);
   await openAdmin(page);
   const entries = page.locator("#registrationEntries [data-registration-entry]");
@@ -325,8 +378,8 @@ test("an admin filters registrations by class and status, reviews a private rece
   await expect(page.locator("#registrationClassBreakdown")).toContainText("1. Sınıf");
   await page.locator("#registrationClassFilter").selectOption("2. Sınıf");
   await expect(entries).toHaveCount(2);
-  await page.locator("#registrationStatusFilter").selectOption("pending");
-  await expect(entries).toHaveCount(1);
+  await expect(page.locator("#registrationStatusFilter")).toHaveCount(0);
+  await expect(page.locator("#registrationsTab")).not.toContainText(/onayla|reddet|beklemede/i);
   await expect(entries.first()).toContainText("Test katılımcısı first");
   await entries.first().locator('[data-registration-receipt="first"]').click();
   await expect(page.locator("#registrationReceiptDialog")).toBeVisible();
@@ -335,12 +388,6 @@ test("an admin filters registrations by class and status, reviews a private rece
   expect(state.receiptReads).toEqual([{ eventId: "native-today", id: "first" }]);
   await page.keyboard.press("Escape");
   await expect(page.locator("#registrationReceiptDialog")).not.toBeVisible();
-  await entries.first().locator('[data-registration-status="approved"]').click();
-  await expect(entries).toHaveCount(0);
-  expect(state.statuses).toEqual([{ eventId: "native-today", id: "first", status: "approved" }]);
-  await page.locator("#registrationStatusFilter").selectOption("approved");
-  await expect(entries).toHaveCount(1);
-  await expect(entries.first()).toContainText("Test katılımcısı first");
   const nextComparison = page.locator('input[name="registrationCompareEvent"][value="native-next"]');
   await nextComparison.check();
   await expect(page.locator("#registrationComparison")).toContainText("Araştırma buluşması");
@@ -354,11 +401,58 @@ test("an admin filters registrations by class and status, reviews a private rece
   expect(readFileSync(await downloaded.path(), "utf8")).toContain("Test katılımcısı first,2. Sınıf,05551234567");
 });
 
+test("an admin can cancel deletion, a failed deletion keeps the receipt and counts, and successful deletion frees a place", async ({ page }) => {
+  const state = await fixture(page);
+  state.forms.get("native-today").maxRegistrations = 3;
+  state.deleteFailures.push(503);
+  await openAdmin(page);
+  const entries = page.locator("#registrationEntries [data-registration-entry]");
+  const first = page.locator('[data-registration-entry="first"]');
+  await expect(entries).toHaveCount(3);
+  await expect(page.locator("#registrationCapacityInfo")).toHaveAttribute("data-full", "true");
+  await page.locator('input[name="registrationCompareEvent"][value="native-next"]').check();
+  await page.locator('input[name="registrationCompareEvent"][value="legacy"]').uncheck();
+  await expect(page.locator("#registrationComparison")).toContainText("Araştırma buluşması");
+  const comparisonTotals = page.locator("#registrationComparison tr").filter({ has: page.getByRole("rowheader", { name: "Toplam kayıt", exact: true }) }).locator("td");
+  const comparisonSecondClass = page.locator("#registrationComparison tr").filter({ has: page.getByRole("rowheader", { name: "2. Sınıf", exact: true }) }).locator("td");
+  await expect(comparisonTotals).toHaveText(["3", "1"]);
+  await expect(comparisonSecondClass).toHaveText(["2", "0"]);
+  const descriptionDraft = "Silme işlemi sırasında korunan açıklama taslağı.";
+  await page.locator("#registrationDescription").fill(descriptionDraft);
+  await first.locator('[data-registration-delete="first"]').click();
+  await first.locator('[data-registration-delete-cancel="first"]').click();
+  expect(state.deletions).toHaveLength(0);
+  await expect(entries).toHaveCount(3);
+  await first.locator('[data-registration-delete="first"]').click();
+  await first.locator('[data-registration-delete-confirm="first"]').click();
+  await expect(first).toContainText("Kayıt silinemedi");
+  await expect(entries).toHaveCount(3);
+  await expect(first.locator('[data-registration-receipt="first"]')).toBeVisible();
+  expect(state.entries.get("native-today")).toHaveLength(3);
+  await expect(page.locator("#registrationClassBreakdown")).toContainText("2. Sınıf: 2");
+  await first.locator('[data-registration-delete-confirm="first"]').click();
+  await expect(entries).toHaveCount(2);
+  expect(state.deletions).toEqual([
+    { eventId: "native-today", id: "first" },
+    { eventId: "native-today", id: "first" },
+  ]);
+  await expect(page.locator("#registrationSummary")).toContainText("2");
+  await expect(page.locator("#registrationClassBreakdown")).toContainText("2. Sınıf: 1");
+  await expect(page.locator("#registrationCapacityInfo")).toHaveAttribute("data-full", "false");
+  await expect(page.locator("#registrationDescription")).toHaveValue(descriptionDraft);
+  await expect(comparisonTotals).toHaveText(["2", "1"]);
+  await expect(comparisonSecondClass).toHaveText(["1", "0"]);
+  expect(state.entries.get("native-today")).toHaveLength(2);
+  await page.goto("/form.html?event=native-today#registrationSection");
+  await expect(page.locator("#nativeRegistrationForm")).toBeVisible();
+  await expect(page.locator("#nativeRegistrationFull")).toHaveCount(0);
+});
+
 test("class filters and totals include registrations beyond the API's first page", async ({ page }) => {
   const state = await fixture(page);
   state.entries.set("native-today", [
-    ...Array.from({ length: 50 }, (_, index) => entry(`page-one-${index}`, "2. Sınıf", "approved")),
-    entry("page-two", "5. Sınıf", "pending"),
+    ...Array.from({ length: 50 }, (_, index) => entry(`page-one-${index}`, "2. Sınıf")),
+    entry("page-two", "5. Sınıf"),
   ]);
   await openAdmin(page);
   await expect(page.locator("#registrationEntries [data-registration-entry]")).toHaveCount(51);

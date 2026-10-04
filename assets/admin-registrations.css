@@ -33,28 +33,29 @@
 .registration-field-actions { display: flex; gap: .4rem; flex-wrap: wrap; }
 .registration-field-actions button { min-height: 2rem; padding: .25rem .55rem; font-size: .8rem; }
 .registration-receipt-options { display: flex; gap: 1.5rem; flex-wrap: wrap; margin: 1.4rem 0; padding: 1rem; border-radius: .9rem; background: #f8fafc; }
-.registration-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin: 1rem 0; }
+.registration-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin: 1rem 0; }
 .registration-stat { padding: .9rem; border-radius: 1rem; background: #f1f5f9; }
 .registration-stat span { display: block; color: #617087; font-size: .83rem; }
 .registration-stat strong { display: block; font-size: 1.65rem; margin-top: .2rem; color: #172033; }
+.registration-capacity-info { color: #526178; font-size: .9rem; line-height: 1.6; }
+.registration-capacity-info[data-full=true] { color: #8b2323; font-weight: 650; }
 .registration-class-breakdown { display: flex; gap: .5rem; flex-wrap: wrap; margin: 1rem 0 1.4rem; }
 .registration-class-chip { padding: .35rem .7rem; background: #f8eeee; border-radius: 2rem; font-size: .83rem; color: #742626; }
-.registration-filters { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: .8rem; margin: 1.2rem 0; }
+.registration-filters { display: grid; grid-template-columns: 1.5fr 1fr; gap: .8rem; margin: 1.2rem 0; }
 .registration-entries { display: grid; gap: 1rem; }
 .registration-entry { padding: 1.1rem; border: 1px solid #e2e8f0; border-radius: 1rem; }
 .registration-entry-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .registration-entry h4 { font-weight: 750; font-size: 1.02rem; }
 .registration-entry-meta { display: flex; flex-wrap: wrap; gap: .35rem 1rem; margin: .4rem 0; color: #617087; font-size: .85rem; }
-.registration-entry-status { border-radius: 2rem; padding: .25rem .65rem; font-size: .8rem; white-space: nowrap; background: #fff6df; color: #8a5500; }
-.registration-entry-status[data-state=approved] { background: #e8f7ed; color: #176a37; }
-.registration-entry-status[data-state=rejected] { background: #fdecec; color: #a12b2b; }
 .registration-entry details { margin-top: .8rem; }
 .registration-entry summary { cursor: pointer; font-size: .86rem; font-weight: 650; }
 .registration-answers { display: grid; grid-template-columns: minmax(8rem, .5fr) minmax(0, 1fr); gap: .5rem 1rem; margin: .9rem 0; font-size: .88rem; }
 .registration-answers dt { font-weight: 650; }
 .registration-answers dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .registration-entry .registration-actions { margin-top: 1rem; }
-.registration-entry .registration-actions button[aria-pressed=true] { box-shadow: inset 0 0 0 1px #8b2323; border-color: #8b2323; color: #8b2323; }
+.registration-admin .registration-delete { color: #a12b2b; border-color: #e6b7b7; }
+.registration-admin .registration-delete-confirm { background: #a12b2b; border-color: #a12b2b; color: white; }
+.registration-delete-prompt { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; color: #a12b2b; font-size: .88rem; }
 .registration-compare-events { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; margin: 1rem 0; max-height: 18rem; overflow-y: auto; }
 .registration-compare-events label { padding: .8rem; border: 1px solid #e2e8f0; border-radius: .8rem; }
 .registration-comparison-scroll { overflow-x: auto; }

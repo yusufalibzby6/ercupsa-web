@@ -5,7 +5,7 @@ import { createRegistrationsHandler } from "../netlify/functions/registrations.m
 import { adminLogin } from "../netlify/lib/security.mjs";
 import {
   CLASS_OPTIONS, RECEIPT_MAX_BYTES, REGISTRATION_MAX_BYTES, REGISTRATION_STORE,
-  REGISTRATION_RECEIPT_STORE, defaultRegistrationForm, entryKey, formKey,
+  REGISTRATION_RECEIPT_STORE, REGISTRATION_FULL_MESSAGE, defaultRegistrationForm, entryKey, formKey, registrationStateKey,
   hydrateRegistrationFlags, registrationCsv, turkeyToday,
 } from "../netlify/lib/registrations.mjs";
 
@@ -48,8 +48,10 @@ function fixture() {
       },
       async getWithMetadata(key, options) {
         calls.push({ name, action: "getWithMetadata", key, options });
+        await hooks.get?.({ name, key, records });
         const record = records.get(key);
-        return record ? structuredClone(record) : null;
+        const cloned = record ? structuredClone(record) : null;
+        return hooks.metadata ? hooks.metadata({ name, key, record: cloned }) : cloned;
       },
       async setJSON(key, data, options = {}) {
         calls.push({ name, action: "setJSON", key, options });
@@ -72,6 +74,7 @@ function fixture() {
       },
       async delete(key) {
         calls.push({ name, action: "delete", key });
+        await hooks.beforeDelete?.({ name, key, records });
         records.delete(key);
       },
       async list({ prefix = "" } = {}) {
@@ -113,11 +116,11 @@ function fixture() {
     setClock: (value) => { clock = new Date(value); } };
 }
 
-test("administrator lists, configuration, statuses, summaries, exports and private receipts require signed cookies", async () => {
+test("administrator lists, configuration, deletion, summaries, exports and private receipts require signed cookies", async () => {
   const { request, calls } = fixture();
-  for (const action of ["admin", "summary", "receipt", "export", "status", "form"]) {
+  for (const action of ["admin", "summary", "receipt", "export", "delete", "form"]) {
     const result = await request(action, {
-      method: ["status", "form"].includes(action) ? "POST" : "GET",
+      method: ["delete", "form"].includes(action) ? "POST" : "GET",
       input: { id: "entry-one", status: "approved" },
       headers: { "x-admin-password": process.env.ADMIN_PASSWORD },
     });
@@ -135,10 +138,15 @@ test("config defaults, core fields, types, lengths and options are enforced with
   const empty = await (await request("admin", { auth: true })).json();
   assert.deepEqual(empty.form, defaultRegistrationForm("event-one"));
   assert.deepEqual(empty.form.fields[1].options, CLASS_OPTIONS);
-  assert.deepEqual((await (await request()).json()), { form: null, available: false });
+  assert.deepEqual((await (await request()).json()), { form: null, available: false, full: false });
   const saved = await open();
   assert.equal(saved.updatedAt, "2026-10-04T09:00:00.000Z");
   const mutations = [
+    (f) => { f.maxRegistrations = 0; },
+    (f) => { f.maxRegistrations = -1; },
+    (f) => { f.maxRegistrations = 1.5; },
+    (f) => { f.maxRegistrations = "40"; },
+    (f) => { f.maxRegistrations = 10001; },
     (f) => { f.eventId = "event-two"; },
     (f) => { f.fields[0].required = false; },
     (f) => { f.fields[0].type = "email"; },
@@ -156,7 +164,7 @@ test("config defaults, core fields, types, lengths and options are enforced with
     const input = structuredClone(saved);
     mutate(input);
     assert.equal((await request("form", { auth: true, method: "POST", input })).status, 400);
-    assert.deepEqual(stores.get(REGISTRATION_STORE).get(formKey("event-one")).data, saved);
+    assert.deepEqual(stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.form, saved);
   }
   for (const eventId of ["", "../event-one", "x/y"])
     assert.equal((await request("admin", { eventId, auth: true })).status, 400);
@@ -205,11 +213,11 @@ test("all configured answers are validated and invalid submissions leave no entr
   assert.equal((await submit({ answers })).status, 400);
   assert.equal((await submit({ answers, receipt: png, website: "spam.example" })).status, 400);
   assert.equal((await submit({ answers, receipt: png })).status, 200);
-  assert.equal([...stores.get(REGISTRATION_STORE).keys()].filter((key) => key.startsWith("entries/")).length, 1);
+  assert.equal(stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries.length, 1);
   assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
 });
 
-test("a native submission is idempotent, private, class-counted, approvable and exportable", async () => {
+test("a native submission is idempotent, private, class-counted and exportable", async () => {
   const { open, submit, request, stores, calls } = fixture();
   await open();
   const requestId = randomUUID();
@@ -222,8 +230,7 @@ test("a native submission is idempotent, private, class-counted, approvable and 
   assert.equal((await submit({ requestId, answers: { ...validAnswers, phone: "05559999999" }, receipt: png })).status, 409);
   assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
   const admin = await (await request("admin", { auth: true })).json();
-  assert.deepEqual(admin.summary, { total: 1, pending: 1, approved: 0, rejected: 0,
-    byClass: [{ classYear: "2. Sınıf", count: 1 }] });
+  assert.deepEqual(admin.summary, { total: 1, byClass: [{ classYear: "2. Sınıf", count: 1 }] });
   assert.equal(admin.entries[0].name, "Deniz Test");
   assert.deepEqual(admin.entries[0].receipt, { name: "dekont.png", mime: "image/png", size: png.length });
   assert.deepEqual(admin.entries[0].fields, defaultRegistrationForm("event-one").fields);
@@ -236,18 +243,19 @@ test("a native submission is idempotent, private, class-counted, approvable and 
   assert.equal(receipt.headers.get("content-security-policy"), "default-src 'none'; sandbox");
   assert.deepEqual(Buffer.from(await receipt.arrayBuffer()), png);
   assert.equal((await request("receipt", { extra: "&id=" + submitted.reference })).status, 401);
-  assert.equal((await request("status", { auth: true, method: "POST",
-    input: { id: submitted.reference, status: "approved" } })).status, 200);
   const summary = await (await request("summary", { auth: true })).json();
-  assert.equal(summary.events.find((event) => event.eventId === "event-one").approved, 1);
+  assert.equal(summary.events.find((event) => event.eventId === "event-one").total, 1);
   assert.equal(summary.events.find((event) => event.eventId === "event-two").total, 0);
   assert.equal((await request("status", { auth: true, method: "POST",
     input: { id: submitted.reference, status: "attendance" } })).status, 400);
   const csv = await request("export", { auth: true });
   assert.match(csv.headers.get("content-disposition"), /attachment/);
-  assert.match(await csv.text(), /Deniz Test/);
+  const csvText = await csv.text();
+  assert.match(csvText, /Deniz Test/);
+  assert.ok(!csvText.includes('"Durum"'));
+  assert.ok(!Object.hasOwn(admin.entries[0], "status"));
   const publicForm = await (await request()).json();
-  assert.deepEqual(Object.keys(publicForm).sort(), ["available", "form"]);
+  assert.deepEqual(Object.keys(publicForm).sort(), ["available", "form", "full"]);
   assert.ok(!JSON.stringify(publicForm).includes("Deniz Test"));
   assert.ok(calls.filter((call) => ["get", "getWithMetadata"].includes(call.action))
     .every((call) => call.options.consistency === "strong"));
@@ -386,7 +394,7 @@ test("legitimate simultaneous registrations behind one campus IP survive counter
   assert.equal((await (await request("admin", { auth: true })).json()).summary.total, 32);
 });
 
-test("field snapshots, approvals and receipts survive form edits and event deletion", async () => {
+test("field snapshots and receipts survive form edits and event deletion", async () => {
   const { open, submit, request, events } = fixture();
   await open("event-one", (form) => ({ ...form, fields: [...form.fields,
     { id: "custom", type: "text", label: "Eski soru", required: false }] }));
@@ -404,9 +412,8 @@ test("field snapshots, approvals and receipts survive form edits and event delet
   assert.equal(archived.event.title, "Birinci etkinlik");
   assert.equal(archived.entries.length, 1);
   assert.equal((await request("receipt", { auth: true, extra: "&id=" + id })).status, 200);
-  assert.equal((await request("status", { auth: true, method: "POST", input: { id, status: "approved" } })).status, 200);
   const summary = await (await request("summary", { auth: true })).json();
-  assert.equal(summary.events.find((event) => event.eventId === "event-one").approved, 1);
+  assert.equal(summary.events.find((event) => event.eventId === "event-one").total, 1);
   const csv = await (await request("export", { auth: true })).text();
   assert.match(csv, /Eski soru/);
   assert.ok(!csv.includes("Yeni soru"));
@@ -446,7 +453,7 @@ test("failed entry writes clean uncommitted receipts and preserve receipts if co
     const { open, submit, request, stores, hooks } = fixture();
     await open();
     const hook = async ({ name, key }) => {
-      if (name === REGISTRATION_STORE && key.startsWith("entries/")) throw new Error("private token failure");
+      if (name === REGISTRATION_STORE && key.startsWith("state/")) throw new Error("private token failure");
     };
     hooks[committed ? "afterSet" : "beforeSet"] = hook;
     const result = await submit({ receipt: png });
@@ -466,7 +473,7 @@ test("receipt writes that fail after committing are cleaned before creating any 
   hooks.afterReceiptSet = () => { throw new Error("receipt connection failed"); };
   assert.equal((await submit({ receipt: png })).status, 503);
   assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 0);
-  assert.equal([...stores.get(REGISTRATION_STORE).keys()].filter((key) => key.startsWith("entries/")).length, 0);
+  assert.equal(stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries.length, 0);
 });
 
 test("uncertain entry writes preserve a potentially committed receipt rather than deleting participant data", async () => {
@@ -474,18 +481,231 @@ test("uncertain entry writes preserve a potentially committed receipt rather tha
   await open();
   let wroteEntry = false;
   hooks.afterSet = ({ name, key }) => {
-    if (name === REGISTRATION_STORE && key.startsWith("entries/")) {
+    if (name === REGISTRATION_STORE && key.startsWith("state/")) {
       wroteEntry = true;
       throw new Error("entry committed but response lost");
     }
   };
   hooks.get = ({ name, key }) => {
-    if (wroteEntry && name === REGISTRATION_STORE && key.startsWith("entries/"))
+    if (wroteEntry && name === REGISTRATION_STORE && key.startsWith("state/"))
       throw new Error("confirmation read temporarily unavailable");
   };
   assert.equal((await submit({ receipt: png })).status, 503);
   assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
-  const entry = [...stores.get(REGISTRATION_STORE).values()].find((record) => record.data.receipt?.key)?.data;
+  const entry = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries[0];
   assert.ok(entry);
   assert.ok(stores.get(REGISTRATION_RECEIPT_STORE).has(entry.receipt.key));
+});
+
+test("a cap of 40 is atomic for 45 simultaneous participants sharing one campus IP", async () => {
+  const { open, submit, request, stores } = fixture();
+  await open("event-one", (form) => ({ ...form, maxRegistrations: 40 }));
+  const responses = await Promise.all(Array.from({ length: 45 }, (_, index) =>
+    submit({ answers: { ...validAnswers, full_name: `Katılımcı ${index}` }, receipt: png })));
+  assert.equal(responses.filter((result) => result.status === 200).length, 40);
+  const refused = responses.filter((result) => result.status !== 200);
+  assert.equal(refused.length, 5);
+  for (const result of refused) {
+    assert.equal(result.status, 409);
+    assert.deepEqual(await result.json(), { error: REGISTRATION_FULL_MESSAGE, code: "REGISTRATION_FULL" });
+  }
+  const admin = await (await request("admin", { auth: true })).json();
+  assert.equal(admin.summary.total, 40);
+  assert.equal(new Set(admin.entries.map((entry) => entry.id)).size, 40);
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 40);
+  const publicForm = await (await request()).json();
+  assert.equal(publicForm.available, false);
+  assert.equal(publicForm.full, true);
+  assert.equal(publicForm.message, REGISTRATION_FULL_MESSAGE);
+  assert.ok(!Object.hasOwn(publicForm.form, "maxRegistrations"));
+  assert.ok(!JSON.stringify(publicForm).includes('"total"'));
+  assert.ok(!JSON.stringify(publicForm).includes("Katılımcı"));
+});
+
+test("identical retries at the last slot succeed, changed payload conflicts, and delete frees the slot", async () => {
+  const { open, submit, request, stores } = fixture();
+  await open("event-one", (form) => ({ ...form, maxRegistrations: 1 }));
+  const requestId = randomUUID();
+  const responses = await Promise.all([submit({ requestId, receipt: png }), submit({ requestId, receipt: png })]);
+  assert.deepEqual(responses.map((result) => result.status), [200, 200]);
+  const accepted = await responses[0].json();
+  assert.deepEqual(await responses[1].json(), accepted);
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
+  assert.equal((await submit({ requestId, receipt: png })).status, 200);
+  const changed = await submit({ requestId, receipt: png, answers: { ...validAnswers, full_name: "Başka kişi" } });
+  assert.equal(changed.status, 409);
+  assert.ok(!(await changed.json()).code);
+  assert.equal((await submit()).status, 409);
+  assert.equal((await request("delete", { auth: true, method: "POST", input: { id: accepted.reference } })).status, 200);
+  assert.equal((await (await request()).json()).available, true);
+  assert.equal((await (await request()).json()).full, false);
+  assert.equal((await (await request("admin", { auth: true })).json()).summary.total, 0);
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 0);
+  assert.equal((await request("receipt", { auth: true, extra: "&id=" + accepted.reference })).status, 404);
+  const deletedRetry = await submit({ requestId, receipt: png });
+  assert.equal(deletedRetry.status, 409);
+  assert.match((await deletedRetry.json()).error, /silinmiş/);
+  assert.equal((await request("delete", { auth: true, method: "POST", input: { id: accepted.reference } })).status, 200);
+  assert.equal((await submit()).status, 200);
+});
+
+test("limits can close below existing totals, reopen when raised, and remain optional", async () => {
+  const { open, submit, request } = fixture();
+  await open();
+  for (let i = 0; i < 3; i++) assert.equal((await submit()).status, 200);
+  await open("event-one", (form) => ({ ...form, maxRegistrations: 2 }));
+  assert.equal((await (await request()).json()).full, true);
+  assert.equal((await submit()).status, 409);
+  await open("event-one", (form) => ({ ...form, maxRegistrations: 4 }));
+  assert.equal((await (await request()).json()).available, true);
+  assert.equal((await submit()).status, 200);
+  assert.equal((await (await request()).json()).full, true);
+  await open("event-one", (form) => ({ ...form, maxRegistrations: null }));
+  assert.equal((await submit()).status, 200);
+  const publicForm = await (await request()).json();
+  assert.equal(publicForm.full, false);
+  assert.equal(publicForm.available, true);
+  assert.ok(!Object.hasOwn(publicForm.form, "maxRegistrations"));
+});
+
+test("cached administrator configuration without a limit cannot remove a newer saved limit", async () => {
+  const { open, request } = fixture();
+  const saved = await open("event-one", (form) => ({ ...form, maxRegistrations: 40 }));
+  const { maxRegistrations, ...oldInput } = saved;
+  const result = await request("form", { method: "POST", auth: true, input: { ...oldInput, description: "Eski panel" } });
+  assert.equal(result.status, 200);
+  assert.equal((await result.json()).form.maxRegistrations, 40);
+});
+
+test("a form limit lowered while the last-slot upload is in flight wins the same CAS race", async () => {
+  const { open, submit, request, hooks, stores } = fixture();
+  await open("event-one", (form) => ({ ...form, maxRegistrations: 2 }));
+  assert.equal((await submit()).status, 200);
+  let release;
+  let signal;
+  const blocked = new Promise((resolve) => { signal = resolve; });
+  const wait = new Promise((resolve) => { release = resolve; });
+  hooks.beforeSet = async ({ name, key, data }) => {
+    if (name === REGISTRATION_STORE && key.startsWith("state/") && data.entries.length === 2) {
+      hooks.beforeSet = null;
+      signal(); await wait;
+    }
+  };
+  const racingSubmit = submit({ receipt: png });
+  await blocked;
+  await open("event-one", (form) => ({ ...form, maxRegistrations: 1 }));
+  release();
+  const result = await racingSubmit;
+  assert.equal(result.status, 409);
+  assert.equal((await result.json()).code, "REGISTRATION_FULL");
+  assert.equal((await (await request("admin", { auth: true })).json()).summary.total, 1);
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 0);
+});
+
+test("legacy pending, approved and rejected entries all count and migrate without data or receipt loss", async () => {
+  const { getStore, open, submit, request, stores, events } = fixture();
+  await open();
+  for (let i = 0; i < 3; i++) await submit({ receipt: png, answers: { ...validAnswers, full_name: `Eski kişi ${i}` } });
+  const store = getStore(REGISTRATION_STORE);
+  const old = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  const { maxRegistrations, ...legacyForm } = old.form;
+  await store.setJSON(formKey("event-one"), legacyForm);
+  for (const [index, entry] of old.entries.entries()) await store.setJSON(entryKey("event-one", entry.id),
+    { ...entry, status: ["pending", "approved", "rejected"][index] });
+  await store.delete(registrationStateKey("event-one"));
+  const readonly = await (await request("admin", { auth: true })).json();
+  assert.equal(readonly.summary.total, 3);
+  assert.equal(readonly.form.maxRegistrations, null);
+  assert.ok(!stores.get(REGISTRATION_STORE).has(registrationStateKey("event-one")));
+  await open("event-one", (form) => ({ ...form, maxRegistrations: 3 }));
+  assert.equal((await (await request()).json()).full, true);
+  const migrated = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  assert.deepEqual(migrated.entries.map((entry) => entry.status).sort(), ["approved", "pending", "rejected"]);
+  const admin = await (await request("admin", { auth: true })).json();
+  assert.deepEqual(Object.keys(admin.summary).sort(), ["byClass", "total"]);
+  assert.ok(admin.entries.every((entry) => !Object.hasOwn(entry, "status")));
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 3);
+  const removed = old.entries[1];
+  assert.equal((await request("delete", { auth: true, method: "POST", input: { id: removed.id } })).status, 200);
+  assert.equal((await (await request()).json()).available, true);
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 2);
+  assert.ok(!stores.get(REGISTRATION_STORE).has(entryKey("event-one", removed.id)));
+  // Stale legacy content must not override native form flags after migration.
+  await store.setJSON(formKey("event-one"), { ...legacyForm, enabled: false });
+  const hydrated = await hydrateRegistrationFlags(events, getStore);
+  assert.equal(hydrated[0].registrationEnabled, true);
+  const summary = await (await request("summary", { auth: true })).json();
+  assert.equal(summary.events.find((event) => event.eventId === "event-one").total, 2);
+});
+
+test("deletion is protected, obsolete status updates are rejected, and unknown IDs do not mutate state", async () => {
+  const { open, submit, request } = fixture();
+  await open();
+  const id = (await (await submit()).json()).reference;
+  assert.equal((await request("delete", { method: "POST", input: { id } })).status, 401);
+  assert.equal((await request("delete", { auth: true, method: "POST", input: { id }, headers: { Origin: "https://foreign.test" } })).status, 403);
+  assert.equal((await request("delete", { auth: true, method: "GET" })).status, 405);
+  assert.equal((await request("delete", { auth: true, method: "POST", input: { id: "../invalid" } })).status, 400);
+  assert.equal((await request("delete", { auth: true, method: "POST", input: { id: "unknown" } })).status, 404);
+  assert.equal((await request("status", { auth: true, method: "POST", input: { id, status: "approved" } })).status, 400);
+  assert.equal((await (await request("admin", { auth: true })).json()).summary.total, 1);
+});
+
+test("failed submit commits cannot consume the only slot, including successful writes with lost responses", async () => {
+  for (const committed of [false, true]) {
+    const { open, submit, request, hooks } = fixture();
+    await open("event-one", (form) => ({ ...form, maxRegistrations: 1 }));
+    let failOnce = true;
+    hooks[committed ? "afterSet" : "beforeSet"] = ({ name, key }) => {
+      if (failOnce && name === REGISTRATION_STORE && key.startsWith("state/")) {
+        failOnce = false; throw new Error("write response lost");
+      }
+    };
+    assert.equal((await submit({ receipt: png })).status, committed ? 200 : 503);
+    const publicForm = await (await request()).json();
+    assert.equal(publicForm.full, committed);
+    if (!committed) assert.equal((await submit()).status, 200);
+  }
+});
+
+test("delete survives a lost commit response and retried cleanup never resurrects a legacy receipt or entry", async () => {
+  const { getStore, open, submit, request, stores, hooks } = fixture();
+  await open("event-one", (form) => ({ ...form, maxRegistrations: 1 }));
+  const id = (await (await submit({ receipt: png })).json()).reference;
+  const original = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries[0];
+  await getStore(REGISTRATION_STORE).setJSON(entryKey("event-one", id), { ...original, status: "approved" });
+  hooks.afterSet = ({ name, key, data }) => {
+    if (name === REGISTRATION_STORE && key.startsWith("state/") && data.deleted.length) {
+      hooks.afterSet = null; throw new Error("deleted but response lost");
+    }
+  };
+  hooks.beforeDelete = () => { throw new Error("private cleanup unavailable"); };
+  assert.equal((await request("delete", { auth: true, method: "POST", input: { id } })).status, 200);
+  assert.equal((await request("receipt", { auth: true, extra: "&id=" + id })).status, 404);
+  assert.equal((await (await request("admin", { auth: true })).json()).summary.total, 0);
+  assert.equal((await (await request()).json()).available, true);
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
+  assert.ok(stores.get(REGISTRATION_STORE).has(entryKey("event-one", id)));
+  const summary = await (await request("summary", { auth: true })).json();
+  assert.equal(summary.events.find((event) => event.eventId === "event-one").total, 0);
+  hooks.beforeDelete = null;
+  assert.equal((await request("delete", { auth: true, method: "POST", input: { id } })).status, 200);
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 0);
+  assert.ok(!stores.get(REGISTRATION_STORE).has(entryKey("event-one", id)));
+});
+
+test("a store missing conditional-write ETags fails closed instead of removing a limit or overwriting records", async () => {
+  const { open, submit, request, hooks } = fixture();
+  const form = await open("event-one", (value) => ({ ...value, maxRegistrations: 1 }));
+  const id = (await (await submit()).json()).reference;
+  hooks.metadata = ({ name, key, record }) => {
+    if (name === REGISTRATION_STORE && key.startsWith("state/")) delete record.etag;
+    return record;
+  };
+  assert.equal((await request("form", { auth: true, method: "POST", input: { ...form, maxRegistrations: null } })).status, 503);
+  assert.equal((await request("delete", { auth: true, method: "POST", input: { id } })).status, 503);
+  const current = await (await request("admin", { auth: true })).json();
+  assert.equal(current.summary.total, 1);
+  assert.equal(current.form.maxRegistrations, 1);
+  assert.equal((await (await request()).json()).full, true);
 });

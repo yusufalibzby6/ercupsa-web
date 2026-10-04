@@ -4,6 +4,7 @@ export const REGISTRATION_STORE = "ercupsa-registrations";
 export const REGISTRATION_RECEIPT_STORE = "ercupsa-registration-receipts";
 export const RECEIPT_MAX_BYTES = 4 * 1024 * 1024;
 export const REGISTRATION_MAX_BYTES = RECEIPT_MAX_BYTES + 128 * 1024;
+export const REGISTRATION_FULL_MESSAGE = "İlginiz için teşekkür ederiz. Kontenjanımız dolmuştur. Bir sonraki etkinliklerimize bekleriz.";
 export const CLASS_OPTIONS = [
   "Hazırlık", "1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf",
   "5. Sınıf", "Mezun", "Diğer",
@@ -16,11 +17,13 @@ const UNSAFE_IDS = new Set(["__proto__", "constructor", "prototype"]);
 export const formKey = (eventId) => `forms/${identifier(eventId)}.json`;
 export const entryPrefix = (eventId) => `entries/${identifier(eventId)}/`;
 export const entryKey = (eventId, id) => `${entryPrefix(eventId)}${identifier(id)}.json`;
+export const registrationStateKey = (eventId) => `state/${identifier(eventId)}.json`;
 
 export function defaultRegistrationForm(eventId) {
   return {
     eventId: identifier(eventId),
     enabled: false,
+    maxRegistrations: null,
     description: "",
     fields: [
       { id: "full_name", type: "text", label: "Ad soyad", required: true },
@@ -37,6 +40,10 @@ export function normalizeRegistrationForm(input, eventId, updatedAt) {
   if (input.eventId != null && input.eventId !== eventId)
     fail(400, "Kayıt formunun etkinliği uyuşmuyor.");
   if (typeof input.enabled !== "boolean") fail(400, "Geçersiz form durumu.");
+  const maxRegistrations = input.maxRegistrations ?? null;
+  if (maxRegistrations !== null && (!Number.isInteger(maxRegistrations) ||
+    maxRegistrations < 1 || maxRegistrations > 10000))
+    fail(400, "Üst sınır 1 ile 10000 arasında tam sayı olmalı veya boş bırakılmalı.");
   if (!Array.isArray(input.fields) || input.fields.length < 3 || input.fields.length > 25)
     fail(400, "Formda temel alanlarla birlikte en fazla 25 soru olabilir.");
   const seen = new Set();
@@ -69,7 +76,7 @@ export function normalizeRegistrationForm(input, eventId, updatedAt) {
     fail(400, "Dekont ayarı geçersiz.");
   if (receipt.required && !receipt.enabled) fail(400, "Zorunlu dekont alanı açık olmalı.");
   return {
-    eventId: identifier(eventId), enabled: input.enabled,
+    eventId: identifier(eventId), enabled: input.enabled, maxRegistrations,
     description: text(input.description, 5000), fields,
     receipt: { enabled: receipt.enabled, required: receipt.required }, updatedAt,
   };
@@ -90,7 +97,8 @@ export function registrationIsAvailable(event, form, now = new Date()) {
 export async function hydrateRegistrationFlags(events, getStore) {
   const store = getStore(REGISTRATION_STORE);
   return mapConcurrent(events, async (event) => {
-    const form = await store.get(formKey(event.id), { type: "json", consistency: "strong" });
+    const state = await store.get(registrationStateKey(event.id), { type: "json", consistency: "strong" });
+    const form = state ? state.form : await store.get(formKey(event.id), { type: "json", consistency: "strong" });
     return form ? { ...event, registrationMode: "native", registrationEnabled: form.enabled === true }
       : { ...event, ...(event.registrationUrl ? { registrationMode: "external" } : {}) };
   });
@@ -231,15 +239,14 @@ export async function validateRegistrationReceipt(file) {
 }
 
 export function entryForAdmin(entry) {
-  const { receipt, fingerprint, ...rest } = entry;
+  const { receipt, fingerprint, status, ...rest } = entry;
   return { ...rest, receipt: receipt ? { name: receipt.name, mime: receipt.mime, size: receipt.size } : null };
 }
 
 export function registrationSummary(entries) {
-  const summary = { total: entries.length, pending: 0, approved: 0, rejected: 0, byClass: [] };
+  const summary = { total: entries.length, byClass: [] };
   const classes = new Map();
   for (const entry of entries) {
-    if (["pending", "approved", "rejected"].includes(entry.status)) summary[entry.status]++;
     const classYear = entry.classYear || "Belirtilmedi";
     classes.set(classYear, (classes.get(classYear) || 0) + 1);
   }
@@ -266,11 +273,11 @@ export function registrationCsv(entries) {
     }
   }
   const columns = [...questions.values()];
-  const rows = [["Kayıt kimliği", "Kayıt tarihi", "Durum", "Ad soyad", "Sınıf", "Telefon", "Dekont", ...columns.map((field) => field.label)]];
+  const rows = [["Kayıt kimliği", "Kayıt tarihi", "Ad soyad", "Sınıf", "Telefon", "Dekont", ...columns.map((field) => field.label)]];
   for (const entry of entries) {
     const snapshots = new Set((entry.fields || []).map((field) => `${field.id}\u0000${field.label}`));
     rows.push([
-      entry.id, entry.createdAt, entry.status, entry.name, entry.classYear, entry.phone,
+      entry.id, entry.createdAt, entry.name, entry.classYear, entry.phone,
       entry.receipt ? "Var" : "Yok",
       ...columns.map((field) => snapshots.has(`${field.id}\u0000${field.label}`) ? entry.answers?.[field.id] : ""),
     ]);

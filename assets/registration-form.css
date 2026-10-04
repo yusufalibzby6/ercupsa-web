@@ -36,17 +36,18 @@ textarea.registration-control { resize: vertical; min-height: 112px; }
 .registration-submit { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 12px; padding: .85rem 1.5rem; font-weight: 750; margin-top: 1.1rem; min-height: 48px; cursor: pointer; }
 .registration-submit:disabled { opacity: .65; cursor: wait; }
 .registration-feedback { border-radius: 11px; background: #fff0f1; border: 1px solid #f3cbd0; padding: .85rem 1rem; color: #962634; font-size: .9rem; margin-top: 1.1rem; line-height: 1.65; }
-.registration-success, .registration-unavailable, .registration-load-error, .registration-loading { padding: 2rem; border-radius: 22px; background: #fff; border: 1px solid #e1e6ee; }
-.registration-success { text-align: center; }
+.registration-success, .registration-full, .registration-unavailable, .registration-load-error, .registration-loading { padding: 2rem; border-radius: 22px; background: #fff; border: 1px solid #e1e6ee; }
+.registration-success, .registration-full { text-align: center; }
 .registration-success h3, .registration-unavailable h3 { font-size: 1.3rem; font-weight: 800; margin-bottom: .65rem; }
-.registration-success p, .registration-unavailable p, .registration-load-error p { color: #5d697b; line-height: 1.75; }
-.registration-success .event-secondary-action, .registration-load-error button { margin-top: 1.1rem; }
+.registration-success p, .registration-full p, .registration-unavailable p, .registration-load-error p { color: #5d697b; line-height: 1.75; }
+.registration-full p { font-size: 1.05rem; overflow-wrap: anywhere; }
+.registration-success .event-secondary-action, .registration-full .event-secondary-action, .registration-load-error button { margin-top: 1.1rem; }
 .registration-success-mark { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; margin: 0 auto 1rem; background: #e7f4ed; color: #24734b; border-radius: 50%; font-size: 1.7rem; font-weight: 800; }
 .registration-honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
-.dark .registration-form, .dark .registration-success, .dark .registration-unavailable, .dark .registration-load-error, .dark .registration-loading { background: #162133; border-color: #33435a; }
+.dark .registration-form, .dark .registration-success, .dark .registration-full, .dark .registration-unavailable, .dark .registration-load-error, .dark .registration-loading { background: #162133; border-color: #33435a; }
 .dark .registration-intro { border-color: #33435a; }
 .dark .registration-label { color: #edf2fa; }
-.dark .registration-description, .dark .registration-success p, .dark .registration-unavailable p, .dark .registration-load-error p { color: #c4cede; }
+.dark .registration-description, .dark .registration-success p, .dark .registration-full p, .dark .registration-unavailable p, .dark .registration-load-error p { color: #c4cede; }
 .dark .registration-control, .dark .registration-choice { background: #101b2c; color: #e2e9f4; border-color: #44526a; }
 .dark .registration-receipt { background: #101b2c; border-color: #44526a; }
 .dark .registration-help, .dark .registration-privacy, .dark .registration-required-note { color: #aab9cf; }
