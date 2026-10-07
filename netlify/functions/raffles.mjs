@@ -2,7 +2,7 @@ import { getStore } from '@netlify/blobs';
 import { guarded, requireAdmin, response, body, identifier, fail, HttpError } from '../lib/security.mjs';
 import { db } from '../lib/database.mjs';
 import { readEvents } from './events.mjs';
-import { paged, participantsFor, poolVersion, drawInput, weightedWinners, savedDraw, drawHistory, saveDraw, deleteDraw, RaffleError, raffleFail } from '../lib/raffles.mjs';
+import { paged, participantsFor, poolVersion, drawChances, drawInput, weightedWinners, savedDraw, drawHistory, saveDraw, deleteDraw, RaffleError, raffleFail } from '../lib/raffles.mjs';
 
 export function createHandler({ read = db, events = readEvents, store = () => getStore({ name: 'ercupsa-raffles', consistency: 'strong' }) } = {}) {
   async function pool(eventId) {
@@ -60,8 +60,9 @@ export function createHandler({ read = db, events = readEvents, store = () => ge
           const { event, participants, poolVersion: actualVersion } = await pool(input.eventId);
           if (input.poolVersion !== actualVersion) raffleFail(409, 'RAFFLE_POOL_CHANGED', 'Katılımcı listesi veya çekiliş hakları değişti. Listeyi yenileyip yeniden başlatın.');
           if (input.excluded.some(id => !participants.some(p => p.id === id))) raffleFail(409, 'RAFFLE_INVALID_SELECTION', 'Katılımcı seçimi geçersiz. Listeyi yenileyin.');
-          const included = participants.filter(p => !input.excluded.includes(p.id));
-          return { id: input.id, hash: input.hash, eventId: input.eventId, eventTitle: event.title, poolVersion: actualVersion, createdAt: new Date().toISOString(), excluded: input.excluded, participants: included, winners: weightedWinners(included, input.count) };
+          const loyaltyBonus = input.loyaltyBonus ?? true;
+          const included = drawChances(participants.filter(p => !input.excluded.includes(p.id)), loyaltyBonus);
+          return { id: input.id, hash: input.hash, eventId: input.eventId, eventTitle: event.title, poolVersion: actualVersion, loyaltyBonus, createdAt: new Date().toISOString(), excluded: input.excluded, participants: included, winners: weightedWinners(included, input.count) };
         });
         return response({ draw });
       }

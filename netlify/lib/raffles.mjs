@@ -71,6 +71,12 @@ export function poolVersion(eventId, participants) {
   return createHash('sha256').update(JSON.stringify({ eventId, participants: snapshot })).digest('hex');
 }
 
+export function drawChances(participants, loyaltyBonus = true) {
+  // Keep the verified preview untouched. A saved draw records the effective
+  // rights for its chosen mode, even when the administrator changes modes later.
+  return participants.map(person => ({ ...person, weight: loyaltyBonus ? person.weight : 1 }));
+}
+
 export function drawInput(input) {
   try {
     const id = identifier(input.requestId), eventId = identifier(input.eventId);
@@ -83,6 +89,11 @@ export function drawInput(input) {
       if (typeof input.poolVersion !== 'string' || !/^[0-9a-f]{64}$/i.test(input.poolVersion)) fail(400, 'Geçersiz katılımcı listesi sürümü.');
       normalized.poolVersion = input.poolVersion.toLowerCase();
     }
+    if (input.loyaltyBonus !== undefined) {
+      if (typeof input.loyaltyBonus !== 'boolean') fail(400, 'Ek hak seçimi açık veya kapalı olmalı.');
+      normalized.loyaltyBonus = input.loyaltyBonus;
+    }
+    // Preserve omitted fields for requests already saved before the toggle.
     // Omitting the version keeps the exact old hash for already-saved legacy
     // draws. The handler rejects every new draw without a preview version.
     return { ...normalized, hash: createHash('sha256').update(JSON.stringify(normalized)).digest('hex') };

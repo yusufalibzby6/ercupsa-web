@@ -2,13 +2,14 @@ import { $, escape, onAdminEvent } from './common.js';
 
 const PENDING_KEY = 'ercupsa_raffle_pending_v1';
 const terminalCodes = new Set(['RAFFLE_POOL_REQUIRED', 'RAFFLE_POOL_CHANGED', 'RAFFLE_INVALID_SELECTION', 'RAFFLE_DRAW_DELETED', 'RAFFLE_REQUEST_CONFLICT']);
-const eventSelect = $('raffleEvent'), countInput = $('raffleCount'), start = $('raffleStart');
+const eventSelect = $('raffleEvent'), countInput = $('raffleCount'), start = $('raffleStart'), loyaltyToggle = $('raffleLoyaltyBonus');
 let events = [], participants = [], draws = [], excluded = new Set();
 let ready = false, loaded = false, busy = false, version = 0, loadedEventId = '', poolVersion = null;
 let queuedCatalog = null, lastDraw = null, pending = recoverPending(), pendingStored = true;
 if (pending) {
   excluded = new Set(pending.excluded);
   loadedEventId = pending.eventId;
+  loyaltyToggle.checked = pending.loyaltyBonus !== false;
 }
 
 function recoverPending() {
@@ -19,11 +20,13 @@ function recoverPending() {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.requestId) ||
         !validId(value.eventId) || !Number.isInteger(value.count) || value.count < 1 || value.count > 200 ||
         !Array.isArray(value.excluded) || value.excluded.length > 10000 || !value.excluded.every(validId) ||
-        !/^[0-9a-f]{64}$/i.test(value.poolVersion)) {
+        !/^[0-9a-f]{64}$/i.test(value.poolVersion) ||
+        (Object.hasOwn(value, 'loyaltyBonus') && typeof value.loyaltyBonus !== 'boolean')) {
       sessionStorage.removeItem(PENDING_KEY); return null;
     }
     // Recover only the request identity and selection. Names never enter browser storage.
-    return { requestId: value.requestId, eventId: value.eventId, count: value.count, excluded: value.excluded, poolVersion: value.poolVersion };
+    return { requestId: value.requestId, eventId: value.eventId, count: value.count, excluded: value.excluded, poolVersion: value.poolVersion,
+      ...(Object.hasOwn(value, 'loyaltyBonus') ? { loyaltyBonus: value.loyaltyBonus } : {}) };
   } catch { return null; }
 }
 function clearPending() {
@@ -35,11 +38,15 @@ function verifyOutcome(result) {
   const draw = result?.draw;
   const winners = draw?.winners, pool = draw?.participants;
   if (!draw || draw.id !== pending.requestId || draw.eventId !== pending.eventId || draw.poolVersion !== pending.poolVersion ||
+      (Object.hasOwn(draw, 'loyaltyBonus') && typeof draw.loyaltyBonus !== 'boolean') ||
+      (draw.loyaltyBonus !== false) !== (pending.loyaltyBonus !== false) ||
       !Array.isArray(winners) || winners.length !== pending.count || !Array.isArray(pool) ||
       [...winners, ...pool].some(person => !person || typeof person.id !== 'string' || typeof person.name !== 'string' ||
-        !Number.isInteger(person.weight) || person.weight < 1 || !Number.isInteger(person.previous) || person.previous < 0) ||
+        !Number.isInteger(person.weight) || person.weight < 1 || !Number.isInteger(person.previous) || person.previous < 0 ||
+        person.weight !== (draw.loyaltyBonus === false ? 1 : person.previous + 1)) ||
       new Set(winners.map(person => person.id)).size !== winners.length ||
-      winners.some(person => pending.excluded.includes(person.id) || !pool.some(participant => participant.id === person.id))) {
+      winners.some(person => pending.excluded.includes(person.id) || !pool.some(participant => participant.id === person.id &&
+        participant.weight === person.weight && participant.previous === person.previous))) {
     throw new Error('Kaydedilmiş çekiliş sonucu doğrulanamadı.');
   }
   return draw;
@@ -62,6 +69,7 @@ function controls() {
   const locked = busy || !!pending;
   eventSelect.disabled = locked;
   countInput.disabled = locked;
+  loyaltyToggle.disabled = locked;
   $('raffleRefresh').disabled = locked || !eventSelect.value;
   $('raffleSearch').disabled = locked;
   $('raffleIncludeAll').disabled = locked || !loaded;
@@ -78,6 +86,19 @@ function stageTitle() {
   const title = lastDraw?.eventTitle || eventTitle(pending?.eventId);
   $('raffleStageEvent').textContent = title;
   $('rafflePresentationTitle').textContent = title;
+  $('raffleStageMode').textContent = modeLabel(lastDraw ? lastDraw.loyaltyBonus !== false : pending ? pending.loyaltyBonus !== false : loyaltyToggle.checked);
+}
+function modeLabel(loyaltyBonus) {
+  return loyaltyBonus ? 'Önceki katılımlara ek hak' : 'Herkese eşit şans';
+}
+function effectiveWeight(person) {
+  return loyaltyToggle.checked ? person.weight : 1;
+}
+function renderMode() {
+  $('raffleLoyaltyHelp').textContent = loyaltyToggle.checked
+    ? 'Açık: Her kişi 1 hakla başlar; önceki her farklı etkinlik +1 hak verir.'
+    : 'Kapalı: Önceki katılımlardan bağımsız olarak herkesin 1 hakkı olur.';
+  stageTitle();
 }
 function claimDate(value) {
   const date = new Date(value);
@@ -88,11 +109,11 @@ function renderParticipants() {
   const focused = list.contains(document.activeElement) ? document.activeElement.dataset.person : null;
   const search = $('raffleSearch').value.toLocaleLowerCase('tr');
   const included = participants.filter(person => !excluded.has(person.id));
-  $('raffleSummary').textContent = `${included.length} kişi dahil · ${included.reduce((sum, person) => sum + person.weight, 0)} toplam hak · ${excluded.size} kişi hariç`;
+  $('raffleSummary').textContent = `${included.length} kişi dahil · ${included.reduce((sum, person) => sum + effectiveWeight(person), 0)} toplam hak · ${excluded.size} kişi hariç`;
   countInput.max = String(Math.min(200, included.length || 1));
   const filtered = participants.filter(person => person.name.toLocaleLowerCase('tr').includes(search));
   list.innerHTML = filtered.map(person =>
-    `<label class="raffle-person ${excluded.has(person.id) ? 'is-excluded' : ''}"><input type="checkbox" data-person="${escape(person.id)}" ${excluded.has(person.id) ? '' : 'checked'}><span><strong>${escape(person.name)}</strong><small>${person.previous} önceki etkinlik · ${person.weight} hak</small><small>${escape(claimDate(person.claimedAt))}</small></span><span class="raffle-weight">×${person.weight}</span></label>`
+    `<label class="raffle-person ${excluded.has(person.id) ? 'is-excluded' : ''}"><input type="checkbox" data-person="${escape(person.id)}" ${excluded.has(person.id) ? '' : 'checked'}><span><strong>${escape(person.name)}</strong><small>${person.previous} önceki etkinlik · ${effectiveWeight(person)} hak</small><small>${escape(claimDate(person.claimedAt))}</small></span><span class="raffle-weight">×${effectiveWeight(person)}</span></label>`
   ).join('') || (participants.length ? '<p>Aramanızla eşleşen katılımcı bulunamadı.</p>' : '<p>Bu etkinliğin biletini hesabına ekleyenler burada görünür.</p>');
   controls();
   if (focused) [...list.querySelectorAll('input')].find(input => input.dataset.person === focused)?.focus({ preventScroll: true });
@@ -102,7 +123,7 @@ function winnerList(winners) {
   return '<ol class="raffle-winners">' + winners.map((person, index) => `<li><span>${index + 1}</span><div><strong>${escape(person.name)}</strong><small>${person.weight} hak · ${person.previous} önceki etkinlik</small></div></li>`).join('') + '</ol>';
 }
 function renderHistory() {
-  $('raffleHistory').innerHTML = draws.map(draw => `<article class="raffle-history-card"><div class="raffle-history-heading"><div><h4>${escape(draw.eventTitle)}</h4><p>${escape(claimDate(draw.createdAt))} · ${draw.participants.length} kişi · ${draw.winners.length} kazanan</p></div><div class="raffle-history-actions"><button type="button" data-export-draw="${escape(draw.id)}">Kazananları indir (CSV)</button><button type="button" data-delete-draw="${escape(draw.id)}">Çekilişi sil</button></div></div>${winnerList(draw.winners)}</article>`).join('') || '<p>Bu etkinlik için henüz çekiliş yapılmadı.</p>';
+  $('raffleHistory').innerHTML = draws.map(draw => `<article class="raffle-history-card"><div class="raffle-history-heading"><div><h4>${escape(draw.eventTitle)}</h4><p>${escape(claimDate(draw.createdAt))} · ${draw.participants.length} kişi · ${draw.winners.length} kazanan</p><p class="raffle-mode">${modeLabel(draw.loyaltyBonus !== false)}</p></div><div class="raffle-history-actions"><button type="button" data-export-draw="${escape(draw.id)}">Kazananları indir (CSV)</button><button type="button" data-delete-draw="${escape(draw.id)}">Çekilişi sil</button></div></div>${winnerList(draw.winners)}</article>`).join('') || '<p>Bu etkinlik için henüz çekiliş yapılmadı.</p>';
   controls();
 }
 function populateCatalog() {
@@ -179,6 +200,10 @@ eventSelect.addEventListener('change', () => load());
 $('raffleRefresh').addEventListener('click', () => load());
 $('raffleSearch').addEventListener('input', renderParticipants);
 $('raffleIncludeAll').addEventListener('click', () => { excluded.clear(); renderParticipants(); });
+loyaltyToggle.addEventListener('change', () => {
+  if (busy || pending) return;
+  renderMode(); renderParticipants();
+});
 $('raffleParticipants').addEventListener('change', event => {
   const id = event.target.dataset.person;
   if (!id || busy || pending) return;
@@ -193,7 +218,7 @@ start.addEventListener('click', async () => {
     if (!loaded || !eventSelect.value || !poolVersion || !Number.isInteger(count) || count < 1 || count > Math.min(200, included.length)) {
       feedback('Kazanan sayısı 1 ile dahil edilen kişi sayısı arasında olmalı (en fazla 200).', true); return;
     }
-    const payload = { requestId: crypto.randomUUID(), eventId: eventSelect.value, count, excluded: [...excluded], poolVersion };
+    const payload = { requestId: crypto.randomUUID(), eventId: eventSelect.value, count, excluded: [...excluded], poolVersion, loyaltyBonus: loyaltyToggle.checked };
     if (new TextEncoder().encode(JSON.stringify(payload)).length > 100000) {
       feedback('Hariç tutulan kişi listesi çok büyük. Daha az kişiyi hariç tutup yeniden deneyin.', true); return;
     }
@@ -249,7 +274,7 @@ function csvCell(value) {
   return '"' + text.replaceAll('"', '""') + '"';
 }
 function exportWinners(draw) {
-  const rows = [['Sıra', 'Ad soyad', 'Katılımcı kimliği', 'Etkinlik', 'Çekiliş tarihi', 'Hak', 'Önceki etkinlik'], ...draw.winners.map((person, index) => [index + 1, person.name, person.id, draw.eventTitle, claimDate(draw.createdAt), person.weight, person.previous])];
+  const rows = [['Sıra', 'Ad soyad', 'Katılımcı kimliği', 'Etkinlik', 'Çekiliş tarihi', 'Hak', 'Önceki etkinlik', 'Çekiliş kuralı'], ...draw.winners.map((person, index) => [index + 1, person.name, person.id, draw.eventTitle, claimDate(draw.createdAt), person.weight, person.previous, modeLabel(draw.loyaltyBonus !== false)])];
   const blob = new Blob(['\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob), link = document.createElement('a');
   link.href = url; link.download = `ERCUPSA-kazananlar-${draw.id}.csv`; link.click();
@@ -302,4 +327,5 @@ $('rafflePresentation').addEventListener('click', () => {
 $('rafflePresentationExit').addEventListener('click', closePresentation);
 presentation.addEventListener('cancel', event => { event.preventDefault(); closePresentation(); });
 presentation.addEventListener('close', closePresentation);
+renderMode();
 controls();

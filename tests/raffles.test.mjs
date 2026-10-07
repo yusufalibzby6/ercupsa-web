@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { participantsFor, poolVersion, weightedWinners, drawInput, saveDraw, deleteDraw, paged, raffleFail } from '../netlify/lib/raffles.mjs';
+import { participantsFor, poolVersion, drawChances, weightedWinners, drawInput, saveDraw, deleteDraw, paged, raffleFail } from '../netlify/lib/raffles.mjs';
 import { createHandler } from '../netlify/functions/raffles.mjs';
 import { adminLogin } from '../netlify/lib/security.mjs';
 
@@ -64,6 +64,17 @@ test('weighted boundaries reflect rights and winners cannot repeat', () => {
   assert.throws(() => weightedWinners(pool, 3), error => error.code === 'RAFFLE_INVALID_SELECTION');
   assert.equal(pool.length, 2);
 });
+test('disabling loyalty gives equal first-choice odds and preserves the verified preview', () => {
+  const base = [{ id: 'a', previous: 2, weight: 3 }, { id: 'b', previous: 0, weight: 1 }];
+  const version = poolVersion('current', base);
+  const equal = drawChances(base, false);
+  assert.deepEqual([0, 1].map(ticket => weightedWinners(equal, 1, () => ticket)[0].id), ['a', 'b']);
+  assert.deepEqual(weightedWinners(equal, 2, () => 0).map(p => p.id), ['a', 'b']);
+  assert.deepEqual(equal.map(p => p.previous), [2, 0]);
+  assert.deepEqual(drawChances(base, true).map(p => p.weight), [3, 1]);
+  assert.equal(poolVersion('current', base), version);
+  assert.deepEqual(base.map(p => p.weight), [3, 1]);
+});
 test('database paging reads beyond 1000 records and continues short server-capped pages until empty', async () => {
   const data = Array.from({ length: 1251 }, (_, id) => ({ id }));
   for (const cap of [500, 100, 37]) {
@@ -107,7 +118,12 @@ test('input rejects spoofed count, malformed identity and exclusion values and p
   assert.equal(legacy.poolVersion, undefined);
   assert.notEqual(drawInput({ ...valid, poolVersion: 'a'.repeat(64) }).hash, legacy.hash);
   assert.equal(drawInput({ ...valid, poolVersion: 'A'.repeat(64) }).hash, drawInput({ ...valid, poolVersion: 'a'.repeat(64) }).hash);
-  for (const change of [{ count: 0 }, { count: '2' }, { count: 201 }, { requestId: 'anything' }, { excluded: ['bad,query'] }, { poolVersion: 'bad' }]) {
+  assert.equal(Object.hasOwn(legacy, 'loyaltyBonus'), false);
+  const weighted = drawInput({ ...valid, loyaltyBonus: true });
+  const equal = drawInput({ ...valid, loyaltyBonus: false });
+  assert.equal(weighted.loyaltyBonus, true); assert.equal(equal.loyaltyBonus, false);
+  assert.notEqual(weighted.hash, legacy.hash); assert.notEqual(equal.hash, weighted.hash);
+  for (const change of [{ count: 0 }, { count: '2' }, { count: 201 }, { requestId: 'anything' }, { excluded: ['bad,query'] }, { poolVersion: 'bad' }, { loyaltyBonus: 'false' }, { loyaltyBonus: 0 }, { loyaltyBonus: null }]) {
     assert.throws(() => drawInput({ ...valid, ...change }), error => error.code === 'RAFFLE_INVALID_SELECTION');
   }
 });
@@ -189,6 +205,47 @@ function fixture({ cap = 500 } = {}) {
   }
   return { state, store, request };
 }
+
+test('API saves the chosen chance mode with authoritative rights and refuses mode changes on the same draw ID', async () => {
+  const { state, request } = fixture();
+  const preview = (await request()).data;
+  for (const mode of [false, true, undefined]) {
+    const input = { requestId: randomUUID(), eventId: 'current', count: 2, excluded: [], poolVersion: preview.poolVersion,
+      ...(mode !== undefined ? { loyaltyBonus: mode } : {}), weights: { a: 9999, b: 0 } };
+    const result = await request('POST', input);
+    assert.equal(result.status, 200);
+    const draw = result.data.draw;
+    assert.equal(draw.loyaltyBonus, mode !== false);
+    assert.deepEqual(draw.participants.map(p => p.weight).sort(), mode === false ? [1, 1] : [1, 2]);
+    assert.equal(draw.participants.find(p => p.id === 'a').previous, 1);
+    assert.equal(new Set(draw.winners.map(p => p.id)).size, 2);
+    assert.ok(draw.winners.every(p => p.weight === (mode === false ? 1 : 1 + p.previous)));
+    assert.equal((await request()).data.poolVersion, preview.poolVersion);
+    state.failRead = true;
+    assert.deepEqual((await request('POST', input)).data.draw, draw);
+    assert.equal((await request('POST', { ...input, loyaltyBonus: mode === false })).data.code, 'RAFFLE_REQUEST_CONFLICT');
+    assert.deepEqual((await request('GET', null, { action: 'result', requestId: input.requestId })).data.draw, draw);
+    state.failRead = false;
+  }
+  const history = (await request('GET', null, { action: 'history' })).data.draws;
+  assert.deepEqual(history.map(d => d.loyaltyBonus), [true, true, false]);
+});
+
+test('an equal-chance draw with a lost response recovers its mode and respects exclusions', async () => {
+  const { state, store, request } = fixture();
+  const preview = (await request()).data;
+  const input = { requestId: randomUUID(), eventId: 'current', count: 1, excluded: ['b'], poolVersion: preview.poolVersion, loyaltyBonus: false };
+  const commit = store.setJSON.bind(store); let first = true;
+  store.setJSON = async (...args) => { const result = await commit(...args); if (first) { first = false; throw Error('lost equal draw response'); } return result; };
+  assert.equal((await request('POST', input)).status, 503);
+  state.failRead = true; state.failEvents = true;
+  const recovered = (await request('GET', null, { action: 'result', requestId: input.requestId })).data.draw;
+  assert.equal(recovered.loyaltyBonus, false);
+  assert.deepEqual(recovered.winners.map(p => [p.id, p.weight]), [['a', 1]]);
+  assert.equal(recovered.winners[0].previous, 1);
+  assert.deepEqual((await request('POST', input)).data.draw, recovered);
+  assert.equal((await request('POST', { ...input, loyaltyBonus: true })).data.code, 'RAFFLE_REQUEST_CONFLICT');
+});
 
 test('private API enforces admin/origin, recomputes weights, excludes selected accounts, persists and deletes history', async () => {
   const { state, request } = fixture({ cap: 1 });
