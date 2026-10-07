@@ -1,4 +1,4 @@
-import { $, escape, api, safeImage, status } from "./common.js";
+import { $, escape, api, safeImage, status, announceAdminEvents, announceAdminReady } from "./common.js?v=raffle-2";
 let events = [],
   photos = [],
   poster = "",
@@ -23,7 +23,7 @@ async function load() {
   const d = await api("/api/events?admin=true");
   events = d.events;
   render();
-  document.dispatchEvent(new CustomEvent("events-loaded", { detail: events }));
+  announceAdminEvents(events);
 }
 function hasRegistrationLink(event) {
   if (!event.published) return false;
@@ -222,7 +222,7 @@ async function show() {
   await load();
   $("login").classList.add("hidden");
   $("app").classList.remove("hidden");
-  document.dispatchEvent(new Event("admin-ready"));
+  announceAdminReady();
 }
 $("loginBtn").onclick = async () => {
   try {

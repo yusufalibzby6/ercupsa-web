@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 import "./admin-registrations.js";
 import "./admin-raffles.js";
-import { $, escape, api, status } from "./common.js";
+import { $, escape, api, status, onAdminEvent } from "./common.js";
 import {
   ticketCard,
   ticketSheets,
@@ -21,7 +21,7 @@ function tab(name) {
 document
   .querySelectorAll("[data-tab]")
   .forEach((b) => b.addEventListener("click", () => tab(b.dataset.tab)));
-document.addEventListener("events-loaded", (e) => {
+onAdminEvent("events-loaded", (e) => {
   events = e.detail;
   const previous = $("ticketEvent").value;
   $("ticketEvent").innerHTML = events
@@ -205,7 +205,7 @@ async function load() {
     status(e.message, true);
   }
 }
-document.addEventListener("admin-ready", load);
+onAdminEvent("admin-ready", load);
 function render() {
   for (const [kind, target] of [
     ["suggestion", "suggestionList"],

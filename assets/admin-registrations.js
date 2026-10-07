@@ -1,4 +1,4 @@
-import { $, escape, api } from "./common.js";
+import { $, escape, api, onAdminEvent } from "./common.js";
 
 const CORE_IDS = new Set(["full_name", "class_year", "phone"]);
 const CLASS_OPTIONS = ["Hazırlık", "1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf", "5. Sınıf", "Mezun", "Diğer"];
@@ -245,13 +245,13 @@ async function showReceipt(id, opener) {
   }
 }
 
-document.addEventListener("events-loaded", (event) => {
+onAdminEvent("events-loaded", (event) => {
   events = Array.isArray(event.detail) ? event.detail : [];
   const oldId = selectedId;
   populateEvents();
   if (ready && (oldId !== selectedId || !getDraft())) loadSelected();
 });
-document.addEventListener("admin-ready", () => { ready = true; loadSelected(); loadSummary(); });
+onAdminEvent("admin-ready", () => { ready = true; loadSelected(); loadSummary(); });
 document.addEventListener("registration-event", (event) => {
   if (saving) { feedback("Form kaydediliyor. Etkinliği değiştirmeden önce işlemin tamamlanmasını bekleyin.", true); return; }
   if (!event.detail?.id || !events.some((current) => current.id === event.detail.id)) return;
