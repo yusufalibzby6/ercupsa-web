@@ -49,3 +49,8 @@
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=3600, must-revalidate"
+
+[[redirects]]
+  from = "/api/raffles"
+  to = "/.netlify/functions/raffles"
+  status = 200

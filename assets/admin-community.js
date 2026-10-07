@@ -1,5 +1,6 @@
 import QRCode from "qrcode";
 import "./admin-registrations.js";
+import "./admin-raffles.js";
 import { $, escape, api, status } from "./common.js";
 import {
   ticketCard,
@@ -13,7 +14,7 @@ let events = [], design = null, designEventId = "", designState = "idle";
 let designBusy = false, batchBusy = false, fileReading = false, candidate = null, candidateFile = null;
 let designLoadVersion = 0, fileReadVersion = 0, batchLoadVersion = 0, cardsVersion = 0;
 let designPromise = null, openedBatch = null;
-const tabs = ["events", "registrations", "suggestions", "experiences", "tickets"];
+const tabs = ["events", "registrations", "suggestions", "experiences", "tickets", "raffles"];
 function tab(name) {
   for (const t of tabs) $(t + "Tab").hidden = t !== name;
 }
