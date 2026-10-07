@@ -45,7 +45,7 @@ export async function paged(query, read, { cursor = [] } = {}) {
   fail(503, 'Katılımcı listesi çok büyük; çekiliş başlatılmadı.');
 }
 
-export function participantsFor(event, events, attendance, profiles, now = Date.now()) {
+export function participantsFor(event, events, attendance, profiles, now = Date.now(), options = {}) {
   const dates = new Map(events.map(e => [e.id, `${e.date}T${e.time || '00:00'}`]));
   const selectedDate = dates.get(event.id);
   const names = new Map(profiles.map(p => [p.id, p.name]));
@@ -59,16 +59,51 @@ export function participantsFor(event, events, attendance, profiles, now = Date.
     // A deleted event has no trustworthy date. Its claim timestamp does not
     // prove that the event happened: future tickets may be claimed early.
   }
-  return [...selected].map(([id, claim]) => {
+  const entryUsers = new Map(), entryTickets = new Map(), ticketsByClaim = new Map();
+  for (const [eventId, entries] of options.checkins || []) {
+    const users = new Set(), tickets = new Set();
+    for (const entry of entries) {
+      const at = Date.parse(entry.enteredAt);
+      if (!Number.isFinite(at) || at > now) continue;
+      if (entry.userId) users.add(entry.userId);
+      if (entry.ticketId) tickets.add(entry.ticketId);
+    }
+    entryUsers.set(eventId, users); entryTickets.set(eventId, tickets);
+  }
+  const entered = (eventId, userId, ticketId) => entryUsers.get(eventId)?.has(userId) || !!ticketId && entryTickets.get(eventId)?.has(ticketId);
+  if (options.checkinBonus) {
+    previousByUser.clear();
+    for (const claim of attendance) {
+      const key = JSON.stringify([claim.user_id, claim.event_id]);
+      if (!ticketsByClaim.has(key)) ticketsByClaim.set(key, new Set());
+      if (claim.ticket_id) ticketsByClaim.get(key).add(claim.ticket_id);
+    }
+    for (const [userId] of selected) {
+      for (const [eventId, date] of dates) {
+        const starts = Date.parse(date + ':00+03:00');
+        if (eventId === event.id || date >= selectedDate || !Number.isFinite(starts) || starts > now) continue;
+        const tickets = ticketsByClaim.get(JSON.stringify([userId, eventId])) || [];
+        if (entered(eventId, userId) || [...tickets].some(ticketId => entered(eventId, userId, ticketId))) {
+          if (!previousByUser.has(userId)) previousByUser.set(userId, new Set());
+          previousByUser.get(userId).add(eventId);
+        }
+      }
+    }
+  }
+  return [...selected].filter(([id, claim]) => !options.checkedInOnly || entered(event.id, id, claim.ticket_id)).map(([id, claim]) => {
     const previous = previousByUser.get(id)?.size || 0;
     return { id, name: names.get(id) || 'İsimsiz katılımcı', previous, weight: 1 + previous, claimedAt: claim.created_at };
   }).sort((a, b) => a.name.localeCompare(b.name, 'tr') || a.id.localeCompare(b.id));
 }
 
-export function poolVersion(eventId, participants) {
+export function poolVersion(eventId, participants, options = {}) {
   const snapshot = participants.map(p => ({ id: p.id, weight: p.weight, name: p.name, claimedAt: p.claimedAt }))
     .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-  return createHash('sha256').update(JSON.stringify({ eventId, participants: snapshot })).digest('hex');
+  // Default previews retain their exact legacy hashes. Entry-based modes bind
+  // their rules even when a coincidentally identical set of people qualifies.
+  const mode = options.checkedInOnly || options.checkinBonus
+    ? { checkedInOnly: !!options.checkedInOnly, checkinBonus: !!options.checkinBonus } : {};
+  return createHash('sha256').update(JSON.stringify({ eventId, participants: snapshot, ...mode })).digest('hex');
 }
 
 export function drawChances(participants, loyaltyBonus = true) {
@@ -92,6 +127,11 @@ export function drawInput(input) {
     if (input.loyaltyBonus !== undefined) {
       if (typeof input.loyaltyBonus !== 'boolean') fail(400, 'Ek hak seçimi açık veya kapalı olmalı.');
       normalized.loyaltyBonus = input.loyaltyBonus;
+    }
+    for (const key of ['checkedInOnly', 'checkinBonus']) {
+      if (input[key] === undefined) continue;
+      if (typeof input[key] !== 'boolean') fail(400, 'Giriş seçimi açık veya kapalı olmalı.');
+      normalized[key] = input[key];
     }
     // Preserve omitted fields for requests already saved before the toggle.
     // Omitting the version keeps the exact old hash for already-saved legacy
@@ -177,6 +217,29 @@ export async function deleteDraw(store, eventId, id) {
     if (draws[index].deleted) return;
     draws[index] = { id, deleted: true };
     if ((await store.setJSON(key, { draws }, { onlyIfMatch: snap.etag })).modified) return;
+  }
+  raffleFail(409, 'RAFFLE_RETRY', 'Çekiliş kaydı değişti. Aynı isteği yeniden deneyin.');
+}
+
+export async function updatePrize(store, eventId, id, winnerId, delivered) {
+  if (typeof delivered !== 'boolean') fail(400, 'Ödül teslim durumu açık veya kapalı olmalı.');
+  const key = `events/${eventId}.json`;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const snap = await store.getWithMetadata(key, { type: 'json', consistency: 'strong' });
+    if (!snap) fail(404, 'Çekiliş bulunamadı.');
+    if (!snap.etag) fail(503, 'Çekiliş kaydı doğrulanamadı.');
+    const draws = snap.data.draws || [], index = draws.findIndex(draw => draw.id === id);
+    if (index < 0 || draws[index].failed) fail(404, 'Çekiliş bulunamadı.');
+    if (draws[index].deleted) raffleFail(409, 'RAFFLE_DRAW_DELETED', 'Bu çekiliş silindi.');
+    const draw = draws[index], winner = draw.winners?.find(person => person.id === winnerId);
+    if (!winner) fail(404, 'Kazanan bulunamadı.');
+    if ((winner.prizeDelivered === true) === delivered) return draw;
+    const updated = { ...draw, winners: draw.winners.map(person => person.id === winnerId ? {
+      ...person, prizeDelivered: delivered, prizeDeliveredAt: delivered ? new Date().toISOString() : null,
+      prizeDeliveredBy: delivered ? 'admin' : null,
+    } : person) };
+    const result = await store.setJSON(key, { draws: draws.map((item, i) => i === index ? updated : item) }, { onlyIfMatch: snap.etag });
+    if (result.modified) return updated;
   }
   raffleFail(409, 'RAFFLE_RETRY', 'Çekiliş kaydı değişti. Aynı isteği yeniden deneyin.');
 }

@@ -241,6 +241,7 @@ $("password").addEventListener("keydown", (e) => {
 });
 $("adminLogout").onclick = async () => {
   await api("/api/events?action=logout", { method: "POST" });
+  document.dispatchEvent(new Event("admin-logout"));
   location.reload();
 };
 sessionStorage.removeItem("ercupsa_admin_password");

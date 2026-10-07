@@ -54,3 +54,28 @@
   from = "/api/raffles"
   to = "/.netlify/functions/raffles"
   status = 200
+
+[[redirects]]
+  from = "/api/gate"
+  to = "/.netlify/functions/gate"
+  status = 200
+
+[[redirects]]
+  from = "/api/staff"
+  to = "/.netlify/functions/staff"
+  status = 200
+
+[[redirects]]
+  from = "/api/feedback"
+  to = "/.netlify/functions/feedback"
+  status = 200
+
+[[headers]]
+  for = "/giris.html"
+  [headers.values]
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/giris"
+  [headers.values]
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=()"

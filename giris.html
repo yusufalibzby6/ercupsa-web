@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="same-origin">
+<title>Etkinlik girişi · ERCUPSA</title>
+<link rel="stylesheet" href="assets/gate.css?v=gate-1">
+</head>
+<body class="gate-page">
+<header class="gate-header"><a href="index.html" class="gate-brand">ERCUPSA <span>Etkinlik girişi</span></a><div class="gate-actions"><a id="gateAdminLink" href="admin.html" hidden>Yönetim paneli</a><button id="gateLogout" type="button" hidden>Çıkış yap</button></div></header>
+<main class="gate-main">
+<section id="gateLogin" class="gate-panel gate-login" aria-labelledby="gateLoginTitle" hidden>
+<h1 id="gateLoginTitle">Görevli girişi</h1><p>Size verilen görevli hesabıyla giriş yapın. Yalnızca görevlendirildiğiniz etkinlikleri görebilirsiniz.</p>
+<form id="gateLoginForm"><label for="gateUsername">Kullanıcı adı<input id="gateUsername" name="username" autocomplete="username" maxlength="50" required></label><label for="gatePassword">Şifre<input id="gatePassword" name="password" type="password" autocomplete="current-password" required></label><button id="gateLoginButton" class="gate-primary" type="submit">Giriş yap</button></form>
+<p id="gateLoginStatus" class="gate-message" role="status" aria-live="polite"></p><p class="gate-muted">Yöneticiyseniz <a href="admin.html">yönetim panelinden giriş yaptıktan</a> sonra bu ekranı açabilirsiniz.</p>
+</section>
+<p id="gateBootStatus" class="gate-message" role="status" aria-live="polite">Oturum kontrol ediliyor…</p><button id="gateSessionRetry" type="button" hidden>Oturumu yeniden kontrol et</button>
+<section id="gateApp" hidden aria-labelledby="gateHeading">
+<div class="gate-top"><div><p id="gateOperator" class="gate-eyebrow"></p><h1 id="gateHeading">Kapıda hızlı giriş</h1><p class="gate-muted">Bileti hesaba eklemek ile etkinliğe giriş yapmak ayrı işlemlerdir.</p></div><label for="gateEvent">Etkinlik<select id="gateEvent"></select></label></div>
+<p id="gateEventDetails" class="gate-muted"></p>
+<div class="gate-layout">
+<section class="gate-panel gate-scanner" aria-labelledby="gateScanHeading"><h2 id="gateScanHeading">Bilet QR’sini okut</h2>
+<div id="gateCamera" class="gate-camera" hidden><video id="gateVideo" muted playsinline aria-label="QR tarama kamerası"></video><div class="gate-camera-frame" aria-hidden="true"></div></div>
+<div class="gate-actions"><button id="gateCameraStart" class="gate-primary" type="button">Kamerayı aç</button><button id="gateCameraStop" type="button" hidden>Kamerayı kapat</button></div>
+<p id="gateCameraStatus" class="gate-muted" role="status" aria-live="polite">Arka kamera kullanılır. Kameraya izin veremiyorsanız bilet kodunu aşağıya yazabilirsiniz.</p>
+<form id="gateCodeForm"><label for="gateCode">Bilet kodu veya QR bağlantısı<input id="gateCode" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="2048" placeholder="ERC-…" required></label><button id="gateCodeSubmit" type="submit">Bileti kontrol et</button></form>
+<div id="gateResult" class="gate-result" role="status" aria-live="polite" aria-atomic="true" data-state="idle"><strong id="gateResultTitle">Bir bilet okutun</strong><span id="gateResultDetail">Önce etkinliği seçin, ardından katılımcının QR kodunu okutun.</span></div>
+</section>
+<section class="gate-panel" aria-labelledby="gatePeopleHeading"><div class="gate-panel-head"><h2 id="gatePeopleHeading">Katılımcılar</h2><button id="gateRefresh" type="button">Yenile</button></div><div class="gate-stats"><div><span>Biletini ekleyen</span><strong id="gateClaimed">—</strong></div><div><span>Giriş yapan</span><strong id="gateEntered">—</strong></div></div><p id="gateListStatus" class="gate-muted" role="status" aria-live="polite"></p><label for="gateSearch">İsim ara<input id="gateSearch" type="search" placeholder="QR’sini açamayan kişiyi bulun"></label><p class="gate-muted">Elle giriş yalnızca bileti hesabına eklemiş kişiler için yapılır. Kişiyi kapıda doğruladıktan sonra onaylayın.</p><p id="gateSearchCount" class="gate-muted"></p><div id="gatePeople" class="gate-people"></div><button id="gateMore" type="button" hidden>Daha fazla göster</button></section>
+</div></section>
+</main>
+<dialog id="gateManualDialog" class="gate-dialog" aria-labelledby="gateManualTitle"><h2 id="gateManualTitle">Elle giriş onayı</h2><p><strong id="gateManualName"></strong> adlı kişinin şu anda kapıda olduğunu doğruladınız mı?</p><p class="gate-muted">Bu işlem seçili etkinliğe gerçek giriş kaydeder.</p><div class="gate-actions"><button id="gateManualCancel" type="button">Vazgeç</button><button id="gateManualConfirm" class="gate-primary" type="button">Evet, girişini kaydet</button></div></dialog>
+<noscript><p class="gate-panel">Bilet okutmak için tarayıcınızda JavaScript’i etkinleştirin.</p></noscript>
+<script type="module" src="assets/gate.bundle.js?v=gate-1"></script>
+</body></html>

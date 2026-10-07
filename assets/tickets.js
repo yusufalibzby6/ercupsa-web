@@ -1,9 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 import { $, escape, api, status } from "./common.js";
+import { createEventFeedback } from "./event-feedback.js";
 let client,
   session,
   recovering = false;
 let authVersion = 0;
+const eventFeedback = createEventFeedback({ request: (path, opts = {}) => {
+  if (!session) throw new Error("Önce giriş yapmalısın.");
+  return api(path, { ...opts, headers: { ...opts.headers, Authorization: "Bearer " + session.access_token } });
+} });
 function authError(error) {
   const messages = {
     invalid_credentials: "E-posta veya şifre yanlış.",
@@ -131,6 +136,7 @@ $("prepareCodeForm").addEventListener("submit", (e) => {
 });
 async function refresh() {
   const version = ++authVersion;
+  eventFeedback.setIdentity(!recovering ? session?.user?.id || null : null);
   $("authPanel").hidden = Boolean(session);
   $("resetPanel").hidden = !session || !recovering;
   $("accountPanel").hidden = !session || recovering;
@@ -144,11 +150,15 @@ async function refresh() {
     d.attendance
       .map(
         (a) =>
-          `<article class="participation-attendance"><span class="participation-attendance-mark" aria-hidden="true">✓</span><div><h4>${attendanceTitle(a)}</h4>${attendanceDate(a.created_at)}</div></article>`,
+          `<article class="participation-attendance"><span class="participation-attendance-mark" aria-hidden="true">✓</span><div><h4>${attendanceTitle(a)}</h4>${attendanceDate(a.created_at)}${typeof a.event_id === "string" && a.event_id ? `<button type="button" class="participation-feedback-button" data-event-feedback="${escape(a.event_id)}" data-event-title="${escape(a.event_title)}">Etkinliği değerlendir</button>` : ""}</div></article>`,
       )
       .join("") ||
     '<div class="participation-empty"><p>Henüz bir katılım eklemedin. Etkinlikte verilen QR kodu veya bilet koduyla ilk anını kaydet.</p><a href="etkinlikler.html">Etkinlikleri keşfet →</a></div>';
 }
+$("attendance").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-event-feedback]");
+  if (button) eventFeedback.open(button.dataset.eventFeedback, button.dataset.eventTitle);
+});
 function form(id, fn) {
   $(id).addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -326,6 +336,7 @@ async function init() {
       },
     });
     client.auth.onAuthStateChange((event, next) => {
+      eventFeedback.setIdentity(event !== "PASSWORD_RECOVERY" ? next?.user?.id || null : null);
       session = next;
       if (event === "PASSWORD_RECOVERY") recovering = true;
       if (event === "SIGNED_OUT") recovering = false;

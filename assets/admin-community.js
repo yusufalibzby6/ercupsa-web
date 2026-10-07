@@ -1,6 +1,8 @@
 import QRCode from "qrcode";
 import "./admin-registrations.js";
 import "./admin-raffles.js";
+import "./admin-gate.js";
+import "./admin-feedback.js";
 import { $, escape, api, status, onAdminEvent } from "./common.js";
 import {
   ticketCard,
@@ -14,9 +16,10 @@ let events = [], design = null, designEventId = "", designState = "idle";
 let designBusy = false, batchBusy = false, fileReading = false, candidate = null, candidateFile = null;
 let designLoadVersion = 0, fileReadVersion = 0, batchLoadVersion = 0, cardsVersion = 0;
 let designPromise = null, openedBatch = null;
-const tabs = ["events", "registrations", "suggestions", "experiences", "tickets", "raffles"];
+const tabs = ["events", "registrations", "suggestions", "experiences", "tickets", "raffles", "attendance", "feedback"];
 function tab(name) {
   for (const t of tabs) $(t + "Tab").hidden = t !== name;
+  document.dispatchEvent(new CustomEvent("admin-tab", { detail: name }));
 }
 document
   .querySelectorAll("[data-tab]")

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { participantsFor, poolVersion, drawChances, weightedWinners, drawInput, saveDraw, deleteDraw, paged, raffleFail } from '../netlify/lib/raffles.mjs';
+import { participantsFor, poolVersion, drawChances, weightedWinners, drawInput, saveDraw, deleteDraw, updatePrize, paged, raffleFail } from '../netlify/lib/raffles.mjs';
 import { createHandler } from '../netlify/functions/raffles.mjs';
 import { adminLogin } from '../netlify/lib/security.mjs';
 
@@ -123,6 +123,16 @@ test('input rejects spoofed count, malformed identity and exclusion values and p
   const equal = drawInput({ ...valid, loyaltyBonus: false });
   assert.equal(weighted.loyaltyBonus, true); assert.equal(equal.loyaltyBonus, false);
   assert.notEqual(weighted.hash, legacy.hash); assert.notEqual(equal.hash, weighted.hash);
+  for (const field of ['checkedInOnly', 'checkinBonus']) {
+    assert.equal(Object.hasOwn(legacy, field), false);
+    assert.equal(drawInput({ ...valid, [field]: true })[field], true);
+    assert.equal(drawInput({ ...valid, [field]: false })[field], false);
+    assert.notEqual(drawInput({ ...valid, [field]: true }).hash, drawInput({ ...valid, [field]: false }).hash);
+    assert.notEqual(drawInput({ ...valid, [field]: false }).hash, legacy.hash);
+    for (const invalid of ['false', 0, null, {}]) {
+      assert.throws(() => drawInput({ ...valid, [field]: invalid }), error => error.code === 'RAFFLE_INVALID_SELECTION');
+    }
+  }
   for (const change of [{ count: 0 }, { count: '2' }, { count: 201 }, { requestId: 'anything' }, { excluded: ['bad,query'] }, { poolVersion: 'bad' }, { loyaltyBonus: 'false' }, { loyaltyBonus: 0 }, { loyaltyBonus: null }]) {
     assert.throws(() => drawInput({ ...valid, ...change }), error => error.code === 'RAFFLE_INVALID_SELECTION');
   }
@@ -173,10 +183,14 @@ function fixture({ cap = 500 } = {}) {
     failRead: false, failEvents: false,
     events: structuredClone(events),
     attendance: [...new Map(attendance.map(a => [`${a.user_id}/${a.event_id}`, a])).values()].map(a => ({ ...a })),
-    profiles: structuredClone(profiles), reads: [],
+    profiles: structuredClone(profiles), reads: [], checkins: {}, checkinReads: [], failCheckins: false,
   };
   const store = memory();
-  const handler = createHandler({ store: () => store, events: async () => { if (state.failEvents) throw Error('events offline'); return state.events; }, read: async path => {
+  const handler = createHandler({ store: () => store, events: async () => { if (state.failEvents) throw Error('events offline'); return state.events; }, checkins: async eventId => {
+    state.checkinReads.push(eventId);
+    if (state.failCheckins) throw Error('checkins offline');
+    return structuredClone(state.checkins[eventId] || []);
+  }, read: async path => {
     state.reads.push(path);
     if (state.failRead) throw Error('database offline');
     const u = new URL('https://db.test/' + path);
@@ -195,11 +209,13 @@ function fixture({ cap = 500 } = {}) {
     const offset = Number(u.searchParams.get('offset'));
     return rows.slice(offset, offset + Math.min(cap, Number(u.searchParams.get('limit'))));
   } });
-  async function request(method = 'GET', data, { auth = true, origin = 'https://site.test', action, eventId = 'current', requestId, rawBody, contentType = 'application/json' } = {}) {
+  async function request(method = 'GET', data, { auth = true, origin = 'https://site.test', action, eventId = 'current', requestId, rawBody, contentType = 'application/json', checkedInOnly, checkinBonus } = {}) {
     const url = new URL('https://site.test/api/raffles');
     url.searchParams.set('eventId', eventId);
     if (action) url.searchParams.set('action', action);
     if (requestId) url.searchParams.set('requestId', requestId);
+    if (checkedInOnly !== undefined) url.searchParams.set('checkedInOnly', String(checkedInOnly));
+    if (checkinBonus !== undefined) url.searchParams.set('checkinBonus', String(checkinBonus));
     const r = await handler(new Request(url, { method, headers: { 'Content-Type': contentType, ...(auth ? { cookie } : {}), origin }, ...(rawBody !== undefined ? { body: rawBody } : data ? { body: JSON.stringify(data) } : {}) }));
     return { status: r.status, data: await r.json(), cache: r.headers.get('cache-control') };
   }
@@ -245,6 +261,151 @@ test('an equal-chance draw with a lost response recovers its mode and respects e
   assert.equal(recovered.winners[0].previous, 1);
   assert.deepEqual((await request('POST', input)).data.draw, recovered);
   assert.equal((await request('POST', { ...input, loyaltyBonus: true })).data.code, 'RAFFLE_REQUEST_CONFLICT');
+});
+
+test('entry-only preview admits claimed accounts through user or ticket links and fences later entrance changes', async () => {
+  const { state, request } = fixture();
+  state.attendance.find(a => a.user_id === 'a' && a.event_id === 'current').ticket_id = 'ticket-a';
+  state.attendance.find(a => a.user_id === 'b' && a.event_id === 'current').ticket_id = 'ticket-b';
+  state.checkins.current = [
+    { ticketId: 'ticket-a', userId: null, name: 'Ada', enteredAt: '2026-10-07T12:00:00Z' },
+    { ticketId: 'unclaimed', userId: 'outsider', name: 'Dışarıda', enteredAt: '2026-10-07T12:00:00Z' },
+  ];
+  const ordinary = (await request()).data;
+  assert.equal(ordinary.participants.length, 2);
+  assert.equal(state.checkinReads.length, 0, 'legacy mode must work without entrance storage');
+  const query = { checkedInOnly: true };
+  const preview = (await request('GET', null, query)).data;
+  assert.deepEqual(preview.participants.map(p => p.id), ['a']);
+  assert.notEqual(preview.poolVersion, ordinary.poolVersion);
+  state.checkins.current.push({ ticketId: 'ticket-b', userId: 'b', name: 'Bora', enteredAt: '2026-10-07T12:00:00Z' });
+  const stale = await request('POST', { requestId: randomUUID(), eventId: 'current', count: 1, excluded: [], checkedInOnly: true, poolVersion: preview.poolVersion });
+  assert.equal(stale.status, 409); assert.equal(stale.data.code, 'RAFFLE_POOL_CHANGED');
+  const fresh = (await request('GET', null, query)).data;
+  assert.deepEqual(fresh.participants.map(p => p.id).sort(), ['a', 'b']);
+  const input = { requestId: randomUUID(), eventId: 'current', count: 2, excluded: [], checkedInOnly: true, poolVersion: fresh.poolVersion };
+  const result = await request('POST', input);
+  assert.equal(result.status, 200); assert.equal(result.data.draw.checkedInOnly, true);
+  assert.equal(result.data.draw.checkinBonus, false);
+  assert.deepEqual(result.data.draw.winners.map(p => p.id).sort(), ['a', 'b']);
+  state.failRead = true; state.failEvents = true; state.failCheckins = true;
+  assert.deepEqual((await request('POST', input)).data.draw, result.data.draw);
+  assert.equal((await request('POST', { ...input, checkedInOnly: false })).data.code, 'RAFFLE_REQUEST_CONFLICT');
+});
+
+test('real-entry bonuses use distinct known past events and link a null entrance account through its claimed ticket', async () => {
+  const { state, request } = fixture();
+  state.events.push({ id: 'claimed-only', date: '2026-08-01' });
+  state.attendance.push({ user_id: 'a', event_id: 'claimed-only', ticket_id: 'ticket-unused', created_at: '2026-08-01' });
+  state.attendance.find(a => a.user_id === 'a' && a.event_id === 'past').ticket_id = 'ticket-past';
+  state.attendance.find(a => a.user_id === 'a' && a.event_id === 'future').ticket_id = 'ticket-future';
+  state.checkins.past = [
+    { ticketId: 'ticket-past', userId: null, enteredAt: '2026-09-01T12:00:00Z' },
+    { ticketId: 'ticket-another', userId: 'a', enteredAt: '2026-09-01T12:01:00Z' },
+  ];
+  state.checkins.future = [{ ticketId: 'ticket-future', userId: 'a', enteredAt: '2026-09-01T12:00:00Z' }];
+  state.checkins.archived = [{ ticketId: 'ticket-unknown', userId: 'a', enteredAt: '2026-08-01T12:00:00Z' }];
+  const base = (await request()).data;
+  assert.equal(base.participants.find(p => p.id === 'a').previous, 2);
+  const entered = (await request('GET', null, { checkinBonus: true })).data;
+  assert.equal(entered.participants.find(p => p.id === 'a').previous, 1);
+  assert.equal(entered.participants.find(p => p.id === 'a').weight, 2);
+  assert.equal(entered.participants.find(p => p.id === 'b').weight, 1);
+  assert.ok(!state.checkinReads.includes('future'), 'future events cannot grant entrance bonuses');
+  assert.ok(!state.checkinReads.includes('archived'), 'unknown event dates cannot grant entrance bonuses');
+  const input = { requestId: randomUUID(), eventId: 'current', count: 2, excluded: [], poolVersion: entered.poolVersion, checkinBonus: true, loyaltyBonus: false };
+  const result = await request('POST', input);
+  assert.equal(result.status, 200);
+  assert.equal(result.data.draw.checkinBonus, true);
+  assert.deepEqual(result.data.draw.winners.map(p => p.weight), [1, 1]);
+  assert.equal(result.data.draw.winners.find(p => p.id === 'a').previous, 1);
+});
+
+test('entry query modes reject malformed booleans, fail closed on storage outages and require matching preview', async () => {
+  const { state, request } = fixture();
+  for (const field of ['checkedInOnly', 'checkinBonus']) {
+    for (const value of ['0', 'TRUE', '', 'true,or(user_id.gt.a)']) {
+      const invalid = await request('GET', null, { [field]: value });
+      assert.equal(invalid.status, 400);
+    }
+  }
+  assert.equal(state.reads.length, 0);
+  const base = (await request()).data;
+  state.failCheckins = true;
+  assert.equal((await request()).status, 200);
+  assert.equal((await request('GET', null, { checkedInOnly: true })).status, 503);
+  state.failCheckins = false;
+  const mismatched = await request('POST', { requestId: randomUUID(), eventId: 'current', count: 1, excluded: [], poolVersion: base.poolVersion, checkedInOnly: true });
+  assert.equal(mismatched.data.code, 'RAFFLE_POOL_CHANGED');
+});
+
+test('prize delivery API enforces admin/origin and only updates saved winners with a strict boolean', async () => {
+  const { state, request } = fixture();
+  const preview = (await request()).data;
+  const input = { requestId: randomUUID(), eventId: 'current', count: 2, excluded: [], poolVersion: preview.poolVersion };
+  const saved = (await request('POST', input)).data.draw;
+  const prize = { eventId: 'current', id: saved.id, winnerId: 'a', delivered: true };
+  const query = { action: 'prize' };
+  assert.equal((await request('POST', prize, { ...query, auth: false })).status, 401);
+  assert.equal((await request('POST', prize, { ...query, origin: 'https://evil.test' })).status, 403);
+  for (const delivered of ['true', 1, null]) {
+    assert.equal((await request('POST', { ...prize, delivered }, query)).status, 400);
+  }
+  assert.equal((await request('POST', { ...prize, winnerId: 'outsider' }, query)).status, 404);
+  assert.equal((await request('POST', { ...prize, winnerId: '../a' }, query)).status, 400);
+  state.failRead = true; state.failEvents = true; state.failCheckins = true;
+  const updated = await request('POST', prize, query);
+  assert.equal(updated.status, 200);
+  const winner = updated.data.draw.winners.find(p => p.id === 'a');
+  assert.equal(winner.prizeDelivered, true);
+  assert.equal(winner.prizeDeliveredBy, 'admin');
+  assert.ok(Number.isFinite(Date.parse(winner.prizeDeliveredAt)));
+  assert.deepEqual(updated.data.draw.participants, saved.participants);
+  assert.deepEqual(updated.data.draw.winners.map(p => p.id), saved.winners.map(p => p.id));
+  const again = (await request('POST', prize, query)).data.draw;
+  assert.equal(again.winners.find(p => p.id === 'a').prizeDeliveredAt, winner.prizeDeliveredAt);
+  assert.equal((await request('GET', null, { action: 'history' })).data.draws[0].winners.find(p => p.id === 'a').prizeDelivered, true);
+  const reset = (await request('POST', { ...prize, delivered: false }, query)).data.draw.winners.find(p => p.id === 'a');
+  assert.equal(reset.prizeDelivered, false);
+  assert.ok(!reset.prizeDeliveredAt); assert.ok(!reset.prizeDeliveredBy);
+});
+
+test('concurrent prize updates preserve distinct winners and deletion fences an in-flight delivery', { timeout: 3000 }, async () => {
+  const store = memory(), input = drawInput({ requestId: randomUUID(), eventId: 'current', count: 2, excluded: [] });
+  const draw = { id: input.id, hash: input.hash, eventId: 'current', participants: [{ id: 'a' }, { id: 'b' }], winners: [{ id: 'a', name: 'Ada' }, { id: 'b', name: 'Bora' }] };
+  await saveDraw(store, input, () => draw);
+  await Promise.all(['a', 'b'].map(id => updatePrize(store, 'current', input.id, id, true)));
+  const delivered = (await store.get('events/current.json')).draws[0];
+  assert.deepEqual(delivered.winners.map(p => p.prizeDelivered), [true, true]);
+  assert.equal(Object.hasOwn(delivered, 'loyaltyBonus'), false, 'prize updates preserve legacy draw metadata');
+  const reached = deferred(), release = deferred(), commit = store.setJSON.bind(store);
+  let pause = true;
+  store.setJSON = async (...args) => {
+    if (pause) { pause = false; reached.resolve(); await release.promise; }
+    return commit(...args);
+  };
+  const updating = updatePrize(store, 'current', input.id, 'a', false);
+  await reached.promise;
+  await deleteDraw(store, 'current', input.id);
+  release.resolve();
+  await assert.rejects(updating, error => error.code === 'RAFFLE_DRAW_DELETED');
+  assert.deepEqual((await store.get('events/current.json')).draws, [{ id: input.id, deleted: true }]);
+});
+
+test('a lost prize write response recovers the same delivery without touching saved draw identity', async () => {
+  const { store, request } = fixture();
+  const preview = (await request()).data;
+  const input = { requestId: randomUUID(), eventId: 'current', count: 1, excluded: ['b'], poolVersion: preview.poolVersion };
+  const original = (await request('POST', input)).data.draw;
+  const prize = { eventId: 'current', id: original.id, winnerId: 'a', delivered: true };
+  const commit = store.setJSON.bind(store); let first = true;
+  store.setJSON = async (...args) => { const result = await commit(...args); if (first) { first = false; throw Error('lost prize response'); } return result; };
+  assert.equal((await request('POST', prize, { action: 'prize' })).status, 503);
+  const recovered = (await request('GET', null, { action: 'result', requestId: original.id })).data.draw;
+  assert.equal(recovered.winners[0].prizeDelivered, true);
+  assert.deepEqual((await request('POST', prize, { action: 'prize' })).data.draw, recovered);
+  assert.equal(recovered.hash, original.hash); assert.equal(recovered.poolVersion, original.poolVersion);
+  assert.deepEqual((await request('POST', input)).data.draw, recovered);
 });
 
 test('private API enforces admin/origin, recomputes weights, excludes selected accounts, persists and deletes history', async () => {
