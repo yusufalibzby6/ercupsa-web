@@ -23,6 +23,18 @@
 .participation-guide li p,.participation-note { font-size:.83rem; line-height:1.7; color:#647080; }
 .participation-note { border-top:1px solid #eeebeb; padding-top:1rem; margin-top:1.5rem; }
 .participation-status { min-height:1.5rem; font-weight:600; margin:1rem 0; }
+.participation-completion { margin:0 0 1.8rem; padding:clamp(1.1rem,4vw,1.8rem); border:2px solid #a52b37; border-radius:1.5rem; background:linear-gradient(135deg,#fff,#fff5f3); box-shadow:0 10px 28px #8b232313; scroll-margin-top:100px; }
+.participation-completion-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+.participation-completion-heading h2 { color:#8b2323; font-size:clamp(1.35rem,4vw,1.8rem); font-weight:900; line-height:1.35; margin:.3rem 0 .5rem; }
+.participation-completion-message { color:#5b6574; line-height:1.7; margin:.5rem 0 1rem; }
+.participation-cancel { flex:none; padding:.55rem .7rem; font-size:.8rem; border:1px solid #d9b9b9; border-radius:.7rem; color:#8b2323; background:#fff; }
+.participation-cancel:focus-visible { outline:3px solid #a52b3780; outline-offset:3px; }
+#ticketCompletionContent #authPanel,#ticketCompletionContent #claimForm { padding:0; border:0; border-radius:0; background:none; box-shadow:none; }
+#ticketCompletionContent #prepareCodeForm,#ticketCompletionContent #pendingCodeNote,#ticketCompletionContent #authPanel>h2,#ticketCompletionContent #authPanel>h2+p,#ticketCompletionContent #claimForm>h2 { display:none; }
+#ticketCompletionStatus .participation-status:empty { display:none; }
+.participation-completion.is-complete { border-color:#27744e; background:#f1faf5; }
+.participation-completion.is-complete h2 { color:#27744e; }
+.participation-note a { color:#8b2323; font-weight:700; text-decoration:underline; }
 .participation-code-entry { border-bottom:1px solid #ece5e5; padding-bottom:1.25rem; margin-bottom:1.5rem; }
 .participation-code-entry label { font-weight:700; }
 .participation-code-entry p { margin:.4rem 0 .8rem; font-size:.85rem; color:#647080; }
@@ -78,5 +90,11 @@ html.dark .participation-milestones .is-earned .milestone-state { color:#e1bc8e;
 html.dark .participation-step,html.dark .participation-attendance-mark { background:#46272b; color:#f1b3b3; }
 html.dark .participation-empty { background:#201919; border-color:#5f4444; }
 html.dark .participation-pending { background:#153528; border-color:#34614b; color:#bcdfcd; }
+html.dark .participation-completion { background:linear-gradient(135deg,#251b1e,#302022); border-color:#bd646d; }
+html.dark .participation-completion-heading h2,html.dark .participation-note a { color:#f1b3b3; }
+html.dark .participation-completion-message { color:#beb5b5; }
+html.dark .participation-cancel { background:#251b1e; border-color:#805454; color:#f1b3b3; }
+html.dark .participation-completion.is-complete { background:#153528; border-color:#5baf80; }
+html.dark .participation-completion.is-complete h2 { color:#bcdfcd; }
 @media(max-width:767px) { .participation-hero { grid-template-columns:1fr; gap:1.6rem; padding-top:1rem; } .participation-guide ol,.participation-account-grid { grid-template-columns:1fr; } .participation-guide { padding:1.3rem; } .participation-guide ol { gap:1.25rem; } .participation-progress-card { padding:1.3rem; } .participation-board { grid-template-columns:1fr; } }
 @media(max-width:420px) { .participation-code-row { flex-direction:column; } .participation-account-heading { flex-wrap:wrap; gap:1rem; } .participation-account-heading #logout { margin:0; } .participation-milestones { gap:.4rem; } .participation-milestones>div>span:not(.participation-medal) { font-size:.67rem; } }

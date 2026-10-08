@@ -9,7 +9,7 @@ export function ticketCard({ code, qr, eventTitle, ticket, design = null, previe
   const state = ticket?.revoked
     ? "İPTAL"
     : ticket?.claimed_at
-      ? "KULLANILDI"
+      ? "HESABA EKLENDİ"
       : "KATILIM BİLETİ";
   return `<article class="ticket${artwork ? " ticket-custom" : ""}" data-code="${escape(code)}">
     ${artwork ? `<img class="ticket-artwork" src="${escape(ticketArtworkSource(artwork))}" alt="${escape(eventTitle)} etkinliğinin özel bilet tasarımı">` : `<div class="ticket-copy">
@@ -44,7 +44,13 @@ function fitTitles(root) {
   }
 }
 
-export async function printTickets(cards, eventTitle) {
+let printing = false;
+let cancelActivePrint = null;
+if (typeof document !== "undefined") document.addEventListener("admin-logout", () => cancelActivePrint?.());
+export async function printTickets(cards, eventTitle, { signal } = {}) {
+  if (printing) throw new Error("Önce devam eden bilet yazdırma işlemini tamamlayın.");
+  signal?.throwIfAborted();
+  printing = true;
   let root = document.getElementById("ticketPrintRoot");
   if (!root) {
     root = document.createElement("div");
@@ -54,19 +60,36 @@ export async function printTickets(cards, eventTitle) {
   root.innerHTML = ticketSheets(cards);
   const releaseArtwork = [...new Set([...root.querySelectorAll(".ticket-artwork")].map(img => img.src))].map(holdTicketArtwork);
   const originalTitle = document.title;
+  let rejectAbort;
+  const aborted = new Promise((resolve, reject) => { rejectAbort = reject; });
+  let cleaned = false;
   const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    if (cancelActivePrint === abort) cancelActivePrint = null;
+    printing = false;
     document.body.classList.remove("printing-tickets");
     root.classList.remove("preparing-print");
     document.title = originalTitle;
     window.removeEventListener("afterprint", cleanup);
+    signal?.removeEventListener("abort", abort);
     root.innerHTML = "";
     releaseArtwork.forEach(release => release());
   };
+  const abort = () => {
+    cleanup();
+    rejectAbort(signal?.reason || new DOMException("Yazdırma iptal edildi.", "AbortError"));
+  };
+  cancelActivePrint = abort;
+  signal?.addEventListener("abort", abort, { once: true });
   try {
-    await Promise.all(
-      [...root.querySelectorAll("img")].map((img) => img.decode()),
-    );
-    await document.fonts.ready;
+    await Promise.race([
+      Promise.all([...root.querySelectorAll("img")].map((img) => img.decode()))
+        .then(() => document.fonts.ready),
+      aborted,
+    ]);
+    signal?.throwIfAborted();
+    if (cleaned) throw new DOMException("Yazdırma iptal edildi.", "AbortError");
     root.classList.add("preparing-print");
     document.title = `ERCUPSA - ${eventTitle} - Biletler`;
     document.body.classList.add("printing-tickets");

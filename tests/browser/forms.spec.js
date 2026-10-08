@@ -109,7 +109,7 @@ test("the second and third Forms entries open and share their own stable encoded
     expect(embed.searchParams.get("embedded")).toBe("true");
     await expect(page.locator("#formFrame")).toHaveAttribute("title", `${event.title} kayıt formu`);
     await page.locator("#shareEvent").click();
-    await expect.poll(() => page.evaluate(() => window.copiedEventLink)).toBe(`http://127.0.0.1:8888/form.html?event=${encodeURIComponent(event.id)}`);
+    await expect.poll(() => page.evaluate(() => window.copiedEventLink)).toBe(`https://ercupsa.com.tr/etkinlik/${encodeURIComponent(event.id)}`);
     await expect(page.locator("#formBackLink")).toHaveAttribute("href", "form.html");
     await page.reload();
     await expect(page.locator("#formTitle")).toHaveText(event.title);

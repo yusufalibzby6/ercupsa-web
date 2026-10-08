@@ -33,6 +33,12 @@
   status = 200
 
 [[redirects]]
+  from = "/etkinlik/:eventId"
+  to = "/.netlify/functions/event-share?eventId=:eventId"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/community"
   to = "/.netlify/functions/community"
   status = 200

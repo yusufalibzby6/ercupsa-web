@@ -227,12 +227,39 @@ export async function validateRegistrationReceipt(file) {
 }
 
 export function entryForAdmin(entry) {
-  const { receipt, fingerprint, status, ...rest } = entry;
-  return { ...rest, receipt: receipt ? { name: receipt.name, mime: receipt.mime, size: receipt.size } : null };
+  const { receipt, fingerprint, status, ticket, ...rest } = entry;
+  return { ...rest, ...(ticket ? { ticket: { batchId: ticket.batchId, status: ticket.status,
+    ...(ticket.issuedAt ? { issuedAt: ticket.issuedAt } : {}) } } : {}),
+    receipt: receipt ? { name: receipt.name, mime: receipt.mime, size: receipt.size } : null };
+}
+
+export function normalizedRegistrationPhone(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("0090") && digits.length === 14) digits = digits.slice(4);
+  else if (digits.startsWith("90") && digits.length === 12) digits = digits.slice(2);
+  else if (digits.startsWith("0") && digits.length === 11) digits = digits.slice(1);
+  return digits.length >= 10 && digits.length <= 15 ? digits : "";
+}
+
+export function annotateRegistrationDuplicates(entries) {
+  const counts = new Map();
+  for (const entry of entries) {
+    const phone = normalizedRegistrationPhone(entry.phone);
+    if (phone) counts.set(phone, (counts.get(phone) || 0) + 1);
+  }
+  return entries.map((entry) => {
+    const count = counts.get(normalizedRegistrationPhone(entry.phone)) || 1;
+    return { ...entry, possibleDuplicate: count > 1, duplicateCount: count };
+  });
 }
 
 export function registrationSummary(entries) {
-  const summary = { total: entries.length, byClass: [] };
+  const annotated = annotateRegistrationDuplicates(entries);
+  const duplicatePhones = new Set(annotated.filter((entry) => entry.possibleDuplicate)
+    .map((entry) => normalizedRegistrationPhone(entry.phone)));
+  const summary = { total: entries.length, byClass: [],
+    duplicateEntries: annotated.filter((entry) => entry.possibleDuplicate).length,
+    duplicateGroups: duplicatePhones.size };
   const classes = new Map();
   for (const entry of entries) {
     const classYear = entry.classYear || "Belirtilmedi";

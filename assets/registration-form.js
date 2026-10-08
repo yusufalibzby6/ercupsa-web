@@ -63,6 +63,82 @@ window.ercupsaRegistration = (() => {
     }) && ['full_name', 'class_year', 'phone'].every(id => ids.has(id));
   }
 
+  function registrationSummary(result, event) {
+    const snapshot = result.event && typeof result.event === 'object' ? result.event : event;
+    const text = (value, limit) => typeof value === 'string' ? value.slice(0, limit).trim() : '';
+    const title = text(snapshot.title, 300) || text(event.title, 300) || 'Etkinlik';
+    const date = text(typeof snapshot.date === 'string' ? snapshot.date : event.date, 10);
+    const dateLabel = window.ercupsaEvents?.formatDate(date) || 'Tarih bilgisi paylaşılmadı.';
+    const time = text(typeof snapshot.time === 'string' ? snapshot.time : event.time, 5);
+    const timeLabel = /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? `${time} · Türkiye saati` : 'Saat bilgisi paylaşılmadı.';
+    const location = text(typeof snapshot.location === 'string' ? snapshot.location : event.location, 500);
+    const reference = text(result.reference, 120);
+    const success = node('div', 'registration-success');
+    success.id = 'registrationSuccess';
+    success.setAttribute('role', 'status');
+    success.tabIndex = -1;
+    success.append(node('span', 'registration-success-mark', '✓'), node('h3', '', 'Kaydın alındı!'),
+      node('p', '', 'Bilgilerin organizatörlere iletildi. Bu özeti saklayabilir, etkinlik duyurularını takip edebilirsin.'));
+    const summary = node('section', 'registration-summary');
+    summary.setAttribute('aria-labelledby', 'registrationSummaryTitle');
+    const heading = node('h4', '', title);
+    heading.id = 'registrationSummaryTitle';
+    const facts = node('dl', 'registration-summary-facts');
+    const fact = (label, value, id) => {
+      const wrap = node('div');
+      const content = node('dd', '', value);
+      if (id) content.id = id;
+      wrap.append(node('dt', '', label), content);
+      facts.append(wrap);
+    };
+    fact('Tarih', dateLabel, 'registrationSummaryDate');
+    fact('Saat', timeLabel, 'registrationSummaryTime');
+    if (location) fact('Konum', location);
+    if (reference) fact('Kayıt numaran', reference, 'registrationReference');
+    summary.append(heading, facts);
+    if (reference) {
+      const savedText = ['ERCUPSA — Etkinlik kayıt özeti', `Etkinlik: ${title}`, `Tarih: ${dateLabel}`,
+        `Saat: ${timeLabel}`, ...(location ? [`Konum: ${location}`] : []), `Kayıt numarası: ${reference}`,
+        '', 'Bu kayıt numarası QR bilet kodu değildir. Bilet bilgisi organizatörler tarafından ayrıca paylaşılır.'].join('\n');
+      const actions = node('div', 'registration-summary-actions');
+      const copy = node('button', 'event-secondary-action', 'Kayıt numaramı kopyala');
+      copy.type = 'button';
+      copy.id = 'registrationCopyReference';
+      const download = node('button', 'event-secondary-action', 'Özeti indir');
+      download.type = 'button';
+      download.id = 'registrationDownloadSummary';
+      const feedback = node('p', 'registration-summary-status');
+      feedback.id = 'registrationSummaryStatus';
+      feedback.setAttribute('role', 'status');
+      copy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(reference);
+          feedback.textContent = 'Kayıt numaran kopyalandı.';
+        } catch {
+          feedback.textContent = 'Otomatik kopyalama yapılamadı. Yukarıdaki kayıt numaranı seçip kopyalayabilir veya özeti indirebilirsin.';
+        }
+      });
+      download.addEventListener('click', () => {
+        const url = URL.createObjectURL(new Blob([savedText], { type: 'text/plain;charset=utf-8' }));
+        const link = node('a');
+        link.href = url;
+        link.download = `ercupsa-kayit-${reference.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || 'ozet'}.txt`;
+        link.hidden = true;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      });
+      actions.append(copy, download);
+      summary.append(actions, feedback);
+    }
+    summary.append(node('p', 'registration-summary-note', 'Bu kayıt numarası QR bilet kodu değildir. Bilet bilgisi organizatörler tarafından ayrıca paylaşılır.'));
+    const back = node('a', 'event-secondary-action', 'Diğer etkinlikleri keşfet');
+    back.href = 'etkinlikler.html';
+    success.append(summary, back);
+    return success;
+  }
+
   function renderForm(container, config, event) {
     const form = node('form', 'registration-form');
     form.id = 'nativeRegistrationForm';
@@ -281,15 +357,7 @@ window.ercupsaRegistration = (() => {
           if (response.status === 429) throw new Error('Çok sık kayıt denemesi yapıldı. Biraz bekleyip tekrar deneyebilirsin.');
           throw new Error(typeof result?.error === 'string' ? result.error : 'Kaydın gönderilemedi. Bilgilerini koruduk; tekrar deneyebilirsin.');
         }
-        const success = node('div', 'registration-success');
-        success.id = 'registrationSuccess';
-        success.setAttribute('role', 'status');
-        success.tabIndex = -1;
-        success.append(node('span', 'registration-success-mark', '✓'), node('h3', '', 'Kaydın alındı!'),
-          node('p', '', 'Bilgilerin organizatörlere iletildi. Etkinlikle ilgili bilgilendirmeler için duyuruları takip edebilirsin.'));
-        const back = node('a', 'event-secondary-action', 'Diğer etkinlikleri keşfet');
-        back.href = 'etkinlikler.html';
-        success.append(back);
+        const success = registrationSummary(result, event);
         container.replaceChildren(success);
         success.focus();
       } catch (error) {

@@ -125,6 +125,9 @@
       show('eventPoster');
     }
     const detailUrl = new URL(detailPath(target), location.href).href;
+    // The public server-rendered page gives WhatsApp and other preview crawlers
+    // this event's poster, date and location without running browser scripts.
+    const shareUrl = `https://ercupsa.com.tr/etkinlik/${encodeURIComponent(target.id)}`;
     const calendarText = calendar(target, detailUrl);
     if (calendarText) {
       const link = element('calendarLink');
@@ -151,13 +154,13 @@
     element('shareEvent').onclick = async () => {
       const status = element('eventShareStatus');
       try {
-        if (navigator.share) await navigator.share({ title: target.title, url: detailUrl });
+        if (navigator.share) await navigator.share({ title: target.title, url: shareUrl });
         else {
-          await navigator.clipboard.writeText(detailUrl);
+          await navigator.clipboard.writeText(shareUrl);
           status.textContent = 'Etkinlik bağlantısı kopyalandı.';
         }
       } catch (error) {
-        if (error.name !== 'AbortError') status.textContent = `Etkinlik bağlantısı: ${detailUrl}`;
+        if (error.name !== 'AbortError') status.textContent = `Etkinlik bağlantısı: ${shareUrl}`;
       }
     };
     show('eventDetails');

@@ -1,6 +1,6 @@
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createRegistrationsHandler } from "../netlify/functions/registrations.mjs";
 import { adminLogin } from "../netlify/lib/security.mjs";
 import {
@@ -29,6 +29,39 @@ function fixture() {
   const stores = new Map();
   const calls = [];
   const hooks = {};
+  const batches = new Map();
+  const tickets = new Map();
+  const databaseCalls = [];
+  const db = async (path, options = {}) => {
+    databaseCalls.push({ path, options });
+    await hooks.beforeDb?.({ path, options, batches, tickets });
+    let result;
+    if (path === "rpc/create_ticket_batch") {
+      const input = options.data;
+      if (batches.has(input.p_id)) {
+        const error = new Error("duplicate batch"); error.status = 409; throw error;
+      }
+      batches.set(input.p_id, { id: input.p_id, event_id: input.p_event,
+        event_title: input.p_title, codes: input.p_codes });
+      const ticketId = randomUUID();
+      tickets.set(ticketId, { id: ticketId, batch_id: input.p_id, event_id: input.p_event,
+        code_hash: createHash("sha256").update(input.p_codes[0]).digest("hex"),
+        claimed_at: null, revoked: false });
+      result = input.p_id;
+    } else if (path.startsWith("ticket_batches?")) {
+      const id = /id=eq\.([^&]+)/.exec(path)[1];
+      result = batches.has(id) ? [batches.get(id)] : [];
+    } else if (path.startsWith("tickets?batch_id=")) {
+      const id = /batch_id=eq\.([^&]+)/.exec(path)[1];
+      result = [...tickets.values()].filter((ticket) => ticket.batch_id === id);
+    } else if (path.startsWith("tickets?id=") && options.method === "PATCH") {
+      const id = /id=eq\.([^&]+)/.exec(path)[1];
+      if (tickets.has(id)) tickets.set(id, { ...tickets.get(id), ...options.data });
+      result = tickets.has(id) ? [tickets.get(id)] : [];
+    } else throw new Error(`Unexpected database request: ${path}`);
+    await hooks.afterDb?.({ path, options, batches, tickets });
+    return structuredClone(result);
+  };
   const events = [
     { id: "event-one", title: "Birinci etkinlik", date: "2026-10-04", time: "00:01", published: true },
     { id: "event-two", title: "İkinci etkinlik", date: "2026-10-10", published: true,
@@ -87,7 +120,7 @@ function fixture() {
     };
   };
   const handler = createRegistrationsHandler({ getStore, readEvents: async () => structuredClone(events),
-    now: () => new Date(clock), uuid: randomUUID });
+    now: () => new Date(clock), uuid: randomUUID, db });
   const request = async (action = "form", {
     method = "GET", eventId = "event-one", auth = false, input, form,
     rawBody, headers = {}, extra = "",
@@ -114,13 +147,13 @@ function fixture() {
     return request("submit", { method: "POST", eventId: options.eventId, form: data,
       headers: options.headers, extra: options.extra });
   };
-  return { stores, calls, hooks, events, getStore, handler, request, open, submit,
+  return { stores, calls, hooks, events, getStore, handler, request, open, submit, batches, tickets, databaseCalls,
     setClock: (value) => { clock = new Date(value); } };
 }
 
 test("administrator lists, configuration, deletion, summaries, exports and private receipts require signed cookies", async () => {
   const { request, calls } = fixture();
-  for (const action of ["admin", "summary", "receipt", "export", "delete", "form"]) {
+  for (const action of ["admin", "summary", "receipt", "export", "delete", "form", "ticket"]) {
     const result = await request(action, {
       method: ["delete", "form"].includes(action) ? "POST" : "GET",
       input: { id: "entry-one", status: "approved" },
@@ -227,12 +260,15 @@ test("a native submission is idempotent, private, class-counted and exportable",
   assert.equal(result.status, 200);
   const submitted = await result.json();
   assert.match(submitted.reference, /^[a-f0-9]{32}$/);
-  assert.deepEqual(Object.keys(submitted).sort(), ["ok", "reference"]);
+  assert.deepEqual(Object.keys(submitted).sort(), ["event", "ok", "reference"]);
+  assert.deepEqual(submitted.event, { id: "event-one", title: "Birinci etkinlik",
+    date: "2026-10-04", time: "00:01", location: "" });
   assert.deepEqual(await (await submit({ requestId, receipt: png })).json(), submitted);
   assert.equal((await submit({ requestId, answers: { ...validAnswers, phone: "05559999999" }, receipt: png })).status, 409);
   assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
   const admin = await (await request("admin", { auth: true })).json();
-  assert.deepEqual(admin.summary, { total: 1, byClass: [{ classYear: "2. Sınıf", count: 1 }] });
+  assert.deepEqual(admin.summary, { total: 1, byClass: [{ classYear: "2. Sınıf", count: 1 }],
+    duplicateEntries: 0, duplicateGroups: 0 });
   assert.equal(admin.entries[0].name, "Deniz Test");
   assert.deepEqual(admin.entries[0].receipt, { name: "dekont.png", mime: "image/png", size: png.length });
   assert.deepEqual(admin.entries[0].fields, defaultRegistrationForm("event-one").fields);
@@ -682,7 +718,7 @@ test("legacy pending, approved and rejected entries all count and migrate withou
   const migrated = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
   assert.deepEqual(migrated.entries.map((entry) => entry.status).sort(), ["approved", "pending", "rejected"]);
   const admin = await (await request("admin", { auth: true })).json();
-  assert.deepEqual(Object.keys(admin.summary).sort(), ["byClass", "total"]);
+  assert.deepEqual(Object.keys(admin.summary).sort(), ["byClass", "duplicateEntries", "duplicateGroups", "total"]);
   assert.ok(admin.entries.every((entry) => !Object.hasOwn(entry, "status")));
   assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 3);
   const removed = old.entries[1];
@@ -768,4 +804,164 @@ test("a store missing conditional-write ETags fails closed instead of removing a
   assert.equal(current.summary.total, 1);
   assert.equal(current.form.maxRegistrations, 1);
   assert.equal((await (await request()).json()).full, true);
+});
+
+test("possible duplicate phones are private same-event warnings calculated before class filtering and pagination", async () => {
+  const { open, submit, request } = fixture();
+  await open(); await open("event-two");
+  for (const phone of ["0555 123 45 67", "+90 (555) 123 45 67", "0090 555 123 45 67"]) {
+    assert.equal((await submit({ answers: { ...validAnswers, phone, class_year: phone.startsWith("0") ? "1. Sınıf" : "2. Sınıf" } })).status, 200);
+  }
+  assert.equal((await submit({ answers: { ...validAnswers, phone: "0555 111 22 33" } })).status, 200);
+  assert.equal((await submit({ eventId: "event-two", answers: validAnswers })).status, 200);
+  const admin = await (await request("admin", { auth: true, extra: "&duplicate_only=true&class_year=2.%20S%C4%B1n%C4%B1f" })).json();
+  assert.equal(admin.entries.length, 1);
+  assert.equal(admin.entries[0].possibleDuplicate, true);
+  assert.equal(admin.entries[0].duplicateCount, 3);
+  assert.equal(admin.summary.total, 4);
+  assert.equal(admin.summary.duplicateGroups, 1);
+  assert.equal(admin.summary.duplicateEntries, 3);
+  const second = await (await request("admin", { auth: true, eventId: "event-two" })).json();
+  assert.equal(second.entries[0].possibleDuplicate, false);
+  assert.equal((await request("admin", { auth: true, extra: "&duplicate_only=1" })).status, 400);
+  const publicResult = await (await request("form")).json();
+  assert.ok(!Object.hasOwn(publicResult, "summary"));
+  assert.ok(!Object.hasOwn(publicResult, "duplicateEntries"));
+});
+
+test("saved forms remain discoverable in the archive even when every registration was removed", async () => {
+  const { open, request, events, getStore } = fixture();
+  await open();
+  events.splice(events.findIndex((event) => event.id === "event-one"), 1);
+  await getStore(REGISTRATION_STORE).setJSON(formKey("legacy-archive"), defaultRegistrationForm("legacy-archive"));
+  const summary = await (await request("summary", { auth: true })).json();
+  const archived = summary.events.find((event) => event.eventId === "event-one");
+  assert.equal(archived.archived, true);
+  assert.equal(archived.title, "Birinci etkinlik");
+  assert.equal(archived.total, 0);
+  assert.ok(summary.events.some((event) => event.eventId === "legacy-archive" && event.archived));
+  const admin = await (await request("admin", { auth: true })).json();
+  assert.equal(admin.event.title, "Birinci etkinlik");
+  assert.equal(admin.event.archived, true);
+});
+
+test("form submission never issues a ticket; explicit administrator issuance is unique and reusable", async () => {
+  const { open, submit, request, batches, tickets, databaseCalls } = fixture();
+  await open();
+  const id = (await (await submit()).json()).reference;
+  assert.equal(databaseCalls.length, 0);
+  assert.equal((await request("ticket", { extra: "&id=" + id })).status, 401);
+  assert.equal((await request("ticket", { auth: true, extra: "&id=" + id })).status, 404);
+  const first = await request("ticket", { method: "POST", auth: true, input: { id } });
+  assert.equal(first.status, 200, await first.clone().text());
+  const issued = await first.json();
+  assert.match(issued.ticket.code, /^ERC-[A-F0-9]{24}$/);
+  assert.equal(issued.ticket.revoked, false);
+  const retried = await (await request("ticket", { method: "POST", auth: true, input: { id } })).json();
+  assert.deepEqual(retried, issued);
+  assert.deepEqual(await (await request("ticket", { auth: true, extra: "&id=" + id })).json(), issued);
+  assert.equal(batches.size, 1); assert.equal(tickets.size, 1);
+  const list = await (await request("admin", { auth: true })).json();
+  assert.equal(list.entries[0].ticket.status, "issued");
+  assert.ok(!JSON.stringify(list).includes(issued.ticket.code));
+  assert.ok(!JSON.stringify(await (await request()).json()).includes(issued.ticket.code));
+  tickets.get(issued.ticket.id).claimed_at = "2026-10-04T10:00:00.000Z";
+  tickets.get(issued.ticket.id).revoked = true;
+  const fresh = await (await request("ticket", { auth: true, extra: "&id=" + id })).json();
+  assert.equal(fresh.ticket.claimedAt, "2026-10-04T10:00:00.000Z");
+  assert.equal(fresh.ticket.revoked, true);
+});
+
+test("concurrent issue requests and lost reservation or SQL responses converge on one ticket", async () => {
+  for (const lost of ["none", "reservation", "sql"]) {
+    const { open, submit, request, hooks, batches, tickets } = fixture();
+    await open();
+    const id = (await (await submit()).json()).reference;
+    if (lost === "reservation") hooks.afterSet = ({ data }) => {
+      if (data.entries?.some((entry) => entry.ticket)) { hooks.afterSet = null; throw new Error("lost reservation response"); }
+    };
+    if (lost === "sql") hooks.afterDb = ({ path }) => {
+      if (path === "rpc/create_ticket_batch") { hooks.afterDb = null; throw new Error("lost SQL response"); }
+    };
+    const results = await Promise.all(Array.from({ length: 8 }, () => request("ticket", {
+      method: "POST", auth: true, input: { id },
+    })));
+    for (const result of results) assert.equal(result.status, 200, await result.clone().text());
+    const bodies = await Promise.all(results.map((result) => result.json()));
+    assert.equal(new Set(bodies.map((result) => result.ticket.code)).size, 1);
+    assert.equal(new Set(bodies.map((result) => result.ticket.id)).size, 1);
+    assert.equal(batches.size, 1); assert.equal(tickets.size, 1);
+  }
+});
+
+test("failed ticket creation keeps the same pending reservation for retry and archived records remain readable", async () => {
+  const { open, submit, request, hooks, stores, events, batches, tickets } = fixture();
+  await open();
+  const id = (await (await submit()).json()).reference;
+  hooks.beforeDb = ({ path }) => { if (path === "rpc/create_ticket_batch") throw new Error("SQL unavailable"); };
+  assert.equal((await request("ticket", { method: "POST", auth: true, input: { id } })).status, 503);
+  const reserved = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries[0].ticket;
+  assert.equal(reserved.status, "pending"); assert.equal(tickets.size, 0);
+  hooks.beforeDb = null;
+  const issued = await (await request("ticket", { method: "POST", auth: true, input: { id } })).json();
+  assert.equal(issued.ticket.code, reserved.code); assert.equal(issued.ticket.batchId, reserved.batchId);
+  assert.equal(batches.size, 1);
+  events.splice(events.findIndex((event) => event.id === "event-one"), 1);
+  assert.equal((await request("ticket", { method: "POST", auth: true, input: { id } })).status, 409);
+  const saved = await request("ticket", { auth: true, extra: "&id=" + id });
+  assert.equal(saved.status, 200);
+  assert.equal((await saved.json()).ticket.code, reserved.code);
+});
+
+test("deleting while ticket issuance is delayed materializes and revokes the reservation before success", async () => {
+  const { open, submit, request, hooks, tickets, batches } = fixture();
+  await open();
+  const id = (await (await submit()).json()).reference;
+  let release, signal;
+  const blocked = new Promise((resolve) => { signal = resolve; });
+  const wait = new Promise((resolve) => { release = resolve; });
+  hooks.beforeDb = async ({ path }) => {
+    if (path === "rpc/create_ticket_batch") { hooks.beforeDb = null; signal(); await wait; }
+  };
+  const issue = request("ticket", { method: "POST", auth: true, input: { id } });
+  await blocked;
+  const removed = await request("delete", { method: "POST", auth: true, input: { id } });
+  assert.equal(removed.status, 200, await removed.clone().text());
+  release();
+  assert.equal((await issue).status, 409);
+  assert.equal(batches.size, 1); assert.equal(tickets.size, 1);
+  assert.equal([...tickets.values()][0].revoked, true);
+  assert.equal((await request("ticket", { auth: true, extra: "&id=" + id })).status, 404);
+});
+
+test("failed ticket cancellation keeps a deletion tombstone and retries cannot resurrect its ticket", async () => {
+  const { open, submit, request, hooks, tickets, stores } = fixture();
+  await open();
+  const requestId = randomUUID();
+  const id = (await (await submit({ requestId })).json()).reference;
+  const issued = await (await request("ticket", { method: "POST", auth: true, input: { id } })).json();
+  hooks.beforeDb = ({ options }) => { if (options.method === "PATCH") throw new Error("cancellation unavailable"); };
+  assert.equal((await request("delete", { method: "POST", auth: true, input: { id } })).status, 503);
+  const data = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  assert.equal(data.entries.length, 0); assert.equal(data.deleted[0].ticket.code, issued.ticket.code);
+  const refreshed = await (await request("admin", { auth: true })).json();
+  assert.deepEqual(refreshed.pendingTicketDeletions, [{ id, name: validAnswers.full_name }]);
+  assert.ok(!JSON.stringify(refreshed).includes(issued.ticket.code));
+  assert.equal((await submit({ requestId })).status, 409);
+  hooks.beforeDb = null;
+  assert.equal((await request("delete", { method: "POST", auth: true, input: { id } })).status, 200);
+  assert.equal(tickets.get(issued.ticket.id).revoked, true);
+  assert.deepEqual((await (await request("admin", { auth: true })).json()).pendingTicketDeletions, []);
+  assert.equal((await request("ticket", { method: "POST", auth: true, input: { id } })).status, 404);
+});
+
+test("idempotent submission summary retains its original event details after the event is edited", async () => {
+  const { open, submit, events } = fixture();
+  events[0].location = "Eczacılık Fakültesi";
+  await open();
+  const requestId = randomUUID();
+  const first = await (await submit({ requestId })).json();
+  events[0].title = "Yeni başlık"; events[0].time = "14:00"; events[0].location = "Yeni yer";
+  assert.deepEqual(await (await submit({ requestId })).json(), first);
+  assert.equal(first.event.location, "Eczacılık Fakültesi");
 });

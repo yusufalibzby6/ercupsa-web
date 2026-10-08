@@ -10,6 +10,7 @@ import {
 } from "../lib/security.mjs";
 import { db, user } from "../lib/database.mjs";
 import { readEvents } from "./events.mjs";
+import { operationsStore, readCheckins } from "../lib/checkins.mjs";
 const classes = ["Hazırlık", "1", "2", "3", "4", "5", "Mezun"];
 export const badge = (n) =>
   n >= 5 ? "Altın" : n >= 4 ? "Gümüş" : n >= 3 ? "Bronz" : null;
@@ -31,7 +32,9 @@ async function rate(req, scope, max = 5, seconds = 3600) {
   )
     fail(429, "Çok fazla deneme yapıldı. Lütfen biraz sonra tekrar dene.");
 }
-export default guarded(async (req) => {
+export function createCommunityHandler({ read = db, events = readEvents, store = operationsStore } = {}) {
+return guarded(async (req) => {
+  const db = read;
   const url = new URL(req.url),
     action = url.searchParams.get("action") || "public";
   if (req.method === "GET" && action === "config")
@@ -157,7 +160,7 @@ export default guarded(async (req) => {
     const b = await body(req);
     if (!Number.isInteger(b.count) || b.count < 1 || b.count > 200)
       fail(400, "1–200 arasında bilet sayısı gir.");
-    const event = (await readEvents()).find(
+    const event = (await events()).find(
       (e) => e.id === identifier(b.event_id),
     );
     if (!event) fail(404, "Etkinlik bulunamadı.");
@@ -184,7 +187,24 @@ export default guarded(async (req) => {
       db(`tickets?batch_id=eq.${id}&select=id,code_hash,claimed_at,revoked`),
     ]);
     if (!batch[0]) fail(404, "Bilet grubu bulunamadı.");
-    return response({ ...batch[0], tickets });
+    let entries = [], checkinsAvailable = false;
+    try {
+      entries = await readCheckins(batch[0].event_id, store());
+      if (!Array.isArray(entries) || entries.some((entry) => !entry ||
+          typeof entry.ticketId !== "string" || typeof entry.enteredAt !== "string" ||
+          !Number.isFinite(Date.parse(entry.enteredAt)))) throw new Error("Invalid check-in data");
+      checkinsAvailable = true;
+    } catch {
+      // A gate storage outage must not turn a claimed ticket into an entered one,
+      // or report an unknown entry status as a confirmed absence.
+      entries = [];
+    }
+    const entered = new Map(entries.map((entry) => [entry.ticketId, entry.enteredAt]));
+    return response({
+      ...batch[0],
+      tickets: tickets.map((ticket) => ({ ...ticket, entered_at: entered.get(ticket.id) || null })),
+      checkins_available: checkinsAvailable,
+    });
   }
   if (action === "revoke" && req.method === "POST") {
     const b = await body(req);
@@ -196,3 +216,5 @@ export default guarded(async (req) => {
   }
   fail(405, "Desteklenmeyen işlem.");
 });
+}
+export default createCommunityHandler();

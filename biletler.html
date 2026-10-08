@@ -10,11 +10,11 @@
     />
     <link rel="stylesheet" href="assets/tailwind.css" />
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="assets/participation.css" />
+    <link rel="stylesheet" href="assets/participation.css?v=qr-flow-2" />
     <link rel="stylesheet" href="assets/event-feedback.css?v=operations-1" />
     <script type="module" src="assets/shell.js"></script>
     <script src="fun.js" defer></script>
-    <script type="module" src="assets/tickets.bundle.js?v=operations-1"></script>
+    <script type="module" src="assets/tickets.bundle.js?v=qr-flow-2"></script>
   </head>
   <body class="text-gray-800">
     <nav class="fixed w-full z-50 glass-panel border-b">
@@ -30,6 +30,15 @@
       ><a href="biletler.html">Biletlerim</a>
     </nav>
     <main class="pt-28 pb-20 max-w-5xl mx-auto px-4">
+      <section id="ticketCompletionPanel" hidden class="participation-completion" aria-labelledby="ticketCompletionHeading">
+        <div class="participation-completion-heading">
+          <div><p class="participation-eyebrow">Biletini hesabına ekle</p><h2 id="ticketCompletionHeading">Kodun hazır</h2></div>
+          <button id="cancelPendingCode" type="button" class="participation-cancel">Kodu iptal et</button>
+        </div>
+        <p id="ticketCompletionMessage" class="participation-completion-message"></p>
+        <div id="ticketCompletionStatus"></div>
+        <div id="ticketCompletionContent"></div>
+      </section>
       <header class="participation-hero">
         <div>
           <p class="participation-eyebrow">Her etkinlik bir anı</p>
@@ -57,7 +66,7 @@
           <li><span class="participation-step" aria-hidden="true">2</span><div><h3>Hesabına giriş yap</h3><p>İlk kez kullanıyorsan bir site hesabı oluştur. Hesabın yalnızca katılımlarını ve rozetlerini saklar.</p></div></li>
           <li><span class="participation-step" aria-hidden="true">3</span><div><h3>Katılımını ekle</h3><p>“Katılımımı ekle” butonuna bas. Her farklı etkinlik seni bir sonraki rozete yaklaştırır.</p></div></li>
         </ol>
-        <p class="participation-note">Bu sayfa etkinlik başvurusu için kullanılmaz. Başvurular etkinlik sayfasındaki Google Form üzerinden yapılır.</p>
+        <p class="participation-note">Etkinliğe başvurmak için <a href="form.html">Kayıt formları</a> sayfasından ilgili etkinliğin formunu doldur. Form başvurusu ile biletini hesabına eklemek ayrı adımlardır. Biletini hesabına ekleyenler için düzenlenen çekilişlerde etkinliğin duyurulan kuralları geçerlidir.</p>
       </section>
       <p id="status" role="status" aria-live="polite" class="participation-status"></p>
       <section id="authPanel" class="glass-panel rounded-3xl p-6">
@@ -256,7 +265,7 @@
               aria-describedby="claimHelp"
               class="block w-full border rounded-xl p-3 font-mono" />
           <button class="btn-primary p-3 rounded-xl">Katılımımı ekle</button>
-          <p id="claimHelp" class="text-sm text-gray-500">Aynı etkinlik için yalnızca bir katılım kaydedilir.</p>
+          <p id="claimHelp" class="text-sm text-gray-500">Aynı etkinlik için yalnızca bir katılım kaydedilir. Bu işlem kapıdaki giriş kontrolünden ayrıdır.</p>
         </form>
         <form id="profileForm" class="glass-panel rounded-3xl p-6 grid gap-4">
           <h2 class="text-xl font-bold">Profil ve görünürlük</h2>

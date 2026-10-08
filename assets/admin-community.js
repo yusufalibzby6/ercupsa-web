@@ -338,16 +338,20 @@ async function renderOpenedBatch() {
       location.origin + "/biletler.html?ticket=" + encodeURIComponent(code),
       { width: 320, margin: 4, errorCorrectionLevel: "M" },
     );
+    const claimState = !ticket ? "Bilet durumu doğrulanamadı" : ticket.claimed_at ? "Hesaba eklendi" : "Henüz hesaba eklenmedi";
+    const entryState = !ticket || d.checkins_available !== true
+      ? "Giriş durumu doğrulanamadı"
+      : ticket.entered_at ? "Kapıda giriş yaptı" : "Henüz giriş yapmadı";
     return {
       card: ticketCard({ code, qr, eventTitle: d.event_title, ticket, design: artwork }),
-      control: `<div class="ticket-controls no-print"><span>${ticket?.revoked ? "İptal" : ticket?.claimed_at ? "Kullanıldı" : "Kullanılmadı"}</span>${ticket && !ticket.revoked && !ticket.claimed_at ? `<button class="text-red-700" data-revoke="${escape(ticket.id)}">İptal et</button>` : ""}</div>`,
+      control: `<div class="ticket-controls no-print"><span>${ticket?.revoked ? "İptal" : claimState} · ${entryState}</span>${ticket && !ticket.revoked && !ticket.claimed_at ? `<button class="text-red-700" data-revoke="${escape(ticket.id)}">İptal et</button>` : ""}</div>`,
     };
   }));
   if (version !== cardsVersion || openedBatch !== d || d.event_id !== $("ticketEvent").value) return;
   const cards = rows.map((r) => r.card);
   $("ticketOutput").dataset.batch = d.id;
   $("ticketOutput").innerHTML =
-    `<div class="no-print mb-4"><h3 class="font-bold">${escape(d.event_title)}</h3><button id="printTickets" class="btn-primary rounded-xl p-3 font-bold">Çıktı oluştur</button><p class="mt-3 text-sm text-gray-500">${cards.length} bilet · ${Math.ceil(cards.length / TICKETS_PER_PAGE)} A4 sayfa. Her sayfada en fazla 10 bilet; kesim çizgileri hazır. ${artwork ? "Etkinliğe özel tasarım kullanılıyor." : "Standart tasarım kullanılıyor."}</p></div>` +
+    `<div class="no-print mb-4"><h3 class="font-bold">${escape(d.event_title)}</h3><button id="printTickets" class="btn-primary rounded-xl p-3 font-bold">Çıktı oluştur</button><p class="mt-3 text-sm text-gray-500">${cards.length} bilet · ${Math.ceil(cards.length / TICKETS_PER_PAGE)} A4 sayfa. Her sayfada en fazla 10 bilet; kesim çizgileri hazır. ${artwork ? "Etkinliğe özel tasarım kullanılıyor." : "Standart tasarım kullanılıyor."}</p><p class="mt-2 text-sm text-gray-500">Hesaba eklenme ve kapıdan giriş ayrı durumlardır. Kapı durumu yalnızca görevlinin giriş kaydını gösterir.${d.checkins_available === true ? "" : " Giriş kayıtları şu anda doğrulanamadı; bilet grubunu yeniden açarak tekrar deneyin."}</p></div>` +
     ticketSheets(cards, rows.map((r) => r.control));
   updateTicketControls();
   $("printTickets").onclick = async () => {

@@ -459,7 +459,14 @@ test("admin copies separate registration links for current published events and 
 test("A4 ticket layout keeps long titles and the final ticket complete", async ({
   page,
 }) => {
+  await page.route("**/api/**", route => route.fulfill({
+    status: 501,
+    json: { error: "Unmocked A4 fixture" },
+  }));
+  await page.route("**/api/events*", route => route.fulfill({ json: { events: [] } }));
+  await page.route("**/api/community*", route => route.fulfill({ json: { submissions: [], batches: [] } }));
   await page.goto("/admin.html");
+  await expect(page.locator("#app")).toBeVisible();
   await page.evaluate(async () => {
     const { ticketCard, printTickets } =
       await import("/assets/ticket-print.js");

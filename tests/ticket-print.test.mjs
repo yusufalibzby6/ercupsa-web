@@ -39,3 +39,16 @@ test("ticket pages contain at most ten distinct, complete tickets with logo, tit
   assert.match(html, /&lt;script&gt;/);
   assert.ok(!html.includes("<script>"));
 });
+test("standard ticket status describes account claim without implying entry or invalidating the QR", () => {
+  const html = ticketCard({
+    code: code(1),
+    qr: "data:image/png;base64,test",
+    eventTitle: "Etkinlik",
+    ticket: { claimed_at: "2026-10-08T10:00:00Z", revoked: false },
+  });
+  assert.match(html, /HESABA EKLENDİ/);
+  assert.ok(!html.includes("KULLANILDI"));
+  assert.match(html, /class="ticket-qr"/);
+  assert.match(html, /data-code="ERC-000000000000000000000001"/);
+  assert.ok(!html.includes("Kapıda giriş yaptı"));
+});

@@ -43,6 +43,16 @@ textarea.registration-control { resize: vertical; min-height: 112px; }
 .registration-full p { font-size: 1.05rem; overflow-wrap: anywhere; }
 .registration-success .event-secondary-action, .registration-full .event-secondary-action, .registration-load-error button { margin-top: 1.1rem; }
 .registration-success-mark { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; margin: 0 auto 1rem; background: #e7f4ed; color: #24734b; border-radius: 50%; font-size: 1.7rem; font-weight: 800; }
+.registration-summary { margin:1.5rem 0 .5rem; padding:1.25rem; border:1px solid #dbe6df; border-radius:14px; background:#f7fbf8; text-align:left; }
+.registration-summary h4 { font-weight:800; font-size:1.1rem; line-height:1.5; overflow-wrap:anywhere; }
+.registration-summary-facts { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin:1rem 0; }
+.registration-summary-facts dt { font-size:.78rem; color:#647084; font-weight:650; margin-bottom:.3rem; }
+.registration-summary-facts dd { color:#263244; font-size:.95rem; overflow-wrap:anywhere; }
+#registrationReference { font-family:ui-monospace,monospace; user-select:all; }
+.registration-summary-actions { display:flex; flex-wrap:wrap; gap:.7rem; }
+.registration-summary-actions .event-secondary-action { margin-top:0; }
+.registration-success .registration-summary-note,.registration-success .registration-summary-status { font-size:.8rem; line-height:1.6; margin-top:.85rem; }
+.registration-summary-status:empty { display:none; }
 .registration-honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .dark .registration-form, .dark .registration-success, .dark .registration-full, .dark .registration-unavailable, .dark .registration-load-error, .dark .registration-loading { background: #162133; border-color: #33435a; }
 .dark .registration-intro { border-color: #33435a; }
@@ -55,6 +65,9 @@ textarea.registration-control { resize: vertical; min-height: 112px; }
 .dark .registration-file::file-selector-button { background: #25334a; border-color: #53637c; color: #e2e9f4; }
 .dark .registration-field-error { color: #ffb3bb; }
 .dark .registration-feedback { background: #432433; color: #ffc7cd; border-color: #784356; }
+.dark .registration-summary { background:#102d24; border-color:#34594b; }
+.dark .registration-summary-facts dt { color:#aab9cf; }
+.dark .registration-summary-facts dd,.dark .registration-summary h4 { color:#edf2fa; }
 @media (max-width: 600px) {
   .native-registration-page main { padding-top: 104px; }
   .native-registration-page #formBackLink { margin-bottom: 1rem; }
@@ -64,4 +77,6 @@ textarea.registration-control { resize: vertical; min-height: 112px; }
   .registration-submit { width: 100%; }
   .registration-receipt { padding: .9rem; }
   .registration-file { font-size: .75rem; }
+  .registration-summary-facts { grid-template-columns:1fr; }
+  .registration-summary-actions { flex-direction:column; }
 }

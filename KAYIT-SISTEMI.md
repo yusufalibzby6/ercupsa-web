@@ -29,6 +29,26 @@ Kaydedilmemiş form değişiklikleri etkinlikler arasında geçiş yaparken koru
 
 **Etkinlikleri karşılaştır** bölümünde istediğiniz etkinlikleri seçerek kayıt sayılarını ve sınıflara göre dağılımı yan yana görebilirsiniz. Bunlar form kayıt sayılarıdır. Etkinliğe fiilen gelen kişiler ve QR bilet katılımları ayrı tutulur; form göndermek bilet oluşturmaz.
 
+Aynı etkinlikte aynı telefonla gönderilmiş başvurular **Olası tekrar kayıtlar** filtresiyle bulunur. Bu bir uyarıdır; ortak telefon kullanan katılımcılar otomatik engellenmez. Cevapları karşılaştırıp gereksiz kaydı silebilirsiniz. **Bilet verilmemiş / Bilet verilmiş** filtreleri de kayıtların bilet durumunu gösterir.
+
+**Etkinlik listesi → Arşiv** ile silinen etkinliklerin korunmuş cevaplarını, dekontlarını ve verilmiş biletlerini açabilirsiniz. Karşılaştırma tablosundaki **Kayıtları aç** düğmesi de ilgili etkinliğe gider. Arşivde form düzenleme ve yeni bilet verme kapalıdır; CSV indirme ve kayıt silme kullanılabilir.
+
+## Form kaydından QR bileti verme
+
+Katılımcının kaydında **Bilet ver** düğmesine basın. O kayda özel tek bir QR bileti hazırlanır. Etkinliğin özel bilet tasarımı varsa aynı tasarım kullanılır. **Bağlantıyı kopyala** ile katılımcıya iletebilir veya **Bileti yazdır / PDF kaydet** ile çıktı alabilirsiniz. Sonraki **Bileti görüntüle** işlemi aynı bileti açar; bağlantı kesildiğinde yeniden denemek ek bilet oluşturmaz. Bilet bağlantısını yalnızca sahibine iletin.
+
+Bu işlem bilet oluşturur; katılımcının hesabına kendiliğinden eklemez. Katılımcı QR’ı okutur, giriş yapar veya hesap oluşturur, ardından **Katılımımı ekle** düğmesine basar. Hazır QR kodu varsa bu adım mobil sayfanın üstünde gösterilir. Kapıda görevli aynı bileti ayrıca okutur. Panelde **Hesaba eklendi** ve **Kapıda giriş yaptı** durumları ayrı gösterilir.
+
+Form kaydını silmek o kayıttan verilmiş QR biletini de iptal eder. Daha önceki hesap katılımı, kapı giriş geçmişi ve çekiliş sonuçları bu işlemle silinmez. İptal sırasında bağlantı hatası olursa **Bilet iptali tamamlanmayı bekliyor** satırı kalır; **Bilet iptalini tamamla** ile aynı işlem yeniden denenir.
+
+## Katılımcı kayıt özeti ve paylaşım
+
+Başarılı form gönderiminden sonra etkinlik bilgileri ve kayıt referansı gösterilir. Katılımcı özeti kopyalayabilir veya metin dosyası olarak indirebilir. Özet bir QR bileti değildir; dekont ve form cevapları özete eklenmez.
+
+Etkinlikteki **Paylaş** veya paneldeki **Etkinliği paylaş** düğmesi `https://ercupsa.com.tr/etkinlik/ETKINLIK_KIMLIGI` bağlantısını kullanır. WhatsApp gibi uygulamalar etkinliğin kendi afişini, adını ve tarihini görür. Açılan kartın düğmesi doğrudan kayıt formuna götürür. Paneldeki doğrudan **Kayıt linkini kopyala** bağlantısı da korunur.
+
+Etkinlik düzenleyicisinde kaydedilmemiş taslaklar aynı tarayıcı sekmesinde etkinlikler arasında geçişte ve yenilemede korunur. **Kaydedilmiş etkinliğe dön** veya **Yeni taslağı sil** ile değişiklikleri kaldırabilirsiniz. Yönetici çıkışı taslakları temizler.
+
 ## Mevcut Google Forms bağlantıları
 
 Henüz site içi form kaydetmediğiniz etkinlikler mevcut Google Forms bağlantılarını kullanmaya devam eder. Bir etkinliğe site içi form kaydettiğinizde kayıt akışı bu forma geçer. Site içi formu kapatırsanız eski Google Forms bağlantısı otomatik açılmaz. Google Forms'taki eski cevaplar bu panele aktarılmaz.
@@ -36,5 +56,7 @@ Henüz site içi form kaydetmediğiniz etkinlikler mevcut Google Forms bağlant�
 ## Yayımlama ve doğrulama
 
 GitHub değişikliklerini Netlify üzerinden yayımlamak yeterlidir. Mevcut `ADMIN_PASSWORD` yönetici oturumu için kullanılır. Dekontlara, kayıt listelerine ve CSV dosyalarına erişim sunucuda yönetici oturumuyla korunur; herkese açık etkinlik API'sinde kayıt sayıları ve kişisel bilgiler bulunmaz.
+
+Form kaydından bilet verme mevcut Supabase `create_ticket_batch` işlevini ve bilet tablolarını kullanır. Yeni SQL migration veya ortam değişkeni gerekmez.
 
 Yerel doğrulama için `npm ci`, `npm run build`, `npm test` ve Netlify Dev açıkken `npm run test:browser` kullanılabilir. Kayıt testleri üretim verilerine yazmadan çalışır.

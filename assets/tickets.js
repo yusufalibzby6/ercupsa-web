@@ -5,6 +5,78 @@ let client,
   session,
   recovering = false;
 let authVersion = 0;
+let claimCompleted = false;
+let preparedTicketCode = "";
+const recoveryTicketKey = "ercupsa.pending-ticket-recovery";
+const validTicketCode = (code) => typeof code === "string" && /^ERC-[A-F0-9]{24}$/.test(code);
+function forgetRecoveryTicket() {
+  try { localStorage.removeItem(recoveryTicketKey); } catch {}
+}
+function saveRecoveryTicket() {
+  if (!readyTicketCode()) {
+    forgetRecoveryTicket();
+    return;
+  }
+  try {
+    localStorage.setItem(recoveryTicketKey, JSON.stringify({ code: $("ticketCode").value, expiresAt: Date.now() + 60 * 60 * 1000 }));
+  } catch {}
+}
+function savedRecoveryCode() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(recoveryTicketKey));
+    if (validTicketCode(saved?.code) && typeof saved.expiresAt === "number" && saved.expiresAt > Date.now()) return saved.code;
+  } catch {}
+  forgetRecoveryTicket();
+  return "";
+}
+const actionHomes = new Map();
+for (const id of ["authPanel", "claimForm", "status"]) {
+  const element = $(id), home = document.createComment(`${id} home`);
+  element.before(home);
+  actionHomes.set(id, home);
+}
+function restoreAction(id) {
+  const home = actionHomes.get(id);
+  if (home.nextSibling !== $(id)) home.after($(id));
+}
+function readyTicketCode() {
+  return validTicketCode($("ticketCode").value);
+}
+function showTicketAction() {
+  // Background profile/auth refreshes must not move a form while someone is
+  // typing a manual code. Only a scanned or explicitly prepared code goes up top.
+  const pending = validTicketCode(preparedTicketCode) && !recovering;
+  const completed = claimCompleted && !recovering;
+  const activeForm = pending ? (session ? "claimForm" : "authPanel") : null;
+  for (const id of ["authPanel", "claimForm", "status"]) {
+    const destination = id === activeForm ? $("ticketCompletionContent")
+      : id === "status" && (pending || completed) ? $("ticketCompletionStatus") : null;
+    if (destination) {
+      if ($(id).parentNode !== destination) destination.append($(id));
+    } else restoreAction(id);
+  }
+  $("ticketCompletionPanel").hidden = recovering || (!pending && !claimCompleted);
+  $("cancelPendingCode").hidden = !pending;
+  if (pending) {
+    $("ticketCompletionHeading").textContent = session
+      ? "Son adım: katılımını ekle"
+      : "Kodun hazır — hesabına giriş yap";
+    $("ticketCompletionMessage").textContent = session
+      ? "QR kodun hazır. Biletini hesabına kaydetmek için aşağıdaki “Katılımımı ekle” butonuna bas."
+      : "Giriş yap veya bir site hesabı oluştur. Ardından “Katılımımı ekle” butonuna basarak bu biletini hesabına kaydet.";
+    $("ticketCompletionPanel").classList.remove("is-complete");
+  } else if (claimCompleted && !recovering) {
+    $("ticketCompletionHeading").textContent = "Katılımın hesabına eklendi!";
+    $("ticketCompletionMessage").textContent = "Biletini kaydettin. Katılımın ve rozet ilerlemen hesabında görünüyor. Biletini hesabına ekleyenler için düzenlenen çekilişlerde etkinliğin duyurulan kuralları geçerlidir.";
+    $("ticketCompletionPanel").classList.add("is-complete");
+  }
+}
+function clearCodeUrl() {
+  const params = new URLSearchParams(location.search);
+  params.delete("ticket");
+  if (params.get("code")?.startsWith("ERC-")) params.delete("code");
+  history.replaceState({}, "", location.pathname + (params.size ? "?" + params : "") + location.hash);
+}
 const eventFeedback = createEventFeedback({ request: (path, opts = {}) => {
   if (!session) throw new Error("Önce giriş yapmalısın.");
   return api(path, { ...opts, headers: { ...opts.headers, Authorization: "Bearer " + session.access_token } });
@@ -118,10 +190,21 @@ function attendanceTitle(attendance) {
     : title;
 }
 function pendingCode(value) {
-  $("ticketCode").value = value;
-  $("entryTicketCode").value = value;
-  $("pendingCodeNote").hidden = !value;
+  const code = String(value || "").toUpperCase().replace(/\s/g, "");
+  preparedTicketCode = validTicketCode(code) ? code : "";
+  $("ticketCode").value = code;
+  $("entryTicketCode").value = code;
+  $("pendingCodeNote").hidden = !code;
+  if (code) claimCompleted = false;
+  else forgetRecoveryTicket();
+  showTicketAction();
 }
+$("cancelPendingCode").addEventListener("click", () => {
+  claimCompleted = false;
+  pendingCode("");
+  clearCodeUrl();
+  status("Bekleyen kod iptal edildi. İstersen başka bir bilet kodu girebilirsin.");
+});
 $("prepareCodeForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const code = $("entryTicketCode").value.toUpperCase().replace(/\s/g, "");
@@ -140,6 +223,7 @@ async function refresh() {
   $("authPanel").hidden = Boolean(session);
   $("resetPanel").hidden = !session || !recovering;
   $("accountPanel").hidden = !session || recovering;
+  showTicketAction();
   if (!session || recovering) return;
   const d = await account("me");
   if (version !== authVersion || !session) return;
@@ -224,6 +308,9 @@ form("signupForm", async () => {
 form("forgotForm", async () => {
   const redirect = new URL("biletler.html", location.href);
   redirect.search = "recovery=1";
+  // Keep the configured Supabase redirect URL exact. PKCE requires the same
+  // browser, so retain the pending QR locally for this recovery round trip.
+  saveRecoveryTicket();
   const { error } = await client.auth.resetPasswordForEmail(
     $("forgotEmail").value.trim(),
     { redirectTo: redirect.href },
@@ -273,11 +360,9 @@ form("claimForm", async () => {
     method: "POST",
     body: JSON.stringify({ code: $("ticketCode").value }),
   });
+  claimCompleted = true;
   pendingCode("");
-  const params = new URLSearchParams(location.search);
-  params.delete("ticket");
-  if (params.get("code")?.startsWith("ERC-")) params.delete("code");
-  history.replaceState({}, "", location.pathname + (params.size ? "?" + params : "") + location.hash);
+  clearCodeUrl();
   await refresh();
   await board();
   status("Katılımın eklendi. Rozet ilerlemen güncellendi.");
@@ -288,6 +373,7 @@ $("logout").addEventListener("click", async () => {
     checkAuth(error);
     session = null;
     recovering = false;
+    claimCompleted = false;
     await refresh();
     status("Çıkış yaptın.");
   } catch (error) {
@@ -312,7 +398,14 @@ async function init() {
   try {
     // Ticket QR codes and Supabase PKCE callbacks must not share the code parameter.
     const params = new URLSearchParams(location.search);
-    const ticket = params.get("ticket") || params.get("code");
+    let ticket = params.get("ticket") || params.get("code");
+    if (!ticket?.startsWith("ERC-") && params.get("recovery") === "1") {
+      ticket = savedRecoveryCode();
+      if (ticket) {
+        params.set("ticket", ticket);
+        history.replaceState({}, "", location.pathname + "?" + params.toString() + location.hash);
+      }
+    }
     if (ticket?.startsWith("ERC-")) {
       pendingCode(ticket);
       if (params.get("code") === ticket) {
@@ -339,7 +432,10 @@ async function init() {
       eventFeedback.setIdentity(event !== "PASSWORD_RECOVERY" ? next?.user?.id || null : null);
       session = next;
       if (event === "PASSWORD_RECOVERY") recovering = true;
-      if (event === "SIGNED_OUT") recovering = false;
+      if (event === "SIGNED_OUT") {
+        recovering = false;
+        claimCompleted = false;
+      }
       // Never await another auth operation inside this callback (Supabase holds its auth lock).
       setTimeout(
         () => refresh().catch((error) => status(error.message, true)),

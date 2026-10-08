@@ -1,6 +1,7 @@
 import { getStore as getBlobStore } from "@netlify/blobs";
 import { createHash, randomUUID } from "node:crypto";
 import { readEvents as readStoredEvents } from "./events.mjs";
+import { db as database } from "../lib/database.mjs";
 import { fail, guarded, identifier, requireAdmin, response } from "../lib/security.mjs";
 import {
   REGISTRATION_STORE, REGISTRATION_RECEIPT_STORE, REGISTRATION_FULL_MESSAGE,
@@ -8,12 +9,14 @@ import {
   formKey, entryKey, entryPrefix, registrationStateKey,
   validateRegistrationAnswers, validateRegistrationReceipt, readRegistrationJson,
   readRegistrationSubmission, entryForAdmin, registrationSummary, registrationCsv,
-  mapConcurrent,
+  mapConcurrent, annotateRegistrationDuplicates,
 } from "../lib/registrations.mjs";
+import { reserveRegistrationTicket, ensureRegistrationTicket, savedRegistrationTicket,
+  revokeRegistrationTicket, registrationTicketResponse } from "../lib/registration-tickets.mjs";
 
 const READ_JSON = { type: "json", consistency: "strong" };
 const hash = (value) => createHash("sha256").update(value).digest("hex");
-const ADMIN_ACTIONS = new Set(["admin", "form", "delete", "summary", "receipt", "export"]);
+const ADMIN_ACTIONS = new Set(["admin", "form", "delete", "summary", "receipt", "export", "ticket"]);
 const RETRY_CONFLICT = "Önceki kayıt isteğin alınmış. Farklı bilgilerle tekrar gönderilemedi. Kaydını düzenlemek için organizatörlerle iletişime geç.";
 const DELETED_CONFLICT = "Bu kayıt yönetici tarafından silinmiş. Yeni bir kayıt için sayfayı yenileyin.";
 const withLimit = (form) => form ? { ...form, maxRegistrations: form.maxRegistrations ?? null } : null;
@@ -55,15 +58,15 @@ async function readState(store, eventId) {
   return { exists: false, etag: null, data: { version: 1, eventId, form: withLimit(form), entries, deleted: [] } };
 }
 
-async function allEntries(store) {
-  const [states, legacy] = await Promise.all([
-    store.list({ prefix: "state/" }), store.list({ prefix: "entries/" }),
+async function allStates(store) {
+  const [states, legacy, forms] = await Promise.all([
+    store.list({ prefix: "state/" }), store.list({ prefix: "entries/" }), store.list({ prefix: "forms/" }),
   ]);
   const eventIds = new Set();
   for (const { key } of states.blobs) eventIds.add(key.slice(6, -5));
   for (const { key } of legacy.blobs) eventIds.add(key.split("/")[1]);
-  return (await mapConcurrent([...eventIds], async (eventId) =>
-    (await readState(store, eventId)).data.entries)).flat();
+  for (const { key } of forms.blobs) eventIds.add(key.slice(6, -5));
+  return mapConcurrent([...eventIds], async (eventId) => (await readState(store, eventId)).data);
 }
 
 async function rateLimit(req, store, now) {
@@ -84,10 +87,17 @@ async function rateLimit(req, store, now) {
   fail(429, "Lütfen biraz sonra tekrar deneyin.");
 }
 
-function archivedEvent(eventId, entries) {
-  return { id: eventId, title: entries[0]?.eventTitle || "Arşivlenmiş etkinlik",
-    date: entries[0]?.eventDate || "", published: false, archived: true };
+function archivedEvent(eventId, entries, savedEvent) {
+  return { id: eventId, title: savedEvent?.title || entries[0]?.eventTitle || "Arşivlenmiş etkinlik",
+    date: savedEvent?.date || entries[0]?.eventDate || "", time: savedEvent?.time || entries[0]?.eventTime || "",
+    location: savedEvent?.location || entries[0]?.eventLocation || "", published: false, archived: true };
 }
+
+const eventSnapshot = (event) => ({ id: event.id, title: event.title, date: event.date,
+  time: event.time || "", location: event.location || "" });
+const submissionResponse = (entry) => response({ ok: true, reference: entry.id,
+  event: { id: entry.eventId, title: entry.eventTitle, date: entry.eventDate,
+    time: entry.eventTime || "", location: entry.eventLocation || "" } });
 
 async function verifyRetry(submission, entry, file) {
   let prepared;
@@ -97,12 +107,12 @@ async function verifyRetry(submission, entry, file) {
     throw error;
   }
   if (prepared.fingerprint !== entry.fingerprint) fail(409, RETRY_CONFLICT);
-  return response({ ok: true, reference: entry.id });
+  return submissionResponse(entry);
 }
 
 export function createRegistrationsHandler({
   getStore = (name) => getBlobStore({ name, consistency: "strong" }),
-  readEvents = readStoredEvents, now = () => new Date(), uuid = randomUUID,
+  readEvents = readStoredEvents, now = () => new Date(), uuid = randomUUID, db = database,
 } = {}) {
   return guarded(async (req) => {
     const url = new URL(req.url);
@@ -116,17 +126,17 @@ export function createRegistrationsHandler({
     }
     if ((["submit", "delete"].includes(action) && method !== "POST") ||
       (["admin", "summary", "receipt", "export"].includes(action) && method !== "GET") ||
-      (action === "form" && !["GET", "POST"].includes(method)))
+      (["form", "ticket"].includes(action) && !["GET", "POST"].includes(method)))
       fail(405, "Desteklenmeyen işlem.");
     const store = getStore(REGISTRATION_STORE);
     if (action === "summary") {
-      const [events, entries] = await Promise.all([readEvents(), allEntries(store)]);
+      const [events, states] = await Promise.all([readEvents(), allStates(store)]);
       const groups = new Map(events.map((event) => [event.id, { event, entries: [] }]));
-      for (const entry of entries) {
-        if (!groups.has(entry.eventId)) groups.set(entry.eventId, {
-          event: archivedEvent(entry.eventId, [entry]), entries: [],
+      for (const state of states) {
+        if (!groups.has(state.eventId)) groups.set(state.eventId, {
+          event: archivedEvent(state.eventId, state.entries, state.event), entries: [],
         });
-        groups.get(entry.eventId).entries.push(entry);
+        groups.get(state.eventId).entries.push(...state.entries);
       }
       return response({ events: [...groups].map(([eventId, group]) => ({
         eventId, title: group.event.title, date: group.event.date,
@@ -163,7 +173,8 @@ export function createRegistrationsHandler({
         let deleted = snap.data.deleted.find((item) => item.id === id);
         if (!entry && !deleted) fail(404, "Kayıt bulunamadı.");
         if (entry) {
-          deleted = { id, ...(entry.receipt ? { receiptKey: entry.receipt.key } : {}) };
+          deleted = { id, name: entry.name, ...(entry.receipt ? { receiptKey: entry.receipt.key } : {}),
+            ...(entry.ticket ? { ticket: entry.ticket } : {}) };
           const data = { ...snap.data, entries: snap.data.entries.filter((item) => item.id !== id),
             deleted: [...snap.data.deleted, deleted] };
           try {
@@ -183,6 +194,27 @@ export function createRegistrationsHandler({
         }
         try { await store.delete(entryKey(eventId, id)); }
         catch { /* Canonical tombstone prevents any legacy resurrection. */ }
+        if (deleted.ticket && !deleted.ticketCancelledAt) {
+          await revokeRegistrationTicket(db, eventId, deleted.ticket);
+          for (let cleanupAttempt = 0; cleanupAttempt < 64; cleanupAttempt++) {
+            const current = await readState(store, eventId);
+            const tombstone = current.data.deleted.find((item) => item.id === id);
+            if (tombstone?.ticketCancelledAt) break;
+            if (!tombstone) fail(503, "Bilet iptal kaydı doğrulanamadı. Silme işlemini tekrar deneyin.");
+            const data = { ...current.data, deleted: current.data.deleted.map((item) => item.id === id
+              ? { ...item, ticketCancelledAt: now().toISOString() } : item) };
+            try {
+              const written = await store.setJSON(registrationStateKey(eventId), data, writeOptions(current));
+              if (written.modified) break;
+            } catch (error) {
+              const saved = await readState(store, eventId);
+              if (!saved.data.deleted.find((item) => item.id === id)?.ticketCancelledAt) throw error;
+              break;
+            }
+            if (cleanupAttempt === 63) fail(409, "Bilet iptal kaydı değişti. Silme işlemini tekrar deneyin.");
+            await pause(cleanupAttempt);
+          }
+        }
         return response({ ok: true });
       }
       fail(409, "Kayıtlar değişti. Lütfen tekrar deneyin.");
@@ -199,21 +231,84 @@ export function createRegistrationsHandler({
     }
     const events = await readEvents();
     const event = events.find((item) => item.id === eventId);
+    if (action === "ticket") {
+      const input = method === "POST" ? await readRegistrationJson(req) : null;
+      const id = identifier(input ? input.id : url.searchParams.get("id"));
+      let entry = snap.data.entries.find((item) => item.id === id);
+      if (!entry) fail(404, "Kayıt bulunamadı.");
+      if (method === "GET") {
+        if (!entry.ticket) fail(404, "Bu kayıt için henüz bilet verilmedi.");
+        const ticket = await savedRegistrationTicket(db, eventId, entry.ticket);
+        return response({ ticket: registrationTicketResponse(entry.ticket, ticket),
+          event: eventSnapshot(event || archivedEvent(eventId, [entry], snap.data.event)) });
+      }
+      if (!event) fail(409, "Arşivlenmiş etkinlikler için yeni bilet verilemez.");
+      for (let attempt = 0; attempt < 64 && !entry.ticket; attempt++) {
+        const reservation = reserveRegistrationTicket(uuid, now().toISOString(), event.title);
+        const data = { ...snap.data, event: eventSnapshot(event),
+          entries: snap.data.entries.map((item) => item.id === id ? { ...item, ticket: reservation } : item) };
+        try {
+          const written = await store.setJSON(registrationStateKey(eventId), data, writeOptions(snap));
+          if (written.modified) { snap = await readState(store, eventId); }
+          else { await pause(attempt); snap = await readState(store, eventId); }
+        } catch (error) {
+          const saved = await readState(store, eventId);
+          if (!saved.data.entries.find((item) => item.id === id)?.ticket) throw error;
+          snap = saved;
+        }
+        entry = snap.data.entries.find((item) => item.id === id);
+        if (!entry) fail(409, "Kayıt silindi. Bilet verilemedi.");
+      }
+      if (!entry.ticket) fail(409, "Kayıtlar değişti. Lütfen tekrar deneyin.");
+      const reservation = entry.ticket;
+      const ticket = reservation.status === "issued" ? await savedRegistrationTicket(db, eventId, reservation)
+        : await ensureRegistrationTicket(db, eventId, reservation);
+      for (let attempt = 0; attempt < 64; attempt++) {
+        snap = await readState(store, eventId);
+        entry = snap.data.entries.find((item) => item.id === id);
+        if (!entry) {
+          await revokeRegistrationTicket(db, eventId, reservation);
+          fail(409, "Kayıt silindi. Bilet iptal edildi.");
+        }
+        if (entry.ticket.status === "issued") return response({
+          ticket: registrationTicketResponse(reservation, ticket), event: eventSnapshot(event) });
+        const issued = { ...entry.ticket, status: "issued", issuedAt: now().toISOString() };
+        try {
+          const written = await store.setJSON(registrationStateKey(eventId), { ...snap.data,
+            entries: snap.data.entries.map((item) => item.id === id ? { ...item, ticket: issued } : item),
+          }, writeOptions(snap));
+          if (written.modified) return response({ ticket: registrationTicketResponse(issued, ticket),
+            event: eventSnapshot(event) });
+        } catch (error) {
+          const saved = await readState(store, eventId);
+          if (saved.data.entries.find((item) => item.id === id)?.ticket?.status !== "issued") throw error;
+          return response({ ticket: registrationTicketResponse(issued, ticket), event: eventSnapshot(event) });
+        }
+        await pause(attempt);
+      }
+      fail(409, "Kayıtlar değişti. Bilet ver düğmesiyle tekrar deneyin.");
+    }
     if (action === "admin") {
       const entries = sortedEntries(snap.data.entries);
-      if (!event && !snap.data.form && !entries.length) fail(404, "Etkinlik bulunamadı.");
-      const filtered = entries.filter((entry) => !url.searchParams.has("class_year") ||
-        entry.classYear === url.searchParams.get("class_year"));
+      if (!event && !snap.data.form && !entries.length && !snap.data.deleted.length)
+        fail(404, "Etkinlik bulunamadı.");
+      if (url.searchParams.has("duplicate_only") && !["true", "false"].includes(url.searchParams.get("duplicate_only")))
+        fail(400, "Geçersiz tekrar kayıt filtresi.");
+      const filtered = annotateRegistrationDuplicates(entries).filter((entry) =>
+        (!url.searchParams.has("class_year") || entry.classYear === url.searchParams.get("class_year")) &&
+        (url.searchParams.get("duplicate_only") !== "true" || entry.possibleDuplicate));
       const rawPage = url.searchParams.get("page") || "1";
       if (!/^[1-9]\d{0,6}$/.test(rawPage)) fail(400, "Geçersiz sayfa numarası.");
       const totalPages = Math.max(1, Math.ceil(filtered.length / 50));
       const page = Math.min(Number(rawPage), totalPages);
-      const eventInfo = event || archivedEvent(eventId, entries);
+      const eventInfo = event || archivedEvent(eventId, entries, snap.data.event);
       return response({ form: snap.data.form || defaultRegistrationForm(eventId),
         event: { id: eventInfo.id, title: eventInfo.title, date: eventInfo.date,
           published: eventInfo.published !== false, ...(eventInfo.archived ? { archived: true } : {}) },
         entries: filtered.slice((page - 1) * 50, page * 50).map(entryForAdmin),
-        summary: registrationSummary(entries), page, totalPages });
+        summary: registrationSummary(entries), page, totalPages,
+        pendingTicketDeletions: snap.data.deleted.filter((item) => item.ticket && !item.ticketCancelledAt)
+          .map((item) => ({ id: item.id, name: item.name || "Silinen kayıt" })) });
     }
     if (!event || (isPublic && event.published === false)) fail(404, "Etkinlik bulunamadı.");
     if (action === "form" && method === "GET") {
@@ -230,7 +325,7 @@ export function createRegistrationsHandler({
         const form = Object.hasOwn(input, "maxRegistrations") ? normalized :
           { ...normalized, maxRegistrations: snap.data.form?.maxRegistrations ?? null };
         const result = await store.setJSON(registrationStateKey(eventId),
-          { ...snap.data, form }, writeOptions(snap));
+          { ...snap.data, form, event: eventSnapshot(event) }, writeOptions(snap));
         if (result.modified) return response({ ok: true, form });
         await pause(attempt); snap = await readState(store, eventId);
       }
@@ -287,14 +382,15 @@ export function createRegistrationsHandler({
         if (receipt && !form.receipt.enabled) fail(400, "Bu formda dekont yüklemesi açık değil.");
         if (!receipt && form.receipt.enabled && form.receipt.required) fail(400, "Dekont dosyanızı yükleyin.");
         const entry = { id, eventId, eventTitle: event.title, eventDate: event.date,
+          eventTime: event.time || "", eventLocation: event.location || "",
           name: answers.full_name, classYear: answers.class_year, phone: answers.phone,
           answers, fields: structuredClone(form.fields), fingerprint, createdAt, receipt };
         // Form settings, all accepted records and deletion tombstones share a
         // single conditional write. No concurrent submission can oversubscribe
         // the last slot, or race a newly lowered limit or closed form.
         const result = await store.setJSON(registrationStateKey(eventId),
-          { ...snap.data, entries: [...snap.data.entries, entry] }, writeOptions(snap));
-        if (result.modified) return response({ ok: true, reference: id });
+          { ...snap.data, event: eventSnapshot(event), entries: [...snap.data.entries, entry] }, writeOptions(snap));
+        if (result.modified) return submissionResponse(entry);
         await pause(attempt); snap = await readState(store, eventId);
       }
       fail(409, "Kayıtlar değişti. Lütfen tekrar deneyin.");
