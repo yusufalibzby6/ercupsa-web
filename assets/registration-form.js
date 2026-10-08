@@ -242,8 +242,8 @@ window.ercupsaRegistration = (() => {
         let error = '';
         if (config.receipt.required && !file) error = 'Dekont dosyanı yüklemelisin.';
         else if (file && file.size > receiptLimit) error = 'Dosya en fazla 4 MB olabilir.';
-        else if (file && !(new Set(['image/png', 'image/jpeg', 'application/pdf']).has(file.type)
-          || (!file.type && /\.(png|jpe?g|pdf)$/i.test(file.name)))) error = 'JPG, PNG veya PDF dosyası seç.';
+        // Android file providers can omit or mislabel MIME types and extensions.
+        // Submit the original file; the server validates its actual JPG/PNG/PDF bytes.
         if (error) {
           setError(control, error);
           firstInvalid ||= receiptInput;

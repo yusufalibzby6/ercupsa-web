@@ -1,9 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 
 const today = new Date("2026-10-04T19:00:00+03:00");
 const fullMessage = "İlginiz için teşekkür ederiz. Kontenjanımız dolmuştur. Bir sonraki etkinliklerimize bekleriz.";
 const receiptBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=", "base64");
+// A real white JPEG, also used in ticket-design tests; the browser tests only inspect multipart transmission.
+const jpegBytes = gunzipSync(Buffer.from(
+  "H4sIAPBxwWoC/+3XzQ7BQBDA8Rml29VtWCpBttRHgqQRqgkS4iBpQjyCh/FmHDyEj4s3WeVWXNznN7f/YWavqy/6AcVtvIkBEQCTAX2HNVimycycxRjj3MoL1xG2LWqlcsH16s2GV1fK7w57fjvoKNWfDoLROIqiZm++nIWL4SQKX0uQcy5sUXWcathSrfBv+gTSyuyyewPbkJFoSNRnqLyfmsKS7BY/K7wq/qzyu95AGJhcMSSs4HgAQgghhBBCCCGEpP/O1yfr59ehSBAAAA==",
+  "base64",
+));
 const classOptions = ["Hazırlık", "1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf", "5. Sınıf", "Mezun", "Diğer"];
 const coreFields = [
   { id: "full_name", type: "text", label: "Ad soyad", required: true },
@@ -193,6 +199,74 @@ test("anonymous registration validates required core and custom answers, then se
   expect(submitted.receipt).toEqual({ name: "dekont.png", type: "image/png", bytes: receiptBytes });
   expect(state.requests.some(request => ["admin", "summary", "receipt"].includes(request.action))).toBe(false);
   await expect(page.locator("body")).not.toContainText(/toplam kayıt|bekleyen kayıt|kontenjan/i);
+});
+
+for (const sample of [
+  { label: "a Samsung JPG-named screenshot with PNG bytes", name: "Screenshot_20261008_123139_VakifBank.jpg", mime: "image/jpeg", bytes: receiptBytes },
+  { label: "a JPEG reported as generic binary data", name: "dekont.jpg", mime: "application/octet-stream", bytes: jpegBytes },
+  { label: "the image/jpg MIME alias", name: "dekont.jpg", mime: "image/jpg", bytes: jpegBytes },
+  { label: "a supported file with no MIME type", name: "dekont.jpg", mime: "", bytes: jpegBytes },
+]) {
+  test(`receipt selection submits ${sample.label} unchanged for server validation`, async ({ page }) => {
+    const state = await fixture(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/form.html?event=native-today");
+    await fillCore(page);
+    // Construct Files directly: automation file pickers can fill an absent MIME type themselves.
+    await page.locator("#registrationReceipt").evaluate((input, sample) => {
+      const selection = new DataTransfer();
+      selection.items.add(new File([new Uint8Array(sample.bytes)], sample.name, { type: sample.mime }));
+      input.files = selection.files;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }, { name: sample.name, mime: sample.mime, bytes: [...sample.bytes] });
+    expect(await page.locator("#registrationReceipt").evaluate(input => input.files[0].type)).toBe(sample.mime);
+    await page.locator("#registrationSubmit").click();
+    await expect(page.locator("#registrationSuccess")).toBeVisible();
+    expect(state.submissions).toHaveLength(1);
+    // Browsers serialize empty File.type as application/octet-stream in multipart.
+    expect(state.submissions[0].receipt).toEqual({ name: sample.name, type: sample.mime || "application/octet-stream", bytes: sample.bytes });
+  });
+}
+
+test("a server-rejected receipt preserves inputs and the selected file until the participant replaces it and retries", async ({ page }) => {
+  const state = await fixture(page);
+  const error = "Dekont JPG, PNG veya PDF dosyası olmalı. Dosyanı kontrol edip tekrar yükle.";
+  state.submitFailures.push({ status: 415, error });
+  await page.goto("/form.html?event=native-today");
+  await fillCore(page);
+  await page.locator("#registrationReceipt").setInputFiles({ name: "gecersiz.jpg", mimeType: "image/jpeg", buffer: Buffer.from("this is not an image") });
+  await page.locator("#registrationSubmit").click();
+  await expect(page.locator("#registrationFeedback")).toHaveText(error);
+  await expect(page.locator("#registrationSuccess")).not.toBeVisible();
+  await expect(page.locator("#registration-full_name")).toHaveValue("Yerel test katılımcısı");
+  await expect(page.locator("#registration-class_year")).toHaveValue("2. Sınıf");
+  await expect(page.locator("#registration-phone")).toHaveValue("05551234567");
+  expect(await page.locator("#registrationReceipt").evaluate(input => input.files[0].name)).toBe("gecersiz.jpg");
+  await expect(page.locator("#registrationSubmit")).toBeEnabled();
+  await expect(page.locator("#registrationReceipt")).toBeEnabled();
+  await page.locator("#registrationReceipt").setInputFiles({ name: "dekont.png", mimeType: "image/png", buffer: receiptBytes });
+  await page.locator("#registrationSubmit").click();
+  await expect(page.locator("#registrationSuccess")).toBeVisible();
+  expect(state.submissions).toHaveLength(2);
+  expect(state.submissions[1].requestId).toBe(state.submissions[0].requestId);
+  expect(state.submissions[1].answers).toEqual(state.submissions[0].answers);
+  expect(state.submissions[1].receipt).toEqual({ name: "dekont.png", type: "image/png", bytes: receiptBytes });
+});
+
+test("an oversized receipt is rejected before submission and can be replaced without losing the answers", async ({ page }) => {
+  const state = await fixture(page);
+  await page.goto("/form.html?event=native-today");
+  await fillCore(page);
+  await page.locator("#registrationReceipt").setInputFiles({ name: "buyuk.jpg", mimeType: "application/octet-stream", buffer: Buffer.alloc(4 * 1024 * 1024 + 1) });
+  await page.locator("#registrationSubmit").click();
+  await expect(page.locator("#registration-error-receipt")).toHaveText("Dosya en fazla 4 MB olabilir.");
+  await expect(page.locator("#registrationReceipt")).toBeFocused();
+  await expect(page.locator("#registration-full_name")).toHaveValue("Yerel test katılımcısı");
+  expect(state.submissions).toHaveLength(0);
+  await page.locator("#registrationReceipt").setInputFiles({ name: "dekont.png", mimeType: "image/png", buffer: receiptBytes });
+  await page.locator("#registrationSubmit").click();
+  await expect(page.locator("#registrationSuccess")).toBeVisible();
+  expect(state.submissions).toHaveLength(1);
 });
 
 test("a failed registration keeps answers and the receipt, and a retry reuses its idempotency key", async ({ page }) => {

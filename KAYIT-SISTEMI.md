@@ -9,7 +9,7 @@ Katılımcılar site hesabı açmadan etkinliğin kendi formunu doldurabilir. Bi
 3. **Formun üst açıklaması** alanına katılımcının görmesini istediğiniz açıklamayı, ücret ve ödeme bilgilerini yazın. Açıklama formun üstünde görünür; satır sonları korunur.
 4. Ad soyad, sınıf ve telefon alanları hazır gelir. Ad soyad her zaman zorunludur; sınıf ve telefonun zorunluluğunu değiştirebilirsiniz. Sınıf seçeneklerini de düzenleyebilirsiniz.
 5. **Soru ekle** ile kısa/uzun cevap, e-posta, telefon, açılır liste, tek seçim veya çoklu seçim soruları ekleyin. Sorunun başlığını, seçeneklerini ve zorunluluğunu belirleyin. Temel alanlarla birlikte en fazla 25 soru olabilir.
-6. İsterseniz dekont yüklemeyi açın ve zorunlu yapın. PNG, JPEG veya PDF dosyaları kabul edilir; sınır 4 MB'dir. Dekontlar herkese açık görsel bağlantısına dönüştürülmez.
+6. İsterseniz dekont yüklemeyi açın ve zorunlu yapın. PNG, JPEG veya PDF dosyaları kabul edilir; sınır 4 MB'dir. Dosya türü gerçek içeriğinden belirlenir; telefonun farklı tür veya uzantı bildirmesi geçerli dekontun reddedilmesine yol açmaz. Dekontlar herkese açık görsel bağlantısına dönüştürülmez.
 7. **Kayıt üst sınırı** alanına örneğin `40` yazın. Toplam kayıt sayısı bu sınıra ulaştığında form otomatik kapanır. Sınır istemiyorsanız alanı boş bırakın. Önceden alınmış kayıtlar da toplam sayıya dahildir.
 8. **Kayıt formunu erişime aç** seçeneğini işaretleyip **Formu kaydet** düğmesine basın. Etkinliği de yayımlayın. Etkinlik kartındaki **Kayıt linkini kopyala** düğmesi paylaşabileceğiniz bağlantıyı verir.
 

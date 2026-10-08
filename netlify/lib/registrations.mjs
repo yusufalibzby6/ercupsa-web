@@ -1,4 +1,5 @@
 import { fail, identifier, text } from "./security.mjs";
+import { receiptFormat } from "./receipt-format.mjs";
 
 export const REGISTRATION_STORE = "ercupsa-registrations";
 export const REGISTRATION_RECEIPT_STORE = "ercupsa-registration-receipts";
@@ -216,26 +217,13 @@ export async function readRegistrationSubmission(req) {
 
 export async function validateRegistrationReceipt(file) {
   if (file.size > RECEIPT_MAX_BYTES) fail(413, "Dekont en fazla 4 MB olabilir.");
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const mime = file.type.toLowerCase();
-  let valid = false;
-  if (mime === "image/png") {
-    valid = bytes.length >= 45 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) &&
-      bytes.readUInt32BE(8) === 13 && bytes.toString("ascii", 12, 16) === "IHDR" &&
-      bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0 &&
-      bytes.subarray(-12).equals(Buffer.from([0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130]));
-  } else if (mime === "image/jpeg") {
-    valid = bytes.length >= 32 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff &&
-      bytes[bytes.length - 2] === 0xff && bytes[bytes.length - 1] === 0xd9;
-  } else if (mime === "application/pdf") {
-    valid = /^%PDF-(?:1\.[0-7]|2\.0)(?:\s|$)/.test(bytes.subarray(0, 16).toString("ascii")) &&
-      /%%EOF\s*$/.test(bytes.subarray(-1024).toString("ascii"));
-  } else fail(415, "Dekontu PNG, JPG veya PDF olarak yükleyin.");
-  if (!valid) fail(415, "Dekont dosyasının içeriği belirtilen türle uyuşmuyor veya dosya eksik.");
-  const extension = mime === "image/png" ? "png" : mime === "image/jpeg" ? "jpg" : "pdf";
+  const detected = receiptFormat(Buffer.from(await file.arrayBuffer()));
+  if (!detected) fail(415, "Dekont dosyası okunamadı. Geçerli bir JPG, PNG veya PDF dosyası seçin; dosya eksikse yeniden indirin ya da ekran görüntüsü alın.");
+  const { bytes, mime, extension } = detected;
   const rawName = typeof file.name === "string" ? file.name : "dekont";
-  const name = rawName.split(/[\\/]/).at(-1).replace(/[\x00-\x1f\x7f"<>]/g, "").slice(0, 160).trim();
-  return { bytes, metadata: { name: name || `dekont.${extension}`, mime, size: bytes.length } };
+  const cleanName = rawName.split(/[\\/]/).at(-1).replace(/[\x00-\x1f\x7f"<>]/g, "").trim();
+  const stem = cleanName.replace(/\.[^.]+$/, '').slice(0, 150).trim() || 'dekont';
+  return { bytes, metadata: { name: `${stem}.${extension}`, mime, size: bytes.length } };
 }
 
 export function entryForAdmin(entry) {

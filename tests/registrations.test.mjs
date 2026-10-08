@@ -21,6 +21,8 @@ const cookie = adminLogin(new Request(origin + "/api/events", {
 })).split(";")[0];
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZioAAAAASUVORK5CYII=", "base64");
 const pdf = Buffer.from("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n");
+const jpeg = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDzuiiiuE+pP//Z", "base64");
+const progressiveJpeg = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wgARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAVAQEBAAAAAAAAAAAAAAAAAAADBf/aAAwDAQACEAMQAAABnQFT/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABAH/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPxB//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPxB//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxB//9k=", "base64");
 const validAnswers = { full_name: "Deniz Test", class_year: "2. Sınıf", phone: "+90 (555) 123 45 67" };
 
 function fixture() {
@@ -261,10 +263,9 @@ test("a native submission is idempotent, private, class-counted and exportable",
     .every((call) => call.options.consistency === "strong"));
 });
 
-test("receipt MIME signatures, disabled uploads, empty and oversized files are rejected", async () => {
+test("unsupported, incomplete, disabled and oversized receipts are rejected", async () => {
   const { open, submit, request, stores } = fixture();
   await open();
-  assert.equal((await submit({ receipt: png, mime: "image/jpeg" })).status, 415);
   assert.equal((await submit({ receipt: Buffer.from("<svg>test</svg>"), mime: "image/svg+xml" })).status, 415);
   assert.equal((await submit({ receipt: png.subarray(0, -10) })).status, 415);
   assert.equal((await submit({ receipt: Buffer.from("%PDF-1.4 without eof"), mime: "application/pdf" })).status, 415);
@@ -278,6 +279,65 @@ test("receipt MIME signatures, disabled uploads, empty and oversized files are r
   assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
   await open("event-one", (form) => ({ ...form, receipt: { enabled: false, required: false } }));
   assert.equal((await submit({ receipt: png })).status, 400);
+});
+
+test("Android MIME hints and JPG screenshot names are normalized from the actual receipt contents", async () => {
+  const { open, submit, request } = fixture();
+  await open();
+  const cases = [
+    [png, 'image/jpeg', 'Screenshot_VakifBank.jpg', 'image/png', 'Screenshot_VakifBank.png'],
+    [png, 'image/x-png', 'dekont.png', 'image/png', 'dekont.png'],
+    [png, '', 'dekont.jpg', 'image/png', 'dekont.png'],
+    [jpeg, 'application/octet-stream', 'dekont.jpg', 'image/jpeg', 'dekont.jpg'],
+    [jpeg, 'image/jpg', 'dekont.jpeg', 'image/jpeg', 'dekont.jpg'],
+    [jpeg, 'image/pjpeg', 'dekont.jpg', 'image/jpeg', 'dekont.jpg'],
+    [jpeg, 'image/png', 'dekont.png', 'image/jpeg', 'dekont.jpg'],
+    [progressiveJpeg, '', 'dekont.jpg', 'image/jpeg', 'dekont.jpg'],
+    [pdf, 'application/octet-stream', 'dekont.pdf', 'application/pdf', 'dekont.pdf'],
+  ];
+  for (const [bytes, mime, filename, actualMime, actualName] of cases) {
+    const uploaded = await submit({ receipt: bytes, mime, filename });
+    assert.equal(uploaded.status, 200, `${filename}: ${mime}`);
+    const reference = (await uploaded.json()).reference;
+    const admin = await (await request('admin', { auth: true })).json();
+    const entry = admin.entries.find(item => item.id === reference);
+    assert.deepEqual(entry.receipt, { name: actualName, mime: actualMime, size: bytes.length });
+    const downloaded = await request('receipt', { auth: true, extra: '&id=' + reference });
+    assert.equal(downloaded.headers.get('content-type'), actualMime);
+    assert.equal(downloaded.headers.get('x-content-type-options'), 'nosniff');
+    assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), bytes);
+  }
+});
+
+test("valid JPEG scans accept trailing phone metadata without confusing metadata markers for an image end", async () => {
+  const { open, submit, request } = fixture();
+  await open();
+  // APP metadata can itself contain FF D9. The parser must skip the segment.
+  const app = Buffer.from([0xff, 0xe1, 0, 8, 1, 2, 0xff, 0xd9, 3, 4]);
+  const withApp = Buffer.concat([jpeg.subarray(0, 2), app, jpeg.subarray(2)]);
+  for (const original of [jpeg, progressiveJpeg, withApp]) {
+    const uploaded = await submit({ receipt: Buffer.concat([original, Buffer.from('\0Samsung_SEF_metadata\0')]), mime: 'image/jpeg', filename: 'dekont.jpg' });
+    assert.equal(uploaded.status, 200);
+    const reference = (await uploaded.json()).reference;
+    const downloaded = await request('receipt', { auth: true, extra: '&id=' + reference });
+    assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), original);
+  }
+  for (const broken of [jpeg.subarray(0, -2), Buffer.from([0xff, 0xd8, ...app, 0xff, 0xd9]),
+    Buffer.concat([jpeg.subarray(0, 2), Buffer.from([0xff, 0xe1, 0xff, 0xff]), jpeg.subarray(2)])]) {
+    assert.equal((await submit({ receipt: broken, mime: 'image/jpeg' })).status, 415);
+  }
+});
+
+test("receipt retries bind canonical content even when the phone changes its MIME or filename hint", async () => {
+  const { open, submit, request, stores } = fixture();
+  await open();
+  const requestId = randomUUID();
+  const first = await submit({ requestId, receipt: png, mime: 'image/jpeg', filename: 'dekont.jpg' });
+  assert.equal(first.status, 200);
+  assert.deepEqual(await (await submit({ requestId, receipt: png, mime: 'application/octet-stream', filename: 'dekont.png' })).json(), await first.json());
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
+  assert.equal((await (await request('admin', { auth: true })).json()).summary.total, 1);
+  assert.equal((await submit({ requestId, receipt: jpeg, mime: 'image/jpeg', filename: 'dekont.jpg' })).status, 409);
 });
 
 test("multipart parsing rejects duplicate, unknown, invalid id and non-file fields; oversized streams are cancelled", async () => {
