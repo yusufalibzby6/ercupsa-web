@@ -14,8 +14,8 @@ async function fixture(page) {
   await page.route("**/api/events*", route => route.fulfill({ json: { events } }));
   await page.route("**/api/community*", route => {
     const url = new URL(route.request().url());
-    if (url.searchParams.get("action") === "admin") {
-      return route.fulfill({ json: { members: [], submissions: [], batches: [...state.batches.values()].map(b => ({ ...b, created_at: "2026-10-03T00:00:00Z" })) } });
+    if (url.searchParams.get("action") === "batches") {
+      return route.fulfill({ json: { batches: [...state.batches.values()].map(b => ({ ...b, created_at: "2026-10-03T00:00:00Z" })) } });
     }
     if (route.request().method() === "POST") {
       const body = route.request().postDataJSON();

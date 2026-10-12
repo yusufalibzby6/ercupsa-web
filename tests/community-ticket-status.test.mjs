@@ -71,6 +71,22 @@ test("admin batch status separates account claims from authoritative gate entry 
   assert.ok(!JSON.stringify(data).includes("private-operator"));
 });
 
+test("the admin ticket catalog loads only batch metadata without removed membership or moderation data", async () => {
+  const { state, request } = fixture();
+  assert.equal((await request({ action: "batches", auth: false })).status, 401);
+  assert.equal(state.reads.length, 0);
+  const { status, data } = await request({ action: "batches" });
+  assert.equal(status, 200);
+  assert.deepEqual(data, { batches: [state.batch] });
+  assert.deepEqual(state.reads, [{
+    path: "ticket_batches?select=id,event_id,event_title,created_at&order=created_at.desc&limit=100",
+    options: undefined,
+  }]);
+  assert.equal(state.storeReads.length, 0);
+  assert.equal(Object.hasOwn(data, "members"), false);
+  assert.equal(Object.hasOwn(data, "submissions"), false);
+});
+
 test("check-in storage failure preserves claim information while making entry status unknown", async () => {
   const { state, request } = fixture();
   state.failStore = true;

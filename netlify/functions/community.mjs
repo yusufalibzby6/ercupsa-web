@@ -120,6 +120,12 @@ return guarded(async (req) => {
     return response(result);
   }
   requireAdmin(req);
+  if (action === "batches" && req.method === "GET") {
+    const batches = await db(
+      "ticket_batches?select=id,event_id,event_title,created_at&order=created_at.desc&limit=100",
+    );
+    return response({ batches });
+  }
   if (action === "admin" && req.method === "GET") {
     const [members, submissions, batches] = await Promise.all([
       db("members?order=created_at.desc"),

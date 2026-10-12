@@ -97,13 +97,16 @@ export function participantsFor(event, events, attendance, profiles, now = Date.
 }
 
 export function poolVersion(eventId, participants, options = {}) {
-  const snapshot = participants.map(p => ({ id: p.id, weight: p.weight, name: p.name, claimedAt: p.claimedAt }))
+  const registrations = options.source === 'registrations';
+  const snapshot = participants.map(p => ({ id: p.id, weight: p.weight, name: p.name,
+    ...(registrations ? { createdAt: p.createdAt } : { claimedAt: p.claimedAt }) }))
     .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   // Default previews retain their exact legacy hashes. Entry-based modes bind
   // their rules even when a coincidentally identical set of people qualifies.
   const mode = options.checkedInOnly || options.checkinBonus
     ? { checkedInOnly: !!options.checkedInOnly, checkinBonus: !!options.checkinBonus } : {};
-  return createHash('sha256').update(JSON.stringify({ eventId, participants: snapshot, ...mode })).digest('hex');
+  return createHash('sha256').update(JSON.stringify({ eventId, participants: snapshot,
+    ...(registrations ? { source: 'registrations' } : {}), ...mode })).digest('hex');
 }
 
 export function drawChances(participants, loyaltyBonus = true) {
@@ -120,6 +123,10 @@ export function drawInput(input) {
     if (!Array.isArray(input.excluded) || input.excluded.length > 10000) fail(400, 'Geçersiz katılımcı seçimi.');
     const excluded = [...new Set(input.excluded.map(identifier))].sort();
     const normalized = { id, eventId, count: input.count, excluded };
+    if (input.source !== undefined) {
+      if (!['qr', 'registrations'].includes(input.source)) fail(400, 'Geçersiz katılımcı kaynağı.');
+      normalized.source = input.source;
+    }
     if (input.poolVersion !== undefined) {
       if (typeof input.poolVersion !== 'string' || !/^[0-9a-f]{64}$/i.test(input.poolVersion)) fail(400, 'Geçersiz katılımcı listesi sürümü.');
       normalized.poolVersion = input.poolVersion.toLowerCase();
@@ -132,6 +139,10 @@ export function drawInput(input) {
       if (input[key] === undefined) continue;
       if (typeof input[key] !== 'boolean') fail(400, 'Giriş seçimi açık veya kapalı olmalı.');
       normalized[key] = input[key];
+    }
+    if (normalized.source === 'registrations' &&
+      ['loyaltyBonus', 'checkedInOnly', 'checkinBonus'].some(key => normalized[key] === true)) {
+      fail(400, 'Form kayıtları çekilişinde herkes eşit şansla katılır; QR ve giriş seçenekleri kullanılamaz.');
     }
     // Preserve omitted fields for requests already saved before the toggle.
     // Omitting the version keeps the exact old hash for already-saved legacy

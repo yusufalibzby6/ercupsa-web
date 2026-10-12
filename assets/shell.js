@@ -4,7 +4,6 @@ const links = [
   ["form.html", "Formlar"],
   ["galeri.html", "Galeri"],
   ["test.html", "Test"],
-  ["topluluk.html", "Topluluk"],
   ["biletler.html", "Biletlerim"],
 ];
 const page = location.pathname.split("/").pop() || "index.html";

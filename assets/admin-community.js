@@ -2,7 +2,7 @@ import QRCode from "qrcode";
 import "./admin-registrations.js";
 import "./admin-raffles.js";
 import "./admin-gate.js";
-import "./admin-feedback.js";
+import "./admin-instagram.js";
 import { $, escape, api, status, onAdminEvent } from "./common.js";
 import {
   ticketCard,
@@ -11,14 +11,29 @@ import {
   TICKETS_PER_PAGE,
 } from "./ticket-print.js";
 import { readTicketDesign, validateStoredDesign, releaseTicketArtwork } from "./ticket-template.js";
-let data = { submissions: [], batches: [] };
+let data = { batches: [] };
 let events = [], design = null, designEventId = "", designState = "idle";
+let ready = false, authGeneration = 0, catalogLoadVersion = 0;
 let designBusy = false, batchBusy = false, fileReading = false, candidate = null, candidateFile = null;
 let designLoadVersion = 0, fileReadVersion = 0, batchLoadVersion = 0, cardsVersion = 0;
 let designPromise = null, openedBatch = null;
-const tabs = ["events", "registrations", "suggestions", "experiences", "tickets", "raffles", "attendance", "feedback"];
+const tabs = ["events", "registrations", "tickets", "raffles", "attendance", "instagram"];
 function tab(name) {
-  for (const t of tabs) $(t + "Tab").hidden = t !== name;
+  if (!tabs.includes(name)) return;
+  for (const t of tabs) {
+    const section = $(t + "Tab");
+    if (section) section.hidden = t !== name;
+  }
+  for (const button of document.querySelectorAll("[data-tab]")) {
+    const active = button.dataset.tab === name;
+    button.classList.toggle("is-active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+    if (active) {
+      if ($("adminSectionTitle")) $("adminSectionTitle").textContent = button.dataset.sectionTitle || button.textContent.trim();
+      if ($("adminSectionDescription")) $("adminSectionDescription").textContent = button.dataset.sectionDescription || "";
+    }
+  }
   document.dispatchEvent(new CustomEvent("admin-tab", { detail: name }));
 }
 document
@@ -26,6 +41,9 @@ document
   .forEach((b) => b.addEventListener("click", () => tab(b.dataset.tab)));
 onAdminEvent("events-loaded", (e) => {
   events = e.detail;
+  if (ready) updateEvents();
+});
+function updateEvents() {
   const previous = $("ticketEvent").value;
   $("ticketEvent").innerHTML = events
     .map((v) => `<option value="${escape(v.id)}">${escape(v.title)}</option>`)
@@ -34,7 +52,7 @@ onAdminEvent("events-loaded", (e) => {
   if (!designBusy && (designEventId !== $("ticketEvent").value || designState === "idle")) {
     changeTicketEvent();
   }
-});
+}
 document.addEventListener("ticket-event", (e) => {
   tab("tickets");
   if (designBusy) {
@@ -51,18 +69,18 @@ function designStatus(message, error = false) {
   $("ticketDesignStatus").dataset.error = String(error);
 }
 function updateTicketControls() {
-  const ready = designState === "ready" && designEventId === $("ticketEvent").value;
-  $("ticketEvent").disabled = designBusy;
-  $("ticketDesignFile").disabled = !ready || designBusy;
-  $("ticketDesignSave").disabled = !ready || !candidate || designBusy || fileReading;
-  $("ticketDesignReset").disabled = !$("ticketEvent").value || (designState !== "error" && (!ready || !design)) || designBusy || fileReading;
+  const designReady = ready && designState === "ready" && designEventId === $("ticketEvent").value;
+  $("ticketEvent").disabled = !ready || designBusy;
+  $("ticketDesignFile").disabled = !designReady || designBusy;
+  $("ticketDesignSave").disabled = !designReady || !candidate || designBusy || fileReading;
+  $("ticketDesignReset").disabled = !ready || !$("ticketEvent").value || (designState !== "error" && (!designReady || !design)) || designBusy || fileReading;
   $("ticketDesignCancel").hidden = !candidate;
   $("ticketDesignCancel").disabled = designBusy;
   $("ticketDesignRetry").hidden = designState !== "error";
   $("ticketDesignRetry").disabled = designBusy;
-  $("createBatch").disabled = !ready || designBusy || batchBusy || !!candidate || fileReading;
+  $("createBatch").disabled = !designReady || designBusy || batchBusy || !!candidate || fileReading;
   const print = $("printTickets");
-  if (print) print.disabled = !ready || designBusy || !!candidate || fileReading;
+  if (print) print.disabled = !designReady || designBusy || !!candidate || fileReading;
 }
 function renderDesignPreview() {
   const current = events.find((e) => e.id === $("ticketEvent").value);
@@ -89,6 +107,7 @@ function changeTicketEvent() {
   loadSelectedDesign().catch(() => {});
 }
 function loadSelectedDesign() {
+  if (!ready) return Promise.resolve(null);
   const eventId = $("ticketEvent").value;
   const version = ++designLoadVersion;
   cardsVersion++;
@@ -167,7 +186,8 @@ $("ticketDesignFile").addEventListener("change", async () => {
   }
 });
 async function saveDesign(method) {
-  if (designBusy || (designState !== "ready" && !(method === "DELETE" && designState === "error"))) return;
+  if (!ready || designBusy || (designState !== "ready" && !(method === "DELETE" && designState === "error"))) return;
+  const generation = authGeneration;
   const eventId = $("ticketEvent").value;
   if (method === "POST" && !candidateFile) return;
   designBusy = true;
@@ -179,18 +199,23 @@ async function saveDesign(method) {
       method,
       ...(method === "POST" ? { headers: { "Content-Type": candidateFile.type }, body: candidateFile } : {}),
     });
+    if (!ready || generation !== authGeneration) return;
     clearCandidate();
     await loadSelectedDesign();
+    if (!ready || generation !== authGeneration) return;
     designStatus(method === "POST" ? "Tasarım kaydedildi. Görseliniz biletin tamamını kaplar; üzerine her bilete farklı QR kodu eklenir." : "Standart ERCUPSA tasarımına dönüldü.");
   } catch (error) {
+    if (!ready || generation !== authGeneration) return;
     // A timeout may happen after storage succeeded. Do not print an older cached image.
     designState = "error";
     designStatus(`${error.message} Kaydedilmiş tasarımı yeniden kontrol etmek için bağlantıyı yeniden deneyin.`, true);
     $("ticketOutput").innerHTML = "";
     renderDesignPreview();
   } finally {
-    designBusy = false;
-    updateTicketControls();
+    if (generation === authGeneration) {
+      designBusy = false;
+      updateTicketControls();
+    }
   }
 }
 $("ticketDesignForm").addEventListener("submit", (e) => {
@@ -201,64 +226,53 @@ $("ticketDesignReset").onclick = () => {
   if (confirm("Bu etkinliğin özel bilet tasarımı kaldırılıp standart tasarıma dönülsün mü?")) saveDesign("DELETE");
 };
 async function load() {
+  if (!ready) return;
+  const generation = authGeneration;
+  const version = ++catalogLoadVersion;
   try {
-    data = await api("/api/community?action=admin");
+    const result = await api("/api/community?action=batches");
+    if (!ready || generation !== authGeneration || version !== catalogLoadVersion) return;
+    data = { batches: Array.isArray(result.batches) ? result.batches : [] };
     render();
   } catch (e) {
-    status(e.message, true);
+    if (ready && generation === authGeneration && version === catalogLoadVersion) status(e.message, true);
   }
 }
-onAdminEvent("admin-ready", load);
+onAdminEvent("admin-ready", () => {
+  ready = true;
+  updateEvents();
+  load();
+});
 function render() {
-  for (const [kind, target] of [
-    ["suggestion", "suggestionList"],
-    ["experience", "experienceList"],
-  ])
-    $(target).innerHTML =
-      data.submissions
-        .filter((s) => s.kind === kind)
-        .map(
-          (s) =>
-            `<article class="card rounded-2xl p-5"><h3 class="font-bold text-xl">${escape(s.title)}</h3><p class="whitespace-pre-wrap my-3">${escape(s.content)}</p><p class="text-sm text-gray-500">${{ pending: "Bekliyor", approved: kind === "experience" ? "Yayımlandı" : "Değerlendirildi", rejected: "Reddedildi" }[s.status]}</p><div class="flex gap-3 mt-3"><button data-moderate="${s.id}" data-state="approved" class="border rounded-xl p-2">${kind === "experience" ? "Onayla ve yayımla" : "Değerlendirildi olarak işaretle"}</button><button data-moderate="${s.id}" data-state="rejected" class="border rounded-xl p-2">${kind === "experience" ? "Reddet / yayından kaldır" : "Reddet"}</button><button data-moderate="${s.id}" data-state="pending" class="border rounded-xl p-2">Beklemeye al</button></div></article>`,
-        )
-        .join("") || "<p>Henüz gönderi yok.</p>";
   $("batchList").innerHTML = data.batches
     .map(
       (b) =>
-        `<button data-batch="${b.id}" class="card rounded-xl p-4 text-left">${escape(b.event_title)} · ${new Date(b.created_at).toLocaleString("tr-TR")} · Biletleri aç</button>`,
+        `<button data-batch="${escape(b.id)}" class="card rounded-xl p-4 text-left">${escape(b.event_title)} · ${new Date(b.created_at).toLocaleString("tr-TR")} · Biletleri aç</button>`,
     )
     .join("");
 }
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("button");
-  if (!b) return;
+  if (!b || !ready) return;
+  const generation = authGeneration;
   try {
-    if (b.dataset.moderate) {
-      await api("/api/community?action=moderate", {
-        method: "POST",
-        body: JSON.stringify({
-          id: b.dataset.moderate,
-          status: b.dataset.state,
-        }),
-      });
-      await load();
-    }
     if (b.dataset.batch) await showBatch(b.dataset.batch);
     if (b.dataset.revoke && confirm("Bu bilet iptal edilsin mi?")) {
       await api("/api/community?action=revoke", {
         method: "POST",
         body: JSON.stringify({ id: b.dataset.revoke }),
       });
+      if (!ready || generation !== authGeneration) return;
       await showBatch($("ticketOutput").dataset.batch);
     }
   } catch (e) {
-    status(e.message, true);
+    if (ready && generation === authGeneration) status(e.message, true);
   }
 });
 $("batchForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const b = e.target.querySelector("button");
-  if (designState !== "ready" || designBusy || batchBusy || candidate || fileReading) {
+  if (!ready || designState !== "ready" || designBusy || batchBusy || candidate || fileReading) {
     status("Biletleri oluşturmadan önce etkinliğin tasarımını kaydedin veya bağlantıyı yeniden deneyin.", true);
     return;
   }
@@ -266,6 +280,7 @@ $("batchForm").addEventListener("submit", async (e) => {
   b.disabled = true;
   const eventId = $("ticketEvent").value;
   const selectionVersion = batchLoadVersion;
+  const generation = authGeneration;
   try {
     const d = await api("/api/community?action=batch", {
       method: "POST",
@@ -274,14 +289,18 @@ $("batchForm").addEventListener("submit", async (e) => {
         count: Number($("ticketCount").value),
       }),
     });
+    if (!ready || generation !== authGeneration) return;
     await load();
+    if (!ready || generation !== authGeneration) return;
     if (selectionVersion === batchLoadVersion && eventId === $("ticketEvent").value) await showBatch(d.id);
     status(`${d.codes.length} bilet oluşturuldu.`);
   } catch (e) {
-    status(e.message, true);
+    if (ready && generation === authGeneration) status(e.message, true);
   } finally {
-    batchBusy = false;
-    updateTicketControls();
+    if (generation === authGeneration) {
+      batchBusy = false;
+      updateTicketControls();
+    }
   }
 });
 async function hash(code) {
@@ -294,6 +313,7 @@ async function hash(code) {
     .join("");
 }
 async function showBatch(id) {
+  if (!ready) return;
   if (designBusy || fileReading || candidate) {
     throw new Error("Önce seçtiğiniz tasarımı kaydedin veya seçimi iptal edin.");
   }
@@ -301,7 +321,7 @@ async function showBatch(id) {
   cardsVersion++;
   $("ticketOutput").innerHTML = "<p>Biletler ve etkinliğin tasarımı hazırlanıyor…</p>";
   const d = await api("/api/community?action=batch&id=" + encodeURIComponent(id));
-  if (version !== batchLoadVersion) return;
+  if (!ready || version !== batchLoadVersion) return;
   let eventId = d.event_id || data.batches.find((b) => b.id === id)?.event_id;
   if (!eventId) {
     const matching = events.filter((e) => e.title === d.event_title);
@@ -321,14 +341,14 @@ async function showBatch(id) {
     if (designEventId === eventId && designState === "loading") await designPromise;
     else await loadSelectedDesign();
   }
-  if (version !== batchLoadVersion || $("ticketEvent").value !== eventId) return;
+  if (!ready || version !== batchLoadVersion || $("ticketEvent").value !== eventId) return;
   if (designState !== "ready") throw new Error("Bilet tasarımı doğrulanamadı. Lütfen yeniden deneyin.");
   openedBatch = { ...d, id, event_id: eventId };
   await renderOpenedBatch();
 }
 async function renderOpenedBatch() {
   const d = openedBatch;
-  if (!d || designState !== "ready" || d.event_id !== designEventId || d.event_id !== $("ticketEvent").value) return;
+  if (!ready || !d || designState !== "ready" || d.event_id !== designEventId || d.event_id !== $("ticketEvent").value) return;
   const version = ++cardsVersion;
   const artwork = design;
   const rows = await Promise.all(d.codes.map(async (code) => {
@@ -347,7 +367,7 @@ async function renderOpenedBatch() {
       control: `<div class="ticket-controls no-print"><span>${ticket?.revoked ? "İptal" : claimState} · ${entryState}</span>${ticket && !ticket.revoked && !ticket.claimed_at ? `<button class="text-red-700" data-revoke="${escape(ticket.id)}">İptal et</button>` : ""}</div>`,
     };
   }));
-  if (version !== cardsVersion || openedBatch !== d || d.event_id !== $("ticketEvent").value) return;
+  if (!ready || version !== cardsVersion || openedBatch !== d || d.event_id !== $("ticketEvent").value) return;
   const cards = rows.map((r) => r.card);
   $("ticketOutput").dataset.batch = d.id;
   $("ticketOutput").innerHTML =
@@ -355,7 +375,7 @@ async function renderOpenedBatch() {
     ticketSheets(cards, rows.map((r) => r.control));
   updateTicketControls();
   $("printTickets").onclick = async () => {
-    if (version !== cardsVersion || designBusy || candidate || fileReading || designState !== "ready" || d.event_id !== $("ticketEvent").value) return;
+    if (!ready || version !== cardsVersion || designBusy || candidate || fileReading || designState !== "ready" || d.event_id !== $("ticketEvent").value) return;
     const button = $("printTickets");
     button.disabled = true;
     try {
@@ -367,3 +387,32 @@ async function renderOpenedBatch() {
     }
   };
 }
+document.addEventListener("admin-logout", () => {
+  ready = false;
+  authGeneration++;
+  catalogLoadVersion++;
+  designLoadVersion++;
+  batchLoadVersion++;
+  cardsVersion++;
+  data = { batches: [] };
+  events = [];
+  openedBatch = null;
+  designBusy = false;
+  batchBusy = false;
+  clearCandidate();
+  releaseTicketArtwork(design);
+  design = null;
+  designEventId = "";
+  designState = "idle";
+  designPromise = null;
+  $("ticketEvent").innerHTML = "";
+  $("batchList").innerHTML = "";
+  $("ticketOutput").innerHTML = "";
+  delete $("ticketOutput").dataset.batch;
+  renderDesignPreview();
+  designStatus("");
+  updateTicketControls();
+  tab("events");
+});
+tab("events");
+updateTicketControls();

@@ -49,6 +49,7 @@ test("mobile navigation opens and closes", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Siteye devam et →" }).click();
   await page.getByRole("button", { name: "Menü", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Topluluk", exact: true })).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: "Biletlerim", exact: true }),
   ).toBeVisible();
@@ -343,34 +344,18 @@ test("ticket QR code cannot be interpreted as a password recovery callback", asy
   );
   expect(state.calls.some((c) => c.path.endsWith("/token"))).toBe(false);
 });
-test("admin has no member section and supports moderation, 50 QR tickets and print action", async ({
+test("admin omits retired sections and supports 50 QR tickets and print action", async ({
   page,
 }) => {
   const { createHash } = await import("node:crypto");
-  const db = {
-    members: [],
-    submissions: [
-      {
-        id: "s1",
-        kind: "experience",
-        title: "Deneyim",
-        content: "Bir staj hikayesi",
-        status: "pending",
-      },
-    ],
-    batches: [],
-  };
+  const db = { batches: [] };
   let batch;
   await page.route("**/api/ticket-design*", route => route.fulfill({ json: { design: null } }));
   await page.route("**/api/community*", (route) => {
     const u = new URL(route.request().url()),
       action = u.searchParams.get("action"),
       method = route.request().method();
-    if (action === "admin") return route.fulfill({ json: db });
-    if (action === "moderate") {
-      db.submissions[0].status = route.request().postDataJSON().status;
-      return route.fulfill({ json: { ok: true } });
-    }
+    if (action === "batches") return route.fulfill({ json: db });
     if (action === "batch" && method === "POST") {
       const b = route.request().postDataJSON(),
         codes = Array.from(
@@ -401,9 +386,8 @@ test("admin has no member section and supports moderation, 50 QR tickets and pri
   await expect(page.locator("#app")).toBeVisible();
   await expect(page.locator('[data-tab="members"]')).toHaveCount(0);
   await expect(page.locator("#membersTab, #memberForm, #memberList")).toHaveCount(0);
-  await page.locator('[data-tab="experiences"]').click();
-  await page.getByRole("button", { name: "Onayla ve yayımla" }).click();
-  await expect(page.locator("#experienceList")).toContainText("Yayımlandı");
+  await expect(page.locator('[data-tab="suggestions"], [data-tab="experiences"], [data-tab="feedback"]')).toHaveCount(0);
+  await expect(page.locator("#suggestionsTab, #experiencesTab, #feedbackTab")).toHaveCount(0);
   await page.locator('[data-tab="tickets"]').click();
   await page.locator("#ticketCount").fill("50");
   await page.getByRole("button", { name: "Kodları oluştur" }).click();

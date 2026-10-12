@@ -1,18 +1,40 @@
 import { $, escape, onAdminEvent } from './common.js';
 
 const PENDING_KEY = 'ercupsa_raffle_pending_v1';
+const SOURCE_KEY = 'ercupsa_raffle_source_v1';
 const terminalCodes = new Set(['RAFFLE_POOL_REQUIRED', 'RAFFLE_POOL_CHANGED', 'RAFFLE_INVALID_SELECTION', 'RAFFLE_DRAW_DELETED', 'RAFFLE_REQUEST_CONFLICT']);
 const eventSelect = $('raffleEvent'), countInput = $('raffleCount'), start = $('raffleStart'), loyaltyToggle = $('raffleLoyaltyBonus');
 const entryToggle = $('raffleCheckedInOnly'), entryBonusToggle = $('raffleCheckinBonus');
+const sourceButtons = [$('raffleSourceQr'), $('raffleSourceRegistrations')].filter(Boolean);
 let events = [], participants = [], draws = [], excluded = new Set();
-let ready = false, loaded = false, busy = false, version = 0, loadedEventId = '', poolVersion = null;
+let ready = false, loaded = false, busy = false, version = 0, loadedEventId = '', loadedSource = '', poolVersion = null, animationTimer = null;
 let queuedCatalog = null, lastDraw = null, pending = recoverPending(), pendingStored = true;
+let source = pending ? sourceOf(pending) : recoverSource();
+let qrSettings = { loyaltyBonus: true, checkedInOnly: false, checkinBonus: false };
 if (pending) {
   excluded = new Set(pending.excluded);
   loadedEventId = pending.eventId;
+  loadedSource = sourceOf(pending);
   loyaltyToggle.checked = pending.loyaltyBonus !== false;
   entryToggle.checked = pending.checkedInOnly === true;
   entryBonusToggle.checked = pending.checkinBonus === true;
+}
+if (source === 'registrations') {
+  loyaltyToggle.checked = entryToggle.checked = entryBonusToggle.checked = false;
+}
+
+function recoverSource() {
+  try { return sessionStorage.getItem(SOURCE_KEY) === 'registrations' ? 'registrations' : 'qr'; }
+  catch { return 'qr'; }
+}
+function sourceOf(value) { return value?.source || 'qr'; }
+function sourceLabel(value = source) { return value === 'registrations' ? 'Form kayıtları' : 'QR katılımcıları'; }
+function personView(person) {
+  return Object.fromEntries(['id', 'name', 'previous', 'weight', 'claimedAt', 'createdAt', 'prizeDelivered', 'prizeDeliveredAt'].filter(key => Object.hasOwn(person, key)).map(key => [key, person[key]]));
+}
+function drawView(draw) {
+  return { ...Object.fromEntries(['id', 'eventId', 'eventTitle', 'poolVersion', 'loyaltyBonus', 'checkedInOnly', 'checkinBonus', 'createdAt'].filter(key => Object.hasOwn(draw, key)).map(key => [key, draw[key]])),
+    source: sourceOf(draw), participants: draw.participants.map(personView), winners: draw.winners.map(personView) };
 }
 
 function recoverPending() {
@@ -24,11 +46,14 @@ function recoverPending() {
         !validId(value.eventId) || !Number.isInteger(value.count) || value.count < 1 || value.count > 200 ||
         !Array.isArray(value.excluded) || value.excluded.length > 10000 || !value.excluded.every(validId) ||
         !/^[0-9a-f]{64}$/i.test(value.poolVersion) ||
+        (Object.hasOwn(value, 'source') && !['qr', 'registrations'].includes(value.source)) ||
+        (value.source === 'registrations' && ['loyaltyBonus', 'checkedInOnly', 'checkinBonus'].some(key => value[key] !== false)) ||
         ['loyaltyBonus', 'checkedInOnly', 'checkinBonus'].some(key => Object.hasOwn(value, key) && typeof value[key] !== 'boolean')) {
       sessionStorage.removeItem(PENDING_KEY); return null;
     }
     // Recover only the request identity and selection. Names never enter browser storage.
     return { requestId: value.requestId, eventId: value.eventId, count: value.count, excluded: value.excluded, poolVersion: value.poolVersion,
+      ...(Object.hasOwn(value, 'source') ? { source: value.source } : {}),
       ...Object.fromEntries(['loyaltyBonus', 'checkedInOnly', 'checkinBonus'].filter(key => Object.hasOwn(value, key)).map(key => [key, value[key]])) };
   } catch { return null; }
 }
@@ -37,23 +62,25 @@ function clearPending() {
   pendingStored = true;
   try { sessionStorage.removeItem(PENDING_KEY); } catch { /* Memory state remains authoritative for this page. */ }
 }
-function verifyOutcome(result) {
+function verifyOutcome(result, selection) {
   const draw = result?.draw;
   const winners = draw?.winners, pool = draw?.participants;
-  if (!draw || draw.id !== pending.requestId || draw.eventId !== pending.eventId || draw.poolVersion !== pending.poolVersion ||
+  if (!draw || draw.id !== selection.requestId || draw.eventId !== selection.eventId || draw.poolVersion !== selection.poolVersion ||
+      !['qr', 'registrations'].includes(sourceOf(draw)) || sourceOf(draw) !== sourceOf(selection) ||
       (Object.hasOwn(draw, 'loyaltyBonus') && typeof draw.loyaltyBonus !== 'boolean') ||
-      (draw.loyaltyBonus !== false) !== (pending.loyaltyBonus !== false) ||
-      ['checkedInOnly', 'checkinBonus'].some(key => (Object.hasOwn(draw, key) && typeof draw[key] !== 'boolean') || (draw[key] === true) !== (pending[key] === true)) ||
-      !Array.isArray(winners) || winners.length !== pending.count || !Array.isArray(pool) ||
+      (draw.loyaltyBonus !== false) !== (selection.loyaltyBonus !== false) ||
+      ['checkedInOnly', 'checkinBonus'].some(key => (Object.hasOwn(draw, key) && typeof draw[key] !== 'boolean') || (draw[key] === true) !== (selection[key] === true)) ||
+      !Array.isArray(winners) || winners.length !== selection.count || !Array.isArray(pool) ||
       [...winners, ...pool].some(person => !person || typeof person.id !== 'string' || typeof person.name !== 'string' ||
         !Number.isInteger(person.weight) || person.weight < 1 || !Number.isInteger(person.previous) || person.previous < 0 ||
         person.weight !== (draw.loyaltyBonus === false ? 1 : person.previous + 1)) ||
       new Set(winners.map(person => person.id)).size !== winners.length ||
-      winners.some(person => pending.excluded.includes(person.id) || !pool.some(participant => participant.id === person.id &&
+      (sourceOf(draw) === 'registrations' && (draw.loyaltyBonus !== false || draw.checkedInOnly === true || draw.checkinBonus === true || [...winners, ...pool].some(person => person.previous !== 0 || person.weight !== 1))) ||
+      winners.some(person => selection.excluded.includes(person.id) || !pool.some(participant => participant.id === person.id &&
         participant.weight === person.weight && participant.previous === person.previous))) {
     throw new Error('Kaydedilmiş çekiliş sonucu doğrulanamadı.');
   }
-  return draw;
+  return drawView(draw);
 }
 function feedback(message, error = false) {
   $('raffleStatus').textContent = message + (pending && !pendingStored ? ' Tarayıcı isteği saklayamadı; sonuç doğrulanana kadar sayfayı yenilemeyin veya kapatmayın.' : '');
@@ -74,9 +101,10 @@ function controls() {
   const locked = busy || !!pending;
   eventSelect.disabled = locked;
   countInput.disabled = locked;
-  loyaltyToggle.disabled = locked;
-  entryToggle.disabled = locked;
-  entryBonusToggle.disabled = locked || !loyaltyToggle.checked;
+  sourceButtons.forEach(button => { button.disabled = locked || !ready; button.setAttribute('aria-pressed', String(button.dataset.source === source)); });
+  loyaltyToggle.disabled = locked || source === 'registrations';
+  entryToggle.disabled = locked || source === 'registrations';
+  entryBonusToggle.disabled = locked || source === 'registrations' || !loyaltyToggle.checked;
   $('raffleRefresh').disabled = locked || !eventSelect.value;
   $('raffleSearch').disabled = locked;
   $('raffleIncludeAll').disabled = locked || !loaded;
@@ -93,20 +121,35 @@ function stageTitle() {
   const title = lastDraw?.eventTitle || eventTitle(pending?.eventId);
   $('raffleStageEvent').textContent = title;
   $('rafflePresentationTitle').textContent = title;
-  const mode = lastDraw || pending || { loyaltyBonus: loyaltyToggle.checked, checkedInOnly: entryToggle.checked, checkinBonus: entryBonus() };
+  const mode = lastDraw || pending || { source, loyaltyBonus: loyaltyToggle.checked, checkedInOnly: entryToggle.checked, checkinBonus: entryBonus() };
   $('raffleStageMode').textContent = modeLabel(mode.loyaltyBonus !== false, mode.checkinBonus === true, mode.checkedInOnly === true);
+  if ($('raffleStageSource')) $('raffleStageSource').textContent = sourceLabel(sourceOf(mode));
 }
 function modeLabel(loyaltyBonus, checkinBonus = false, checkedInOnly = false) {
   const chance = loyaltyBonus ? checkinBonus ? 'Önceki gerçek girişlere ek hak' : 'Önceki katılımlara ek hak' : 'Herkese eşit şans';
   return chance + (checkedInOnly ? ' · Yalnızca giriş yapanlar' : '');
 }
 function entryBonus() {
-  return loyaltyToggle.checked && entryBonusToggle.checked;
+  return source === 'qr' && loyaltyToggle.checked && entryBonusToggle.checked;
 }
 function effectiveWeight(person) {
-  return loyaltyToggle.checked ? person.weight : 1;
+  return source === 'qr' && loyaltyToggle.checked ? person.weight : 1;
 }
 function renderMode() {
+  const forms = source === 'registrations';
+  if ($('raffleSourceHelp')) $('raffleSourceHelp').textContent = forms
+    ? 'Bu etkinliğin kayıt formunu dolduranlar listelenir. Hesap oluşturma veya QR ekleme şartı yoktur; her aktif form kaydı 1 hak kazanır.'
+    : 'Bu etkinliğin bilet QR kodunu hesabına ekleyenler listelenir. Form kayıtları bu listeye karıştırılmaz.';
+  if ($('raffleParticipantsHelp')) $('raffleParticipantsHelp').textContent = forms
+    ? 'İşareti kaldırarak bu kaydı yalnızca çekilişten çıkarabilirsiniz. Etkinlik kaydı korunur.'
+    : 'İşareti kaldırarak kişiyi yalnızca çekilişten çıkarabilirsiniz. Hesabı ve bileti korunur.';
+  document.querySelectorAll('.raffle-chance-setting').forEach(setting => setting.classList.toggle('is-unavailable', forms));
+  if (forms) {
+    $('raffleLoyaltyHelp').textContent = 'Form çekilişinde herkesin 1 hakkı vardır. Önceki QR katılımları ek hak vermez.';
+    $('raffleEntryHelp').textContent = 'Form çekilişinde giriş şartı aranmaz; formu dolduranlar dahil edilir.';
+    $('raffleCheckinBonusHelp').textContent = 'Gerçek girişlere göre ek hak, QR katılımcıları seçildiğinde kullanılabilir.';
+    stageTitle(); controls(); return;
+  }
   $('raffleLoyaltyHelp').textContent = loyaltyToggle.checked
     ? `Açık: Her kişi 1 hakla başlar; ${entryBonus() ? 'giriş yaptığı önceki her farklı etkinlik' : 'önceki her farklı etkinlik'} +1 hak verir.`
     : 'Kapalı: Önceki katılımlardan bağımsız olarak herkesin 1 hakkı olur.';
@@ -132,17 +175,17 @@ function renderParticipants() {
   countInput.max = String(Math.min(200, included.length || 1));
   const filtered = participants.filter(person => person.name.toLocaleLowerCase('tr').includes(search));
   list.innerHTML = filtered.map(person =>
-    `<label class="raffle-person ${excluded.has(person.id) ? 'is-excluded' : ''}"><input type="checkbox" data-person="${escape(person.id)}" ${excluded.has(person.id) ? '' : 'checked'}><span><strong>${escape(person.name)}</strong><small>${person.previous} önceki ${entryBonus() ? 'gerçek giriş' : 'etkinlik'} · ${effectiveWeight(person)} hak</small><small>${escape(claimDate(person.claimedAt))}</small></span><span class="raffle-weight">×${effectiveWeight(person)}</span></label>`
-  ).join('') || (participants.length ? '<p>Aramanızla eşleşen katılımcı bulunamadı.</p>' : `<p>${entryToggle.checked ? 'Biletini hesabına ekleyip etkinliğe giriş yapan kişiler burada görünür.' : 'Bu etkinliğin biletini hesabına ekleyenler burada görünür.'}</p>`);
+    `<label class="raffle-person ${excluded.has(person.id) ? 'is-excluded' : ''}"><input type="checkbox" data-person="${escape(person.id)}" ${excluded.has(person.id) ? '' : 'checked'}><span><strong>${escape(person.name)}</strong><small>${source === 'registrations' ? 'Form kaydı · 1 hak' : `${person.previous} önceki ${entryBonus() ? 'gerçek giriş' : 'etkinlik'} · ${effectiveWeight(person)} hak`}</small><small>${escape(claimDate(source === 'registrations' ? person.createdAt : person.claimedAt))}</small></span><span class="raffle-weight">×${effectiveWeight(person)}</span></label>`
+  ).join('') || (participants.length ? '<p class="raffle-empty">Aramanızla eşleşen katılımcı bulunamadı.</p>' : `<p class="raffle-empty">${source === 'registrations' ? 'Bu etkinlikte henüz aktif form kaydı bulunmuyor.' : entryToggle.checked ? 'Biletini hesabına ekleyip etkinliğe giriş yapan kişiler burada görünür.' : 'Bu etkinliğin biletini hesabına ekleyenler burada görünür.'}</p>`);
   controls();
   if (focused) [...list.querySelectorAll('input')].find(input => input.dataset.person === focused)?.focus({ preventScroll: true });
   list.scrollTop = scroll;
 }
 function winnerList(winners, draw = null, withPrize = false) {
-  return '<ol class="raffle-winners">' + winners.map((person, index) => `<li><span>${index + 1}</span><div><strong>${escape(person.name)}</strong><small>${person.weight} hak · ${person.previous} önceki ${draw?.checkinBonus === true ? 'gerçek giriş' : 'etkinlik'}</small>${withPrize ? `<small class="raffle-prize-status">${person.prizeDelivered === true ? `Ödül teslim edildi · ${escape(claimDate(person.prizeDeliveredAt))}` : 'Ödül teslim bekliyor'}</small><button type="button" data-prize-draw="${escape(draw.id)}" data-prize-winner="${escape(person.id)}" data-prize-delivered="${person.prizeDelivered !== true}">${person.prizeDelivered === true ? 'Teslim işaretini kaldır' : 'Ödül teslim edildi olarak işaretle'}</button>` : ''}</div></li>`).join('') + '</ol>';
+  return '<ol class="raffle-winners">' + winners.map((person, index) => `<li><span>${index + 1}</span><div><strong>${escape(person.name)}</strong><small>${sourceOf(draw) === 'registrations' ? 'Form kaydı · 1 hak' : `${person.weight} hak · ${person.previous} önceki ${draw?.checkinBonus === true ? 'gerçek giriş' : 'etkinlik'}`}</small>${withPrize ? `<small class="raffle-prize-status">${person.prizeDelivered === true ? `Ödül teslim edildi · ${escape(claimDate(person.prizeDeliveredAt))}` : 'Ödül teslim bekliyor'}</small><button type="button" data-prize-draw="${escape(draw.id)}" data-prize-winner="${escape(person.id)}" data-prize-delivered="${person.prizeDelivered !== true}">${person.prizeDelivered === true ? 'Teslim işaretini kaldır' : 'Ödül teslim edildi olarak işaretle'}</button>` : ''}</div></li>`).join('') + '</ol>';
 }
 function renderHistory() {
-  $('raffleHistory').innerHTML = draws.map(draw => `<article class="raffle-history-card"><div class="raffle-history-heading"><div><h4>${escape(draw.eventTitle)}</h4><p>${escape(claimDate(draw.createdAt))} · ${draw.participants.length} kişi · ${draw.winners.length} kazanan</p><p class="raffle-mode">${modeLabel(draw.loyaltyBonus !== false, draw.checkinBonus === true, draw.checkedInOnly === true)}</p></div><div class="raffle-history-actions"><button type="button" data-export-draw="${escape(draw.id)}">Kazananları indir (CSV)</button><button type="button" data-delete-draw="${escape(draw.id)}">Çekilişi sil</button></div></div>${winnerList(draw.winners, draw, true)}</article>`).join('') || '<p>Bu etkinlik için henüz çekiliş yapılmadı.</p>';
+  $('raffleHistory').innerHTML = draws.map(draw => `<article class="raffle-history-card"><div class="raffle-history-heading"><div><span class="raffle-source-badge">${sourceLabel(sourceOf(draw))}</span><h4>${escape(draw.eventTitle)}</h4><p>${escape(claimDate(draw.createdAt))} · ${draw.participants.length} kişi · ${draw.winners.length} kazanan</p><p class="raffle-mode">${modeLabel(draw.loyaltyBonus !== false, draw.checkinBonus === true, draw.checkedInOnly === true)}</p></div><div class="raffle-history-actions"><button type="button" data-export-draw="${escape(draw.id)}">Kazananları indir (CSV)</button><button type="button" data-delete-draw="${escape(draw.id)}">Çekilişi sil</button></div></div>${winnerList(draw.winners, draw, true)}</article>`).join('') || '<p class="raffle-empty">Bu etkinlik için henüz çekiliş yapılmadı.</p>';
   controls();
 }
 function populateCatalog() {
@@ -158,9 +201,9 @@ function populateCatalog() {
 }
 async function load({ keepResults = false } = {}) {
   if (!ready || busy || pending) return;
-  const current = ++version, eventId = eventSelect.value;
-  const sameEvent = eventId === loadedEventId;
-  loadedEventId = eventId; loaded = false; poolVersion = null;
+  const current = ++version, eventId = eventSelect.value, selectedSource = source;
+  const sameEvent = eventId === loadedEventId && selectedSource === loadedSource;
+  loadedEventId = eventId; loadedSource = selectedSource; loaded = false; poolVersion = null;
   participants = []; draws = [];
   if (!sameEvent) { excluded.clear(); $('raffleSearch').value = ''; }
   if (!keepResults) {
@@ -170,24 +213,25 @@ async function load({ keepResults = false } = {}) {
   }
   renderParticipants(); renderHistory(); stageTitle();
   if (!eventId) { excluded.clear(); renderParticipants(); feedback('Çekiliş için önce bir etkinlik oluşturun.'); return; }
-  feedback('Biletini hesabına ekleyen katılımcılar yükleniyor…');
+  feedback(selectedSource === 'registrations' ? 'Kayıt formunu dolduranlar yükleniyor…' : 'Biletini hesabına ekleyen katılımcılar yükleniyor…');
   try {
     const modes = { checkedInOnly: entryToggle.checked, checkinBonus: entryBonus() };
-    const data = await request('GET', null, { eventId, ...modes });
-    if (current !== version || eventId !== eventSelect.value) return;
+    const data = await request('GET', null, { eventId, source: selectedSource, ...modes });
+    if (!ready || current !== version || eventId !== eventSelect.value || selectedSource !== source) return;
     if (!Array.isArray(data.participants) || !Array.isArray(data.draws) || !/^[0-9a-f]{64}$/i.test(data.poolVersion) ||
+        sourceOf(data) !== selectedSource ||
         data.checkedInOnly !== modes.checkedInOnly || data.checkinBonus !== modes.checkinBonus) throw new Error('Katılımcı listesi doğrulanamadı. Listeyi yeniden yükleyin.');
-    participants = data.participants; draws = data.draws; poolVersion = data.poolVersion; loaded = true;
+    participants = data.participants.map(personView); draws = data.draws.map(drawView); poolVersion = data.poolVersion; loaded = true;
     excluded = new Set([...excluded].filter(id => participants.some(person => person.id === id)));
     renderParticipants(); renderHistory(); feedback('Katılımcı seçimini ve kazanan sayısını ayarlayıp çekilişi başlatabilirsiniz.');
   } catch (error) {
-    if (current !== version || eventId !== eventSelect.value) return;
+    if (!ready || current !== version || eventId !== eventSelect.value || selectedSource !== source) return;
     feedback(error.message, true);
     // Reading saved outcomes must remain possible if the live participant database is unavailable.
     try {
       const history = await request('GET', null, { action: 'history', eventId });
-      if (current !== version || eventId !== eventSelect.value) return;
-      if (Array.isArray(history.draws)) { draws = history.draws; renderHistory(); }
+      if (!ready || current !== version || eventId !== eventSelect.value || selectedSource !== source) return;
+      if (Array.isArray(history.draws)) { draws = history.draws.map(drawView); renderHistory(); }
     } catch { /* Keep the original participant error and drawing disabled. */ }
   }
   controls();
@@ -212,12 +256,26 @@ onAdminEvent('events-loaded', event => receiveCatalog(event.detail));
 onAdminEvent('admin-ready', () => {
   ready = true;
   if (pending) {
+    excluded = new Set(pending.excluded);
+    loadedEventId = pending.eventId; loadedSource = sourceOf(pending);
     populateCatalog();
     feedback('Önceki çekilişin sonucu henüz doğrulanmadı. Aynı çekiliş sonucunu yeniden sorgulayın; yeni çekiliş oluşturulmaz.', true);
   } else load();
   controls();
 });
 eventSelect.addEventListener('change', () => load());
+sourceButtons.forEach(button => button.addEventListener('click', () => {
+  const next = button.dataset.source;
+  if (!ready || busy || pending || next === source || !['qr', 'registrations'].includes(next)) return;
+  if (source === 'qr') qrSettings = { loyaltyBonus: loyaltyToggle.checked, checkedInOnly: entryToggle.checked, checkinBonus: entryBonusToggle.checked };
+  source = next;
+  loyaltyToggle.checked = source === 'qr' && qrSettings.loyaltyBonus;
+  entryToggle.checked = source === 'qr' && qrSettings.checkedInOnly;
+  entryBonusToggle.checked = source === 'qr' && qrSettings.checkinBonus;
+  try { sessionStorage.setItem(SOURCE_KEY, source); } catch { /* Selection still works for this page. */ }
+  excluded.clear(); $('raffleSearch').value = '';
+  renderMode(); load();
+}));
 $('raffleRefresh').addEventListener('click', () => load());
 $('raffleSearch').addEventListener('input', renderParticipants);
 $('raffleIncludeAll').addEventListener('click', () => { excluded.clear(); renderParticipants(); });
@@ -244,7 +302,7 @@ start.addEventListener('click', async () => {
     if (!loaded || !eventSelect.value || !poolVersion || !Number.isInteger(count) || count < 1 || count > Math.min(200, included.length)) {
       feedback('Kazanan sayısı 1 ile dahil edilen kişi sayısı arasında olmalı (en fazla 200).', true); return;
     }
-    const payload = { requestId: crypto.randomUUID(), eventId: eventSelect.value, count, excluded: [...excluded], poolVersion, loyaltyBonus: loyaltyToggle.checked, checkedInOnly: entryToggle.checked, checkinBonus: entryBonus() };
+    const payload = { requestId: crypto.randomUUID(), eventId: eventSelect.value, source, count, excluded: [...excluded], poolVersion, loyaltyBonus: loyaltyToggle.checked, checkedInOnly: entryToggle.checked, checkinBonus: entryBonus() };
     if (new TextEncoder().encode(JSON.stringify(payload)).length > 100000) {
       feedback('Hariç tutulan kişi listesi çok büyük. Daha az kişiyi hariç tutup yeniden deneyin.', true); return;
     }
@@ -253,16 +311,17 @@ start.addEventListener('click', async () => {
     catch { pendingStored = false; }
     pending = payload;
   }
-  busy = true; controls(); version++;
+  busy = true; controls();
+  const current = ++version, selection = pending;
   lastDraw = null; $('raffleResults').innerHTML = ''; stageTitle();
   const stage = $('raffleStage');
   stage.classList.remove('is-celebrating'); stage.classList.add('is-drawing');
   feedback(retry ? 'Kaydedilmiş çekiliş sonucu sorgulanıyor…' : 'Çekiliş yapılıyor…');
-  const candidates = participants.filter(person => !pending.excluded.includes(person.id));
+  const candidates = participants.filter(person => !selection.excluded.includes(person.id));
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let index = 0;
   $('raffleStageName').textContent = reduced ? 'Şanslı isimler seçiliyor…' : candidates[0]?.name || 'Şanslı isimler seçiliyor…';
-  const timer = reduced ? null : setInterval(() => {
+  const timer = animationTimer = reduced ? null : setInterval(() => {
     $('raffleStageName').textContent = candidates[(index++ * 7 + Math.floor(Math.random() * candidates.length)) % candidates.length]?.name || 'Seçiliyor…';
   }, 90);
   const pause = new Promise(resolve => setTimeout(resolve, 5000));
@@ -270,29 +329,37 @@ start.addEventListener('click', async () => {
     // Retry first reads the saved outcome without depending on the participant database.
     const outcome = async () => {
       if (retry) {
-        const saved = await request('GET', null, { action: 'result', eventId: pending.eventId, requestId: pending.requestId });
-        if (saved.draw === null) return request('POST', pending);
+        const saved = await request('GET', null, { action: 'result', eventId: selection.eventId, requestId: selection.requestId });
+        if (!ready || current !== version || pending !== selection) return null;
+        if (saved.draw === null) return request('POST', selection);
         if (Object.hasOwn(saved, 'draw') && saved.draw) return saved;
         throw new Error('Kaydedilmiş çekiliş sonucu doğrulanamadı.');
       }
-      return request('POST', pending);
+      return request('POST', selection);
     };
     const [result] = await Promise.all([outcome(), pause]);
-    verifyOutcome(result);
+    if (!ready || current !== version || pending !== selection) return;
+    const draw = verifyOutcome(result, selection);
     if (timer) clearInterval(timer);
-    lastDraw = result.draw;
+    lastDraw = draw;
     $('raffleStageName').textContent = 'Kazananları tebrik ediyoruz!';
-    $('raffleResults').innerHTML = winnerList(result.draw.winners, result.draw); stageTitle();
+    $('raffleResults').innerHTML = winnerList(draw.winners, draw); stageTitle();
     stage.classList.remove('is-drawing'); stage.classList.add('is-celebrating');
-    draws = [result.draw, ...draws.filter(draw => draw.id !== result.draw.id)];
+    draws = [draw, ...draws.filter(item => item.id !== draw.id)];
+    // Recovery can happen with no live pool loaded, or after authentication
+    // cleared private state. Keep the frozen exclusions bound to this source
+    // so refreshing the same pool preserves the administrator's selection.
+    excluded = new Set(selection.excluded);
+    loadedEventId = selection.eventId; loadedSource = sourceOf(selection);
     clearPending(); renderHistory();
-    feedback(`${result.draw.winners.length} kazanan seçildi ve çekiliş geçmişine kaydedildi.`);
+    feedback(`${draw.winners.length} kazanan seçildi ve çekiliş geçmişine kaydedildi.`);
   } catch (error) {
+    if (!ready || current !== version || pending !== selection) return;
     if (timer) clearInterval(timer);
     stage.classList.remove('is-drawing'); $('raffleStageName').textContent = 'Sonuç gösterilemedi';
     if (terminalCodes.has(error.code)) { clearPending(); loaded = false; poolVersion = null; }
     feedback(error.message + (pending ? ' Sonuç kaydedilmiş olabilir. Aynı çekiliş sonucunu yeniden sorgulayın; yeni çekiliş oluşturulmaz.' : ' Katılımcı listesini yenileyerek devam edebilirsiniz.'), true);
-  } finally { busy = false; finishCatalog(); controls(); }
+  } finally { if (timer) clearInterval(timer); if (animationTimer === timer) animationTimer = null; if (current === version) { busy = false; finishCatalog(); controls(); } }
 });
 function csvCell(value) {
   let text = String(value ?? '');
@@ -300,7 +367,7 @@ function csvCell(value) {
   return '"' + text.replaceAll('"', '""') + '"';
 }
 function exportWinners(draw) {
-  const rows = [['Sıra', 'Ad soyad', 'Katılımcı kimliği', 'Etkinlik', 'Çekiliş tarihi', 'Hak', 'Önceki etkinlik', 'Çekiliş kuralı', 'Ödül teslim durumu', 'Ödül teslim tarihi'], ...draw.winners.map((person, index) => [index + 1, person.name, person.id, draw.eventTitle, claimDate(draw.createdAt), person.weight, person.previous, modeLabel(draw.loyaltyBonus !== false, draw.checkinBonus === true, draw.checkedInOnly === true), person.prizeDelivered === true ? 'Teslim edildi' : 'Teslim bekliyor', claimDate(person.prizeDeliveredAt)])];
+  const rows = [['Sıra', 'Ad soyad', 'Katılımcı kimliği', 'Etkinlik', 'Çekiliş tarihi', 'Katılımcı kaynağı', 'Hak', 'Önceki etkinlik', 'Çekiliş kuralı', 'Ödül teslim durumu', 'Ödül teslim tarihi'], ...draw.winners.map((person, index) => [index + 1, person.name, person.id, draw.eventTitle, claimDate(draw.createdAt), sourceLabel(sourceOf(draw)), person.weight, person.previous, modeLabel(draw.loyaltyBonus !== false, draw.checkinBonus === true, draw.checkedInOnly === true), person.prizeDelivered === true ? 'Teslim edildi' : 'Teslim bekliyor', claimDate(person.prizeDeliveredAt)])];
   const blob = new Blob(['\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob), link = document.createElement('a');
   link.href = url; link.download = `ERCUPSA-kazananlar-${draw.id}.csv`; link.click();
@@ -309,17 +376,21 @@ function exportWinners(draw) {
 $('raffleHistory').addEventListener('click', async event => {
   const prize = event.target.closest('[data-prize-draw]');
   if (prize && !busy && !pending) {
-    const eventId = eventSelect.value, id = prize.dataset.prizeDraw, winnerId = prize.dataset.prizeWinner, delivered = prize.dataset.prizeDelivered === 'true';
+    const current = ++version, eventId = eventSelect.value, id = prize.dataset.prizeDraw, winnerId = prize.dataset.prizeWinner, delivered = prize.dataset.prizeDelivered === 'true';
+    const original = draws.find(draw => draw.id === id);
     busy = true; controls();
     try {
       const { draw } = await request('POST', { eventId, id, winnerId, delivered }, { action: 'prize' });
+      if (!ready || current !== version || eventId !== eventSelect.value) return;
       if (!draw || draw.id !== id || draw.eventId !== eventId || !Array.isArray(draw.winners) ||
+          !Array.isArray(draw.participants) || sourceOf(draw) !== sourceOf(original) ||
           !draw.winners.some(person => person.id === winnerId && (person.prizeDelivered === true) === delivered)) throw new Error('Ödül teslim kaydı doğrulanamadı. Listeyi yenileyin.');
-      draws = draws.map(item => item.id === id ? draw : item);
-      if (lastDraw?.id === id) lastDraw = draw;
+      const saved = drawView(draw);
+      draws = draws.map(item => item.id === id ? saved : item);
+      if (lastDraw?.id === id) lastDraw = saved;
       renderHistory(); feedback(delivered ? 'Ödül teslim edildi olarak kaydedildi.' : 'Ödül teslim işareti kaldırıldı.');
-    } catch (error) { feedback(`${error.message} Gerekirse listeyi yenileyerek kaydı kontrol edin.`, true); }
-    finally { busy = false; finishCatalog(); controls(); }
+    } catch (error) { if (ready && current === version) feedback(`${error.message} Gerekirse listeyi yenileyerek kaydı kontrol edin.`, true); }
+    finally { if (current === version) { busy = false; finishCatalog(); controls(); } }
     return;
   }
   const exportButton = event.target.closest('[data-export-draw]');
@@ -329,18 +400,19 @@ $('raffleHistory').addEventListener('click', async event => {
   }
   const button = event.target.closest('[data-delete-draw]');
   if (!button || busy || pending || !confirm('Bu çekiliş ve kazanan kaydı silinsin mi? Daha sonra yeni bir çekiliş yapabilirsiniz.')) return;
-  const eventId = eventSelect.value, id = button.dataset.deleteDraw;
+  const current = ++version, eventId = eventSelect.value, id = button.dataset.deleteDraw;
   busy = true; controls();
   try {
     await request('DELETE', { eventId, id });
+    if (!ready || current !== version || eventId !== eventSelect.value) return;
     draws = draws.filter(draw => draw.id !== id);
     if (lastDraw?.id === id) {
       lastDraw = null; $('raffleResults').innerHTML = ''; $('raffleStageName').textContent = 'Yeni çekilişe hazır';
       $('raffleStage').classList.remove('is-celebrating'); stageTitle();
     }
     renderHistory(); feedback('Çekiliş silindi. Yeni bir çekiliş başlatabilirsiniz.');
-  } catch (error) { feedback(error.message, true); }
-  finally { busy = false; finishCatalog(); controls(); }
+  } catch (error) { if (ready && current === version) feedback(error.message, true); }
+  finally { if (current === version) { busy = false; finishCatalog(); controls(); } }
 });
 
 const presentation = $('rafflePresentationOverlay'), stage = $('raffleStage');
@@ -368,5 +440,25 @@ $('rafflePresentation').addEventListener('click', () => {
 $('rafflePresentationExit').addEventListener('click', closePresentation);
 presentation.addEventListener('cancel', event => { event.preventDefault(); closePresentation(); });
 presentation.addEventListener('close', closePresentation);
+document.addEventListener('admin-logout', event => {
+  version++; ready = loaded = busy = false;
+  if (animationTimer) clearInterval(animationTimer);
+  animationTimer = null;
+  closePresentation();
+  events = []; participants = []; draws = []; excluded.clear();
+  queuedCatalog = lastDraw = null; loadedEventId = loadedSource = ''; poolVersion = null;
+  // An expired cookie can precede login after refresh or an uncertain save.
+  // Keep only the anonymous request identity to recover the same saved draw.
+  if (!['initial-session-probe', 'session-expired'].includes(event.detail?.reason)) {
+    clearPending(); source = 'qr';
+    try { sessionStorage.removeItem(SOURCE_KEY); } catch { /* No private data is stored here. */ }
+    qrSettings = { loyaltyBonus: true, checkedInOnly: false, checkinBonus: false };
+    loyaltyToggle.checked = true; entryToggle.checked = entryBonusToggle.checked = false;
+  }
+  eventSelect.replaceChildren(); $('raffleSearch').value = '';
+  $('raffleResults').replaceChildren(); $('raffleStageName').textContent = 'Sıradaki şanslı kim?';
+  stage.classList.remove('is-drawing', 'is-celebrating');
+  renderMode(); renderParticipants(); renderHistory(); feedback(''); controls();
+});
 renderMode();
 controls();

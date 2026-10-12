@@ -11,6 +11,10 @@ const participants = [
   { id: 'b', name: 'Bora Daş', previous: 0, weight: 1, claimedAt: '2026-10-07T11:00:00Z' },
   { id: 'c', name: 'Ceren Ergül', previous: 1, weight: 2, claimedAt: '2026-10-07T12:00:00Z' },
 ];
+const registrations = [
+  { id: 'registration-a', name: 'Defne Yılmaz', createdAt: '2026-10-07T08:00:00Z', previous: 0, weight: 1, phone: 'private-phone', email: 'private-email@example.test' },
+  { id: 'registration-b', name: 'Ege <img src=x onerror=alert(1)>', createdAt: '2026-10-07T09:00:00Z', previous: 0, weight: 1 },
+];
 const poolVersion = '1'.repeat(64);
 const pendingKey = 'ercupsa_raffle_pending_v1';
 
@@ -19,15 +23,18 @@ async function fixture(page, options = {}) {
     draws: structuredClone(options.draws || []), requests: [], lookups: [], deletes: [], gets: [],
     events: structuredClone(events), participants: structuredClone(options.participants || participants),
     poolVersion, postErrors: [...(options.postErrors || [])], lookupErrors: [...(options.lookupErrors || [])],
-    deleteErrors: [...(options.deleteErrors || [])], holdPool: null,
+    deleteErrors: [...(options.deleteErrors || [])], holdPool: null, poolHolds: {}, poolErrors: [],
+    registrations: structuredClone(options.registrations || registrations), sourceQueries: [],
     poolQueries: [], prizes: [], prizeErrors: [...(options.prizeErrors || [])], holdPrize: null, checkedInIds: ['a', 'c'], checkinPrevious: { a: 1, b: 0, c: 0 },
   };
-  function selectedPool(eventId, checkedInOnly, checkinBonus) {
+  function selectedPool(eventId, checkedInOnly, checkinBonus, source = 'qr') {
+    if (source === 'registrations') return { source, participants: eventId === 'one' ? structuredClone(state.registrations) : [],
+      poolVersion: createHash('sha256').update(`${state.poolVersion}|registrations`).digest('hex'), checkedInOnly: false, checkinBonus: false };
     const people = eventId === 'one' ? state.participants.filter(p => !checkedInOnly || state.checkedInIds.includes(p.id)) : [];
     return {
       participants: people.map(person => checkinBonus ? { ...person, previous: state.checkinPrevious[person.id] || 0, weight: 1 + (state.checkinPrevious[person.id] || 0) } : { ...person }),
       poolVersion: checkedInOnly || checkinBonus ? createHash('sha256').update(`${state.poolVersion}|${checkedInOnly}|${checkinBonus}`).digest('hex') : state.poolVersion,
-      checkedInOnly, checkinBonus,
+      checkedInOnly, checkinBonus, source: 'qr',
     };
   }
   await page.route('https://**/*', route => route.abort());
@@ -49,9 +56,14 @@ async function fixture(page, options = {}) {
       if (action === 'history') return route.fulfill({ json: { draws: state.draws.filter(d => d.eventId === selected) } });
       state.gets.push(selected);
       const checkedInOnly = url.searchParams.get('checkedInOnly') === 'true', checkinBonus = url.searchParams.get('checkinBonus') === 'true';
+      const source = url.searchParams.get('source') || 'qr';
+      state.sourceQueries.push(source);
       state.poolQueries.push({ eventId: selected, checkedInOnly, checkinBonus });
       if (state.holdPool) await state.holdPool;
-      return route.fulfill({ json: { event: state.events.find(e => e.id === selected), ...selectedPool(selected, checkedInOnly, checkinBonus), draws: state.draws.filter(d => d.eventId === selected) } });
+      if (state.poolHolds[source]) await state.poolHolds[source];
+      const error = state.poolErrors.shift();
+      if (error) return route.fulfill({ status: 503, json: { error } });
+      return route.fulfill({ json: { event: state.events.find(e => e.id === selected), ...selectedPool(selected, checkedInOnly, checkinBonus, source), draws: state.draws.filter(d => d.eventId === selected) } });
     }
     const input = req.postDataJSON();
     if (req.method() === 'DELETE') {
@@ -78,12 +90,12 @@ async function fixture(page, options = {}) {
     }
     state.requests.push(input);
     let draw = state.draws.find(d => d.id === input.requestId);
-    const preview = selectedPool(input.eventId, input.checkedInOnly === true, input.checkinBonus === true);
+    const preview = selectedPool(input.eventId, input.checkedInOnly === true, input.checkinBonus === true, input.source || 'qr');
     if (!draw && input.poolVersion !== preview.poolVersion) return route.fulfill({ status: 409, json: { error: 'Katılımcı listesi değişti. Listeyi yenileyin.', code: 'RAFFLE_POOL_CHANGED' } });
     const error = state.postErrors.shift();
     if (!draw && (!error || error.commit)) {
       const included = preview.participants.filter(p => !input.excluded.includes(p.id)).map(p => ({ ...p, weight: input.loyaltyBonus === false ? 1 : p.weight }));
-      draw = { id: input.requestId, eventId: input.eventId, poolVersion: input.poolVersion, loyaltyBonus: input.loyaltyBonus !== false, checkedInOnly: input.checkedInOnly === true, checkinBonus: input.checkinBonus === true, eventTitle: 'Çekiliş gecesi', participants: included, winners: included.slice(0, input.count), createdAt: '2026-10-07T18:00:00Z' };
+      draw = { id: input.requestId, eventId: input.eventId, source: input.source || 'qr', poolVersion: input.poolVersion, loyaltyBonus: input.loyaltyBonus !== false, checkedInOnly: input.checkedInOnly === true, checkinBonus: input.checkinBonus === true, eventTitle: 'Çekiliş gecesi', participants: included, winners: included.slice(0, input.count), createdAt: '2026-10-07T18:00:00Z' };
       state.draws.unshift(draw);
     }
     if (error) return route.fulfill({ status: error.status, json: { error: error.message || 'Bağlantı kesildi.', ...(error.code ? { code: error.code } : {}) } });
@@ -271,6 +283,7 @@ test('legacy pending requests retain an omitted mode when recovered and retried'
     delete input.loyaltyBonus;
     delete input.checkedInOnly;
     delete input.checkinBonus;
+    delete input.source;
     sessionStorage.setItem(key, JSON.stringify(input));
     return input;
   }, pendingKey);
@@ -516,4 +529,139 @@ test('late community bundle replays authentication and event catalog without rel
   await expect(page.locator('#ticketEvent option')).toHaveCount(2);
   await expect(page.locator('#registrationEvent option')).toHaveCount(2);
   expect(state.gets).toContain('one');
+});
+
+test('one-click form source keeps QR pools separate and records equal chances with the source in results and exports', async ({ page }) => {
+  const state = await fixture(page);
+  await page.locator('#raffleCheckedInOnly').check();
+  await page.locator('#raffleCheckinBonus').check();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
+  await page.locator('[data-person=a]').uncheck();
+  await page.locator('#raffleSourceRegistrations').click();
+  await expect(page.locator('#raffleSourceRegistrations')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
+  await expect(page.locator('#raffleParticipants')).toContainText('Defne Yılmaz');
+  await expect(page.locator('#raffleParticipants')).not.toContainText('Ada');
+  await expect(page.locator('#raffleParticipants img')).toHaveCount(0);
+  await expect(page.locator('#raffleSummary')).toHaveText('2 kişi dahil · 2 toplam hak · 0 kişi hariç');
+  for (const id of ['raffleLoyaltyBonus', 'raffleCheckedInOnly', 'raffleCheckinBonus']) {
+    await expect(page.locator('#' + id)).not.toBeChecked();
+    await expect(page.locator('#' + id)).toBeDisabled();
+  }
+  await page.locator('#raffleCount').fill('2');
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleSourceQr')).toBeDisabled();
+  await expect(page.locator('#raffleResults li')).toHaveCount(2, { timeout: 6500 });
+  expect(state.requests[0]).toMatchObject({ source: 'registrations', loyaltyBonus: false, checkedInOnly: false, checkinBonus: false });
+  expect(state.draws[0].winners.map(person => person.weight)).toEqual([1, 1]);
+  await expect(page.locator('#raffleStageSource')).toHaveText('Form kayıtları');
+  await expect(page.locator('#raffleResults')).toContainText('Form kaydı · 1 hak');
+  await expect(page.locator('#raffleHistory .raffle-source-badge')).toHaveText('Form kayıtları');
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('[data-export-draw]').click();
+  const csv = await readFile(await (await downloadPromise).path(), 'utf8');
+  expect(csv).toContain('Katılımcı kaynağı'); expect(csv).toContain('Form kayıtları');
+  expect(csv).not.toContain('private-phone'); expect(csv).not.toContain('private-email');
+  await page.locator('#raffleSourceQr').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
+  await expect(page.locator('#raffleCheckedInOnly')).toBeChecked();
+  await expect(page.locator('#raffleCheckinBonus')).toBeChecked();
+  await expect(page.locator('#raffleSummary')).toContainText('2 kişi dahil · 3 toplam hak');
+  await expect(page.locator('#raffleParticipants')).not.toContainText('Defne');
+  await expect(page.locator('[data-person=a]')).toBeChecked();
+});
+
+test('uncertain form draw restores its source and recovers the same saved result after refresh', async ({ page }) => {
+  const state = await fixture(page, { postErrors: [{ status: 503, commit: true }] });
+  await page.locator('#raffleSourceRegistrations').click();
+  await expect(page.locator('[data-person=registration-b]')).toBeVisible();
+  await page.locator('[data-person=registration-b]').uncheck();
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleStart')).toHaveText('Aynı çekiliş sonucunu yeniden sorgula');
+  const saved = await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)), pendingKey);
+  expect(saved.source).toBe('registrations');
+  expect(JSON.stringify(saved)).not.toContain('Defne');
+  await page.reload();
+  await page.locator('[data-tab=raffles]').click();
+  await expect(page.locator('#raffleSourceRegistrations')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#raffleSourceQr')).toBeDisabled();
+  await expect(page.locator('#raffleStageSource')).toHaveText('Form kayıtları');
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleResults li')).toHaveCount(1, { timeout: 6500 });
+  expect(state.requests).toHaveLength(1);
+  expect(state.lookups).toEqual([saved.requestId]);
+  await expect(page.locator('#raffleSourceQr')).toBeEnabled();
+  await expect(page.locator('#raffleLoyaltyBonus')).toBeDisabled();
+  await page.locator('#raffleRefresh').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
+  await expect(page.locator('[data-person=registration-b]')).not.toBeChecked();
+  await expect(page.locator('#raffleSummary')).toContainText('1 kişi dahil · 1 toplam hak');
+});
+
+test('a late QR pool cannot replace the immediately selected form pool', async ({ page }) => {
+  const state = await fixture(page);
+  let release;
+  state.poolHolds.qr = new Promise(resolve => { release = resolve; });
+  await page.locator('#raffleRefresh').click();
+  await expect(page.locator('#raffleStart')).toBeDisabled();
+  await page.locator('#raffleSourceRegistrations').click();
+  await expect(page.locator('#raffleParticipants')).toContainText('Defne Yılmaz');
+  release(); delete state.poolHolds.qr;
+  await page.waitForTimeout(200);
+  await expect(page.locator('#raffleParticipants')).not.toContainText('Ada');
+  await expect(page.locator('#raffleSourceRegistrations')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#raffleSummary')).toContainText('2 kişi dahil · 2 toplam hak');
+  await expect(page.locator('#raffleStart')).toBeEnabled();
+});
+
+test('empty forms and failed form loads have different feedback and can be retried without a draw', async ({ page }) => {
+  const state = await fixture(page, { registrations: [] });
+  await page.locator('#raffleSourceRegistrations').click();
+  await expect(page.locator('#raffleParticipants')).toContainText('henüz aktif form kaydı bulunmuyor');
+  await expect(page.locator('#raffleStatus')).toHaveAttribute('data-error', 'false');
+  await expect(page.locator('#raffleStart')).toBeDisabled();
+  state.poolErrors.push('Form kayıtları şu anda yüklenemedi.');
+  await page.locator('#raffleRefresh').click();
+  await expect(page.locator('#raffleStatus')).toContainText('Form kayıtları şu anda yüklenemedi');
+  await expect(page.locator('#raffleStatus')).toHaveAttribute('data-error', 'true');
+  await expect(page.locator('#raffleStart')).toBeDisabled();
+  state.registrations.push(registrations[0]);
+  await page.locator('#raffleRefresh').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(1);
+  await expect(page.locator('#raffleStart')).toBeEnabled();
+  expect(state.requests).toHaveLength(0);
+});
+
+test('saved result from another source is rejected without creating a new form draw', async ({ page }) => {
+  const state = await fixture(page, { postErrors: [{ status: 503, commit: true }] });
+  await page.locator('#raffleSourceRegistrations').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleStart')).toHaveText('Aynı çekiliş sonucunu yeniden sorgula');
+  state.draws[0].source = 'qr';
+  await page.locator('#raffleStart').click();
+  // Recovery keeps the same five-second reveal delay as a normal draw.
+  await expect(page.locator('#raffleStatus')).toContainText('Kaydedilmiş çekiliş sonucu doğrulanamadı', { timeout: 6500 });
+  await expect(page.locator('#raffleResults li')).toHaveCount(0);
+  await expect(page.locator('#raffleSourceQr')).toBeDisabled();
+  expect(state.requests).toHaveLength(1);
+  expect(await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)).source, pendingKey)).toBe('registrations');
+});
+
+test('logout during a form draw closes presentation and blocks delayed private winners from returning', async ({ page }) => {
+  await fixture(page);
+  await page.locator('#raffleSourceRegistrations').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
+  await page.locator('#rafflePresentation').click();
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleStage')).toHaveClass(/is-drawing/);
+  await page.evaluate(() => document.dispatchEvent(new Event('admin-logout')));
+  await expect(page.locator('#rafflePresentationOverlay')).not.toBeVisible();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(0);
+  await page.waitForTimeout(5200);
+  await expect(page.locator('#raffleResults li')).toHaveCount(0);
+  await expect(page.locator('#raffleHistory article')).toHaveCount(0);
+  await expect(page.locator('#rafflesTab')).not.toContainText('Defne');
+  expect(await page.evaluate(key => sessionStorage.getItem(key), pendingKey)).toBeNull();
+  expect(await page.evaluate(() => sessionStorage.getItem('ercupsa_raffle_source_v1'))).toBeNull();
 });

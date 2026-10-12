@@ -1,17 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { participantsFor, poolVersion, drawChances, weightedWinners, drawInput, saveDraw, deleteDraw, updatePrize, paged, raffleFail } from '../netlify/lib/raffles.mjs';
 import { createHandler } from '../netlify/functions/raffles.mjs';
 import { adminLogin } from '../netlify/lib/security.mjs';
+import { readRegistrationParticipants } from '../netlify/lib/raffle-registrations.mjs';
+import { registrationStateKey, entryKey } from '../netlify/lib/registrations.mjs';
 
 function memory() {
   const records = new Map(); let revision = 0;
   return {
     records,
-    async get(key) { return structuredClone(records.get(key)?.data || null); },
+    async get(key) { return structuredClone(records.get(key)?.data ?? null); },
     async getWithMetadata(key) { return structuredClone(records.get(key) || null); },
-    async setJSON(key, value, options) {
+    async setJSON(key, value, options = {}) {
       const existing = records.get(key);
       if (options.onlyIfNew && existing || options.onlyIfMatch && existing?.etag !== options.onlyIfMatch) return { modified: false };
       records.set(key, { data: structuredClone(value), etag: String(++revision) }); return { modified: true };
@@ -184,12 +186,20 @@ function fixture({ cap = 500 } = {}) {
     events: structuredClone(events),
     attendance: [...new Map(attendance.map(a => [`${a.user_id}/${a.event_id}`, a])).values()].map(a => ({ ...a })),
     profiles: structuredClone(profiles), reads: [], checkins: {}, checkinReads: [], failCheckins: false,
+    registrationReads: [], failRegistrations: false,
   };
   const store = memory();
+  const registrationStore = memory();
+  registrationStore.list = async ({ prefix }) => ({ blobs: [...registrationStore.records.keys()]
+    .filter(key => key.startsWith(prefix)).map(key => ({ key })) });
   const handler = createHandler({ store: () => store, events: async () => { if (state.failEvents) throw Error('events offline'); return state.events; }, checkins: async eventId => {
     state.checkinReads.push(eventId);
     if (state.failCheckins) throw Error('checkins offline');
     return structuredClone(state.checkins[eventId] || []);
+  }, registrations: async eventId => {
+    state.registrationReads.push(eventId);
+    if (state.failRegistrations) throw Error('registration store offline');
+    return readRegistrationParticipants(eventId, registrationStore);
   }, read: async path => {
     state.reads.push(path);
     if (state.failRead) throw Error('database offline');
@@ -209,17 +219,18 @@ function fixture({ cap = 500 } = {}) {
     const offset = Number(u.searchParams.get('offset'));
     return rows.slice(offset, offset + Math.min(cap, Number(u.searchParams.get('limit'))));
   } });
-  async function request(method = 'GET', data, { auth = true, origin = 'https://site.test', action, eventId = 'current', requestId, rawBody, contentType = 'application/json', checkedInOnly, checkinBonus } = {}) {
+  async function request(method = 'GET', data, { auth = true, origin = 'https://site.test', action, eventId = 'current', requestId, rawBody, contentType = 'application/json', checkedInOnly, checkinBonus, source } = {}) {
     const url = new URL('https://site.test/api/raffles');
     url.searchParams.set('eventId', eventId);
     if (action) url.searchParams.set('action', action);
     if (requestId) url.searchParams.set('requestId', requestId);
     if (checkedInOnly !== undefined) url.searchParams.set('checkedInOnly', String(checkedInOnly));
     if (checkinBonus !== undefined) url.searchParams.set('checkinBonus', String(checkinBonus));
+    if (source !== undefined) url.searchParams.set('source', String(source));
     const r = await handler(new Request(url, { method, headers: { 'Content-Type': contentType, ...(auth ? { cookie } : {}), origin }, ...(rawBody !== undefined ? { body: rawBody } : data ? { body: JSON.stringify(data) } : {}) }));
     return { status: r.status, data: await r.json(), cache: r.headers.get('cache-control') };
   }
-  return { state, store, request };
+  return { state, store, registrationStore, request };
 }
 
 test('API saves the chosen chance mode with authoritative rights and refuses mode changes on the same draw ID', async () => {
@@ -445,7 +456,11 @@ test('new draws require preview; legacy saved retries retain old hash without re
   const normalized = drawInput(legacyInput), legacy = { id: normalized.id, hash: normalized.hash, winners: [{ id: 'a', name: 'Ada' }] };
   await saveDraw(store, normalized, () => legacy);
   state.failRead = true; state.failEvents = true;
-  assert.deepEqual((await request('POST', legacyInput)).data.draw, legacy);
+  assert.deepEqual((await request('POST', legacyInput)).data.draw, { ...legacy, source: 'qr' });
+  assert.deepEqual((await request('GET', null, { action: 'result', requestId: legacyInput.requestId })).data.draw, { ...legacy, source: 'qr' });
+  assert.deepEqual((await request('GET', null, { action: 'history' })).data.draws, [{ ...legacy, source: 'qr' }]);
+  assert.deepEqual((await store.get('events/current.json')).draws.find(draw => draw.id === legacy.id), legacy,
+    'normalizing legacy API labels must not rewrite saved hashes or records');
 });
 
 test('stale previews fence new claims, changed rights, renames and claim timestamps without storing participants or winners', async () => {
@@ -595,4 +610,192 @@ test('uncertain rejection writes retain their request identity and reveal the co
   await assert.rejects(saveDraw(store, input, () => raffleFail(409, 'RAFFLE_POOL_CHANGED', 'Changed')), /rejection response lost/);
   await assert.rejects(saveDraw(store, input, () => assert.fail('rejected request cannot select winners')), error => error.code === 'RAFFLE_POOL_CHANGED');
   assert.deepEqual((await store.get('events/current.json')).draws, [{ id: input.id, hash: input.hash, failed: true, status: 409, code: 'RAFFLE_POOL_CHANGED', message: 'Changed' }]);
+});
+
+const formEntry = (id, name = `Katılımcı ${id}`, extra = {}) => ({ id, eventId: 'current', name,
+  createdAt: '2026-10-07T12:00:00Z', phone: 'PRIVATE_PHONE', answers: { full_name: name, custom: 'PRIVATE_ANSWER' },
+  receipt: { key: 'PRIVATE_RECEIPT' }, ticket: { code: 'PRIVATE_TICKET' }, ...extra });
+const formState = (entries, deleted = []) => ({ version: 1, eventId: 'current', entries, deleted });
+const formPreview = request => request('GET', null, { source: 'registrations' });
+const formInput = preview => ({ requestId: randomUUID(), eventId: 'current', source: 'registrations',
+  count: 1, excluded: [], poolVersion: preview.poolVersion });
+
+test('form participants use only active authoritative rows and never merge stale legacy copies or private fields', async () => {
+  const { state, registrationStore, request } = fixture();
+  await registrationStore.setJSON(registrationStateKey('current'), formState([
+    formEntry('a', 'Ada'), formEntry('b', 'Bora'), formEntry('removed', 'Silindi'),
+  ], [{ id: 'removed', name: 'Silindi', receiptKey: 'PRIVATE_DELETED_RECEIPT' }]));
+  await registrationStore.setJSON(entryKey('current', 'stale'), formEntry('stale', 'Eski kopya'));
+  state.failRead = true; state.failCheckins = true;
+  const preview = await formPreview(request);
+  assert.equal(preview.status, 200); assert.equal(preview.cache, 'no-store');
+  assert.equal(preview.data.source, 'registrations');
+  assert.deepEqual(preview.data.participants.map(person => person.id), ['a', 'b']);
+  for (const person of preview.data.participants) {
+    assert.deepEqual(Object.keys(person).sort(), ['createdAt', 'id', 'name', 'previous', 'weight']);
+    assert.equal(person.previous, 0); assert.equal(person.weight, 1);
+  }
+  assert.ok(!JSON.stringify(preview.data).includes('PRIVATE_'));
+  assert.equal(state.reads.length, 0); assert.equal(state.checkinReads.length, 0);
+  const input = { ...formInput(preview.data), excluded: ['b'] };
+  const result = await request('POST', input);
+  assert.equal(result.status, 200);
+  assert.equal(result.data.draw.source, 'registrations'); assert.equal(result.data.draw.loyaltyBonus, false);
+  assert.equal(result.data.draw.checkedInOnly, false); assert.equal(result.data.draw.checkinBonus, false);
+  assert.deepEqual(result.data.draw.winners.map(person => [person.id, person.weight]), [['a', 1]]);
+  assert.ok(!JSON.stringify(result.data.draw).includes('PRIVATE_'));
+  assert.equal(state.reads.length, 0); assert.equal(state.checkinReads.length, 0);
+});
+
+test('form mode remains admin-only and rejects foreign-origin mutations before any registration read', async () => {
+  const { state, store, request } = fixture();
+  assert.equal((await request('GET', null, { auth: false, source: 'registrations' })).status, 401);
+  assert.equal((await request('POST', formInput({ poolVersion: 'a'.repeat(64) }), { auth: false })).status, 401);
+  assert.equal((await request('POST', formInput({ poolVersion: 'a'.repeat(64) }), { origin: 'https://foreign.test' })).status, 403);
+  assert.equal(state.registrationReads.length, 0); assert.equal(state.reads.length, 0); assert.equal(store.records.size, 0);
+});
+
+test('source selection validates inputs, binds request hashes and retains legacy omitted QR hashes', () => {
+  const base = { requestId: randomUUID(), eventId: 'current', count: 1, excluded: [], poolVersion: 'a'.repeat(64) };
+  const old = drawInput(base), qr = drawInput({ ...base, source: 'qr' }), form = drawInput({ ...base, source: 'registrations' });
+  assert.equal(Object.hasOwn(old, 'source'), false);
+  assert.notEqual(old.hash, qr.hash); assert.notEqual(qr.hash, form.hash);
+  const original = JSON.stringify({ id: old.id, eventId: base.eventId, count: 1, excluded: [], poolVersion: base.poolVersion });
+  assert.equal(old.hash, createHash('sha256').update(original).digest('hex'));
+  for (const source of ['', 'form', 'QR', null, false, {}, ['qr']]) {
+    assert.throws(() => drawInput({ ...base, source }), error => error.code === 'RAFFLE_INVALID_SELECTION');
+  }
+  for (const key of ['loyaltyBonus', 'checkedInOnly', 'checkinBonus']) {
+    assert.throws(() => drawInput({ ...base, source: 'registrations', [key]: true }), error => error.code === 'RAFFLE_INVALID_SELECTION');
+    assert.equal(drawInput({ ...base, source: 'registrations', [key]: false })[key], false);
+  }
+  const common = [{ id: 'same', name: 'Aynı', weight: 1, claimedAt: '2026-10-07', createdAt: '2026-10-07' }];
+  assert.equal(poolVersion('current', common), poolVersion('current', common, { source: 'qr' }));
+  assert.notEqual(poolVersion('current', common), poolVersion('current', common, { source: 'registrations' }));
+});
+
+test('form source rejects QR-only options and malformed source without reading participant stores', async () => {
+  const { state, store, request } = fixture();
+  for (const source of ['', 'form', 'QR', 'null']) assert.equal((await request('GET', null, { source })).status, 400);
+  for (const key of ['checkedInOnly', 'checkinBonus']) {
+    assert.equal((await request('GET', null, { source: 'registrations', [key]: true })).status, 400);
+  }
+  for (const key of ['loyaltyBonus', 'checkedInOnly', 'checkinBonus']) {
+    const result = await request('POST', { ...formInput({ poolVersion: 'a'.repeat(64) }), [key]: true });
+    assert.equal(result.status, 400); assert.equal(result.data.code, 'RAFFLE_INVALID_SELECTION');
+  }
+  assert.equal(state.registrationReads.length, 0); assert.equal(state.reads.length, 0); assert.equal(state.checkinReads.length, 0);
+  assert.equal(store.records.size, 0);
+});
+
+test('switching participant sources changes preview and cannot reuse a saved request identity', async () => {
+  const { state, store, registrationStore, request } = fixture();
+  await registrationStore.setJSON(registrationStateKey('current'), formState([formEntry('a', 'Ada'), formEntry('b', 'Bora')]));
+  const qr = (await request()).data, form = (await formPreview(request)).data;
+  assert.notEqual(qr.poolVersion, form.poolVersion);
+  const rejected = await request('POST', { ...formInput(form), poolVersion: qr.poolVersion });
+  assert.equal(rejected.status, 409); assert.equal(rejected.data.code, 'RAFFLE_POOL_CHANGED');
+  const input = { ...formInput(form), count: 2, loyaltyBonus: false, checkedInOnly: false, checkinBonus: false };
+  const drawn = await request('POST', input);
+  assert.equal(drawn.status, 200); assert.equal(drawn.data.draw.source, 'registrations');
+  state.failRead = true; state.failRegistrations = true;
+  const changed = await request('POST', { ...input, source: 'qr', poolVersion: qr.poolVersion });
+  assert.equal(changed.status, 409); assert.equal(changed.data.code, 'RAFFLE_REQUEST_CONFLICT');
+  assert.deepEqual((await request('POST', input)).data.draw, drawn.data.draw);
+  assert.equal((await store.get('events/current.json')).draws.filter(draw => !draw.failed).length, 1);
+});
+
+test('form previews fence registration additions, deletions, names and timestamps, without binding private answers', async () => {
+  for (const mutate of [
+    current => { current.entries.push(formEntry('late')); },
+    current => { current.entries.shift(); current.deleted.push({ id: 'a' }); },
+    current => { current.entries[0].name = 'Yeni ad'; },
+    current => { current.entries[0].createdAt = '2026-10-06T12:00:00Z'; },
+  ]) {
+    const { store, registrationStore, request } = fixture();
+    await registrationStore.setJSON(registrationStateKey('current'), formState([formEntry('a'), formEntry('b')]));
+    const preview = (await formPreview(request)).data;
+    const current = await registrationStore.get(registrationStateKey('current')); mutate(current);
+    await registrationStore.setJSON(registrationStateKey('current'), current);
+    const input = formInput(preview), result = await request('POST', input);
+    assert.equal(result.status, 409); assert.equal(result.data.code, 'RAFFLE_POOL_CHANGED');
+    const rejected = (await store.get('events/current.json')).draws[0];
+    assert.equal(rejected.failed, true); assert.equal(rejected.participants, undefined); assert.equal(rejected.winners, undefined);
+    assert.equal((await request('POST', input)).data.code, 'RAFFLE_POOL_CHANGED');
+  }
+  const { registrationStore, request } = fixture();
+  await registrationStore.setJSON(registrationStateKey('current'), formState([formEntry('a')]));
+  const preview = (await formPreview(request)).data;
+  const current = await registrationStore.get(registrationStateKey('current'));
+  current.entries[0].phone = 'CHANGED_PRIVATE_PHONE'; current.entries[0].answers.custom = 'CHANGED_PRIVATE_ANSWER';
+  await registrationStore.setJSON(registrationStateKey('current'), current);
+  assert.equal((await formPreview(request)).data.poolVersion, preview.poolVersion);
+});
+
+test('malformed or unavailable form state fails closed instead of falling back to stale files or saving a partial draw', async () => {
+  for (const bad of [false, {}, { ...formState([]), version: 2 }, { ...formState([]), eventId: 'other' },
+    { ...formState([]), entries: null }, { ...formState([]), deleted: null },
+    formState([formEntry('a'), formEntry('a')]), formState([formEntry('bad/query')]),
+    formState([formEntry('a', '')]), formState([formEntry('a', 'Ada', { createdAt: 'invalid' })]),
+    formState([formEntry('a', 'Ada', { eventId: 'other' })]), formState([], [{ id: 'bad/query' }]),
+  ]) {
+    const { store, registrationStore, request } = fixture();
+    await registrationStore.setJSON(registrationStateKey('current'), bad);
+    await registrationStore.setJSON(entryKey('current', 'legacy'), formEntry('legacy'));
+    assert.equal((await formPreview(request)).status, 503);
+    const result = await request('POST', formInput({ poolVersion: 'a'.repeat(64) }));
+    assert.equal(result.status, 503); assert.equal(store.records.size, 0);
+  }
+  const { state, store, request } = fixture(); state.failRegistrations = true;
+  assert.equal((await formPreview(request)).status, 503);
+  assert.equal((await request('POST', formInput({ poolVersion: 'a'.repeat(64) }))).status, 503);
+  assert.equal(store.records.size, 0);
+});
+
+test('legacy form rows load beyond one thousand and a concurrently created authoritative state wins', async () => {
+  const { registrationStore } = fixture();
+  for (let i = 0; i < 1001; i++) {
+    const id = String(i).padStart(4, '0'); await registrationStore.setJSON(entryKey('current', id), formEntry(id));
+  }
+  assert.equal((await readRegistrationParticipants('current', registrationStore)).length, 1001);
+  const get = registrationStore.get.bind(registrationStore); let created = false;
+  registrationStore.get = async key => {
+    if (key.startsWith('entries/') && !created) {
+      created = true;
+      await registrationStore.setJSON(registrationStateKey('current'), formState([formEntry('only-active')], [{ id: '0000' }]));
+    }
+    return get(key);
+  };
+  assert.deepEqual((await readRegistrationParticipants('current', registrationStore)).map(person => person.id), ['only-active']);
+  registrationStore.list = () => assert.fail('authoritative state must not read legacy data');
+  assert.deepEqual((await readRegistrationParticipants('current', registrationStore)).map(person => person.id), ['only-active']);
+});
+
+test('an empty form pool is valid while corrupt or incomplete legacy listings fail closed', async () => {
+  assert.deepEqual(await readRegistrationParticipants('current', { get: async () => null, list: async () => ({ blobs: [] }) }), []);
+  for (const listed of [{}, { blobs: null }, { blobs: [{ key: 'entries/other/a.json' }] },
+    { blobs: [{ key: 'entries/current/a.json' }, { key: 'entries/current/a.json' }] }]) {
+    await assert.rejects(readRegistrationParticipants('current', { get: async () => null, list: async () => listed }), error => error.status === 503);
+  }
+  await assert.rejects(readRegistrationParticipants('current', { get: async () => null,
+    list: async () => ({ blobs: [{ key: 'entries/current/missing.json' }] }) }), error => error.status === 503);
+});
+
+test('form draw lost-response recovery preserves source and winners through storage outage, prize update and deletion', async () => {
+  const { state, store, registrationStore, request } = fixture();
+  await registrationStore.setJSON(registrationStateKey('current'), formState([formEntry('a', 'Ada'), formEntry('b', 'Bora')]));
+  const preview = (await formPreview(request)).data, input = { ...formInput(preview), excluded: ['b'] };
+  const commit = store.setJSON.bind(store); let first = true;
+  store.setJSON = async (...args) => { const result = await commit(...args); if (first) { first = false; throw Error('form draw response lost'); } return result; };
+  assert.equal((await request('POST', input)).status, 503);
+  state.failRead = true; state.failEvents = true; state.failCheckins = true; state.failRegistrations = true;
+  const recovered = (await request('GET', null, { action: 'result', requestId: input.requestId })).data.draw;
+  assert.equal(recovered.source, 'registrations'); assert.equal(recovered.loyaltyBonus, false);
+  assert.deepEqual(recovered.winners.map(person => [person.id, person.weight]), [['a', 1]]);
+  assert.deepEqual((await request('POST', input)).data.draw, recovered);
+  assert.deepEqual((await request('GET', null, { action: 'history' })).data.draws, [recovered]);
+  const prize = (await request('POST', { eventId: 'current', id: recovered.id, winnerId: 'a', delivered: true }, { action: 'prize' })).data.draw;
+  assert.equal(prize.source, 'registrations'); assert.equal(prize.winners[0].prizeDelivered, true);
+  assert.equal((await request('DELETE', { eventId: 'current', id: recovered.id })).status, 200);
+  assert.equal((await request('POST', input)).data.code, 'RAFFLE_DRAW_DELETED');
 });

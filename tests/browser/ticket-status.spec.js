@@ -20,7 +20,7 @@ async function fixture(page) {
   }] } }));
   await page.route("**/api/community*", route => {
     const action = new URL(route.request().url()).searchParams.get("action");
-    return route.fulfill({ json: action === "admin" ? { submissions: [], members: [], batches: [{
+    return route.fulfill({ json: action === "batches" ? { batches: [{
       id: state.id, event_id: state.event_id, event_title: state.event_title, created_at: "2026-10-08T10:00:00Z",
     }] } : state });
   });
