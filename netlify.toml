@@ -48,6 +48,11 @@
   to = "/.netlify/functions/community"
   status = 200
 
+[[redirects]]
+  from = "/api/accounts"
+  to = "/.netlify/functions/accounts"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]

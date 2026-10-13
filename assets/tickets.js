@@ -98,6 +98,30 @@ function authError(error) {
     signup_disabled:
       "Yeni kayıtlar şu an kapalı. Lütfen daha sonra tekrar dene.",
   };
+  if (error.code === "weak_password" || error.name === "AuthWeakPasswordError" || /password.*(?:weak|at least|contain)/i.test(error.message || "")) {
+    const reasons = new Set(Array.isArray(error.reasons) ? error.reasons : []);
+    const detail = [];
+    const minimum = Number((error.message || "").match(/at least\s+(\d+)\s+characters/i)?.[1]);
+    if (reasons.has("length") || reasons.has("min_length") || minimum)
+      detail.push(`En az ${minimum >= 8 && minimum <= 128 ? minimum : 8} karakter kullan.`);
+    const characterRules = [
+      [["uppercase", "upper_case"], "Şifrende en az bir büyük harf kullan."],
+      [["lowercase", "lower_case"], "Şifrende en az bir küçük harf kullan."],
+      [["digit", "number"], "Şifrende en az bir rakam kullan."],
+      [["symbol", "special_character"], "Şifrende en az bir özel karakter kullan."],
+    ];
+    const specificRules = characterRules.filter(([codes]) => codes.some(code => reasons.has(code)));
+    detail.push(...specificRules.map(([, message]) => message));
+    if (!specificRules.length && (reasons.has("characters") || /contain|upper.?case|lower.?case|digit|symbol/i.test(error.message || "")))
+      detail.push("Büyük harf, küçük harf, rakam ve özel karakter içeren bir şifre seç.");
+    if (reasons.has("pwned") || /breach|compromised|pwned/i.test(error.message || ""))
+      detail.push("Bu şifre sızdırılmış şifreler arasında bulundu. Başka bir şifre seç.");
+    return detail.length ? detail.join(" ") : messages.weak_password;
+  }
+  if (/zaman aşımına|timeout|timed out/i.test(error.message || ""))
+    return "Bağlantı zaman aşımına uğradı. İşlem sonucu doğrulanamadı. Giriş yapmayı deneyebilir veya tekrar deneyebilirsin.";
+  if (error.name === "AuthRetryableFetchError" || /failed to fetch|network/i.test(error.message || ""))
+    return "Hesap hizmetine bağlanılamadı. İnternet bağlantını kontrol edip tekrar dene.";
   if (messages[error.code]) return messages[error.code];
   // Older GoTrue responses may contain a message without a structured error code.
   if (/invalid login credentials/i.test(error.message || "")) return messages.invalid_credentials;
@@ -106,8 +130,39 @@ function authError(error) {
     return "E-posta şu an gönderilemiyor. Lütfen daha sonra tekrar dene.";
   return "İşlem tamamlanamadı. Lütfen bilgilerini kontrol edip tekrar dene.";
 }
-function checkAuth(error) {
-  if (error) throw new Error(authError(error));
+function checkAuth(error, field) {
+  if (error) {
+    const translated = new Error(authError(error));
+    if (field && (error.code === "weak_password" || error.name === "AuthWeakPasswordError" || /password.*(?:weak|at least|contain)/i.test(error.message || ""))) translated.field = field;
+    throw translated;
+  }
+}
+async function authFetch(input, options = {}) {
+  // Bound the actual request, so a stalled signup cannot keep the submit button
+  // disabled forever or complete a second request after a manual retry.
+  const controller = new AbortController();
+  const cancel = () => controller.abort(options.signal?.reason);
+  if (options.signal?.aborted) cancel();
+  else options.signal?.addEventListener("abort", cancel, { once: true });
+  const timeout = setTimeout(() => {
+    const error = new Error("Bağlantı isteği zaman aşımına uğradı.");
+    error.name = "TimeoutError";
+    controller.abort(error);
+  }, 15000);
+  try {
+    const response = await fetch(input, { ...options, signal: controller.signal });
+    // Auth responses are small JSON objects. Read their body within the same
+    // deadline, including connections that stall after receiving the headers.
+    const body = await response.arrayBuffer();
+    return new Response(body.byteLength ? body : null, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+  } finally {
+    clearTimeout(timeout);
+    options.signal?.removeEventListener("abort", cancel);
+  }
 }
 function tab(name) {
   for (const mode of ["login", "signup", "forgot"])
@@ -119,6 +174,7 @@ function tab(name) {
     $(mode + "Tab").classList.toggle("border", !selected);
   }
   status("");
+  for (const mode of ["login", "signup", "forgot"]) clearFormFeedback($(mode + "Form"));
 }
 $("loginTab").onclick = () => tab("login");
 $("signupTab").onclick = () => tab("signup");
@@ -229,6 +285,7 @@ async function refresh() {
   if (version !== authVersion || !session) return;
   $("name").value = d.profile?.name || metadataName();
   $("publicName").checked = d.profile?.public_name || false;
+  $("publicNameModeration").hidden = !d.profile?.public_name_blocked;
   showProgress(d.total);
   $("attendance").innerHTML =
     d.attendance
@@ -243,27 +300,103 @@ $("attendance").addEventListener("click", (event) => {
   const button = event.target.closest("[data-event-feedback]");
   if (button) eventFeedback.open(button.dataset.eventFeedback, button.dataset.eventTitle);
 });
+function formFeedback(element, message, err = false) {
+  const feedback = $(element.id + "Feedback");
+  if (!feedback) return;
+  feedback.textContent = message;
+  feedback.hidden = !message;
+  feedback.classList.toggle("is-error", err);
+  feedback.setAttribute("role", err ? "alert" : "status");
+}
+function clearFormFeedback(element) {
+  formFeedback(element, "");
+  for (const field of element.querySelectorAll('[aria-invalid="true"]')) {
+    field.removeAttribute("aria-invalid");
+    const feedback = $(field.id + "Error");
+    if (feedback) { feedback.textContent = ""; feedback.hidden = true; }
+  }
+}
+function fieldFeedback(field, message) {
+  const feedback = $(field.id + "Error");
+  field.setAttribute("aria-invalid", "true");
+  if (feedback) { feedback.textContent = message; feedback.hidden = false; }
+}
+function validationMessage(field) {
+  const label = { firstName: "İsim", lastName: "Soyisim", signupEmail: "E-posta", loginEmail: "E-posta", forgotEmail: "E-posta", signupPassword: "Şifre", signupPasswordAgain: "Şifre tekrar", newPassword: "Yeni şifre", newPasswordAgain: "Yeni şifre tekrar", loginPassword: "Şifre", name: "Ad soyad", ticketCode: "Katılım kodu" }[field.id] || "Bu alan";
+  if (field.validity.valueMissing) return `${label} alanını doldur.`;
+  if (field.validity.typeMismatch) return "Geçerli bir e-posta adresi gir.";
+  if (field.validity.tooShort || field.validity.tooLong) return `${label} ${field.minLength > 0 ? field.minLength + "–" : "en fazla "}${field.maxLength} karakter ${field.minLength > 0 ? "arasında" : "uzunluğunda"} olmalı.`;
+  return `${label} alanını kontrol et.`;
+}
 function form(id, fn) {
-  $(id).addEventListener("submit", async (e) => {
+  const element = $(id);
+  for (const field of element.querySelectorAll("input[id]")) {
+    const feedback = document.createElement("p");
+    feedback.id = field.id + "Error";
+    feedback.className = "participation-field-feedback";
+    feedback.hidden = true;
+    field.after(feedback);
+    field.setAttribute("aria-describedby", [field.getAttribute("aria-describedby"), feedback.id].filter(Boolean).join(" "));
+  }
+  element.addEventListener("invalid", (event) => {
+    // Native minlength/required checks run before submit; surface their reason
+    // inside the form instead of leaving the submit button apparently silent.
+    event.preventDefault();
+    const field = event.target, message = validationMessage(field);
+    fieldFeedback(field, message);
+    if (element.querySelector(":invalid") === field) {
+      formFeedback(element, message, true);
+      status(message, true);
+      field.focus();
+    }
+  }, true);
+  element.addEventListener("input", (event) => {
+    const field = event.target;
+    field.removeAttribute("aria-invalid");
+    const feedback = $(field.id + "Error");
+    if (feedback) { feedback.textContent = ""; feedback.hidden = true; }
+    formFeedback(element, "");
+  });
+  let pending = false;
+  element.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (pending) return;
     const btn = e.target.querySelector(
       'button[type="submit"], button:not([type])',
     );
+    pending = true;
+    clearFormFeedback(element);
+    status("");
+    formFeedback(element, "İşlem sürüyor…");
+    element.setAttribute("aria-busy", "true");
     btn.disabled = true;
     try {
       if (!client) throw new Error("Hesap bölümü henüz kullanıma açılmadı.");
       await fn();
+      formFeedback(element, $("status").textContent);
     } catch (error) {
       status(error.message, true);
+      formFeedback(element, error.message, true);
+      if (error.field) {
+        fieldFeedback($(error.field), error.message);
+        $(error.field).focus();
+      }
     } finally {
+      pending = false;
+      element.removeAttribute("aria-busy");
       btn.disabled = false;
     }
   });
 }
-function password(value, repeated) {
+function invalidField(message, field) {
+  const error = new Error(message);
+  error.field = field;
+  throw error;
+}
+function password(value, repeated, field, repeatedField) {
   if (value.length < 8 || value.length > 128)
-    throw new Error("Şifre 8–128 karakter arasında olmalı.");
-  if (value !== repeated) throw new Error("Şifreler eşleşmiyor.");
+    invalidField("Şifre 8–128 karakter arasında olmalı.", field);
+  if (value !== repeated) invalidField("Şifreler eşleşmiyor.", repeatedField);
 }
 form("loginForm", async () => {
   const { data, error } = await client.auth.signInWithPassword({
@@ -281,15 +414,16 @@ form("signupForm", async () => {
   const firstName = $("firstName").value.trim(),
     lastName = $("lastName").value.trim(),
     fullName = `${firstName} ${lastName}`;
-  if (!firstName || !lastName || fullName.length > 120)
-    throw new Error("İsim ve soyisim toplamı en fazla 120 karakter olmalı.");
-  password($("signupPassword").value, $("signupPasswordAgain").value);
+  if (!firstName) invalidField("İsim alanını doldur.", "firstName");
+  if (!lastName) invalidField("Soyisim alanını doldur.", "lastName");
+  if (fullName.length > 120) invalidField("İsim ve soyisim toplamı en fazla 120 karakter olmalı.", "lastName");
+  password($("signupPassword").value, $("signupPasswordAgain").value, "signupPassword", "signupPasswordAgain");
   const { data, error } = await client.auth.signUp({
     email: $("signupEmail").value.trim(),
     password: $("signupPassword").value,
     options: { data: { first_name: firstName, last_name: lastName } },
   });
-  checkAuth(error);
+  checkAuth(error, "signupPassword");
   if (!data.session)
     throw new Error(
       "Hesabın henüz girişe açık değil. Lütfen yönetimle iletişime geç.",
@@ -323,11 +457,11 @@ form("forgotForm", async () => {
 form("resetForm", async () => {
   if (!session || !recovering)
     throw new Error("Şifre sıfırlama bağlantısını e-postandan açmalısın.");
-  password($("newPassword").value, $("newPasswordAgain").value);
+  password($("newPassword").value, $("newPasswordAgain").value, "newPassword", "newPasswordAgain");
   const { error } = await client.auth.updateUser({
     password: $("newPassword").value,
   });
-  checkAuth(error);
+  checkAuth(error, "newPassword");
   $("resetForm").reset();
   recovering = false;
   history.replaceState(
@@ -422,6 +556,7 @@ async function init() {
     if (!c.url || !c.key)
       throw new Error("Hesap bölümü henüz kullanıma açılmadı.");
     client = createClient(c.url, c.key, {
+      global: { fetch: authFetch },
       auth: {
         persistSession: true,
         detectSessionInUrl: true,

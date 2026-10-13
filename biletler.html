@@ -10,11 +10,11 @@
     />
     <link rel="stylesheet" href="assets/tailwind.css" />
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="assets/participation.css?v=qr-flow-2" />
+    <link rel="stylesheet" href="assets/participation.css?v=signup-feedback-3" />
     <link rel="stylesheet" href="assets/event-feedback.css?v=operations-1" />
     <script type="module" src="assets/shell.js?v=panel-2"></script>
     <script src="fun.js" defer></script>
-    <script type="module" src="assets/tickets.bundle.js?v=qr-flow-2"></script>
+    <script type="module" src="assets/tickets.bundle.js?v=signup-feedback-3"></script>
   </head>
   <body class="text-gray-800">
     <nav class="fixed w-full z-50 glass-panel border-b">
@@ -126,7 +126,7 @@
             maxlength="128"
             autocomplete="current-password"
             class="border rounded-xl p-3"
-          /><button class="btn-primary p-3 rounded-xl">Giriş yap</button
+          /><p id="loginFormFeedback" class="participation-form-feedback" role="status" aria-live="polite" aria-atomic="true" hidden></p><button class="btn-primary p-3 rounded-xl">Giriş yap</button
           ><button
             id="forgotLink"
             type="button"
@@ -175,11 +175,13 @@
             minlength="8"
             maxlength="128"
             autocomplete="new-password"
+            aria-describedby="signupPasswordHelp"
             class="border rounded-xl p-3"
           />
-          <p class="text-sm text-gray-500">
-            En az 8 karakter kullan. Şifreni sıfırlayabilmek için erişebildiğin
-            bir e-posta adresi gir.
+          <p id="signupPasswordHelp" class="text-sm text-gray-500">
+            8–128 karakter kullan. Büyük harf, küçük harf, rakam ve özel karakter
+            ekleyerek daha güçlü bir şifre seç. Şifreni sıfırlayabilmek için
+            erişebildiğin bir e-posta adresi gir.
           </p>
           <label for="signupPasswordAgain">Şifre tekrar</label
           ><input
@@ -190,7 +192,7 @@
             maxlength="128"
             autocomplete="new-password"
             class="border rounded-xl p-3"
-          /><button class="btn-primary p-3 rounded-xl">Hesap oluştur</button>
+          /><p id="signupFormFeedback" class="participation-form-feedback" role="status" aria-live="polite" aria-atomic="true" hidden></p><button class="btn-primary p-3 rounded-xl">Hesap oluştur</button>
         </form>
         <form id="forgotForm" hidden class="grid gap-4">
           <h2 class="text-xl font-bold">Şifreni sıfırla</h2>
@@ -205,7 +207,7 @@
             maxlength="254"
             autocomplete="email"
             class="border rounded-xl p-3"
-          /><button class="btn-primary p-3 rounded-xl">
+          /><p id="forgotFormFeedback" class="participation-form-feedback" role="status" aria-live="polite" aria-atomic="true" hidden></p><button class="btn-primary p-3 rounded-xl">
             Sıfırlama bağlantısı gönder</button
           ><button id="backToLogin" type="button" class="border rounded-xl p-3">
             Girişe dön
@@ -233,7 +235,7 @@
             maxlength="128"
             autocomplete="new-password"
             class="border rounded-xl p-3"
-          /><button class="btn-primary p-3 rounded-xl">Şifremi güncelle</button>
+          /><p id="resetFormFeedback" class="participation-form-feedback" role="status" aria-live="polite" aria-atomic="true" hidden></p><button class="btn-primary p-3 rounded-xl">Şifremi güncelle</button>
         </form>
       </section>
       <section id="accountPanel" hidden>
@@ -263,6 +265,7 @@
               spellcheck="false"
               aria-describedby="claimHelp"
               class="block w-full border rounded-xl p-3 font-mono" />
+          <p id="claimFormFeedback" class="participation-form-feedback" role="status" aria-live="polite" aria-atomic="true" hidden></p>
           <button class="btn-primary p-3 rounded-xl">Katılımımı ekle</button>
           <p id="claimHelp" class="text-sm text-gray-500">Aynı etkinlik için yalnızca bir katılım kaydedilir. Bu işlem kapıdaki giriş kontrolünden ayrıdır.</p>
         </form>
@@ -277,8 +280,10 @@
               class="block w-full border rounded-xl p-3" /></label
           ><label class="flex gap-3"
             ><input id="publicName" type="checkbox" />Rozet kazandığımda adımın
-            rozet panosunda görünmesine izin veriyorum.</label
-          ><button class="border rounded-xl p-3 font-bold">
+            rozet panosunda görünmesine izin veriyorum.</label>
+          <p id="publicNameModeration" hidden class="participation-profile-note">Yönetim, adının rozet panosunda görünmesini kapattı. Paylaşım tercihin kaydedilir; katılımların ve rozetlerin etkilenmez.</p>
+          <p id="profileFormFeedback" class="participation-form-feedback" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+          <button class="border rounded-xl p-3 font-bold">
             Bilgilerimi kaydet
           </button>
         </form>

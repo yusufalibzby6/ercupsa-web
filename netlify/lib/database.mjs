@@ -47,3 +47,16 @@ export async function user(req) {
   if (!u.id || !u.email) fail(401, "Geçerli bir hesapla giriş yapmalısın.");
   return u;
 }
+
+// This service credential stays inside Netlify functions. Never return the
+// complete Auth record (identities, metadata and tokens) to a browser.
+export async function authAdmin(path) {
+  const { url, key } = config();
+  const r = await fetch(`${url}/auth/v1/admin/${path}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) fail(r.status === 404 ? 404 : 503,
+    r.status === 404 ? "Hesap bulunamadı." : "Hesap bilgileri alınamadı. Lütfen tekrar deneyin.");
+  return r.json();
+}

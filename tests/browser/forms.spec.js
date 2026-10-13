@@ -168,3 +168,35 @@ test("Forms catalog and a selected form fit a narrow mobile viewport", async ({ 
   await expect(page.locator("#registrationSection")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
+
+test("portrait and landscape posters fill their cards without side bands or cropped content", async ({ page }) => {
+  await page.route("https://res.cloudinary.com/poster-layout/**", route => {
+    const portrait = route.request().url().includes("portrait");
+    const width = portrait ? 800 : 1200, height = portrait ? 1100 : 675;
+    return route.fulfill({ contentType: "image/svg+xml", body:
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#8b2323"/><rect x="10" y="10" width="${width - 20}" height="${height - 20}" fill="none" stroke="white" stroke-width="10"/></svg>` });
+  });
+  await mockEvents(page, [
+    { ...events[0], id: "portrait", title: "Dikey afiş", poster: "https://res.cloudinary.com/poster-layout/portrait.svg" },
+    { ...events[0], id: "landscape", title: "Yatay afiş", poster: "https://res.cloudinary.com/poster-layout/landscape.svg" },
+  ]);
+  for (const width of [320, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/form.html");
+    const images = page.locator(".form-catalog-poster");
+    await expect(images).toHaveCount(2);
+    await expect.poll(() => images.evaluateAll(nodes => nodes.every(node => node.complete && node.naturalWidth > 0))).toBe(true);
+    const sizes = await images.evaluateAll(nodes => nodes.map(node => ({
+      width: node.getBoundingClientRect().width,
+      height: node.getBoundingClientRect().height,
+      naturalRatio: node.naturalHeight / node.naturalWidth,
+      cardWidth: node.closest("article").clientWidth,
+    })));
+    for (const image of sizes) {
+      expect(Math.abs(image.width - image.cardWidth)).toBeLessThanOrEqual(1);
+      expect(Math.abs(image.height - image.width * image.naturalRatio)).toBeLessThanOrEqual(1);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await expect(page.getByRole("link", { name: "Dikey afiş kayıt formunu aç", exact: true })).toHaveAttribute("href", "form.html?event=portrait#registrationSection");
+  }
+});

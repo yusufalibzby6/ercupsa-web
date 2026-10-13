@@ -1,0 +1,70 @@
+@media screen {
+  .accounts-admin { min-width: 0; }
+  .accounts-panel { background: #fff; border: 1px solid var(--admin-border, #e3e7ed); border-radius: 18px; padding: 26px; }
+  .accounts-search { display: flex; align-items: end; gap: 12px; margin-bottom: 20px; }
+  .accounts-search label { display: flex; flex-direction: column; gap: 7px; font-weight: 700; flex: 1; max-width: 540px; min-width: 0; }
+  .accounts-search input { width: 100%; }
+  .accounts-secondary { background: #fff; border: 1px solid #dce2e9; border-radius: 10px; padding: 11px 15px; font-size: 12px; font-weight: 650; line-height: 1.5; }
+  .accounts-secondary:hover:not(:disabled) { background: #f6f7f9; border-color: #bfc9d6; }
+  .accounts-message { color: #69758a; font-size: 13px; line-height: 1.7; margin-bottom: 14px; overflow-wrap: anywhere; }
+  .accounts-message:empty { display: none; }
+  .accounts-message[data-error="true"] { color: #a52b35; }
+  .accounts-list-heading, .accounts-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(160px, 1.15fr) minmax(130px, .85fr); gap: 18px; align-items: center; }
+  .accounts-list-heading { background: #f7f8fa; padding: 13px 16px; border-radius: 10px; font-size: 11px; font-weight: 750; color: #69758a; }
+  .accounts-row { padding: 18px 16px; border-bottom: 1px solid #e9edf2; min-width: 0; }
+  .accounts-name { min-width: 0; }
+  .admin-workspace .accounts-name-button { display: block; text-align: left; color: #952d35; font-size: 14px; font-weight: 750; text-decoration: underline; text-decoration-color: #952d3530; text-underline-offset: 4px; overflow-wrap: anywhere; }
+  .accounts-name-button:hover { text-decoration-color: currentColor; }
+  .accounts-created { display: block; color: #69758a; font-size: 11px; margin-top: 6px; }
+  .accounts-email { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; min-width: 0; }
+  .accounts-pill { display: inline-block; color: #526378; background: #f1f4f8; border-radius: 7px; padding: 6px 9px; font-size: 10px; line-height: 1.5; font-weight: 650; }
+  .accounts-pill[data-state="blocked"] { background: #fff0f0; color: #9c3540; }
+  .accounts-pill[data-state="allowed"] { background: #edf7f2; color: #35705a; }
+  .accounts-pagination { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 20px; color: #69758a; font-size: 12px; }
+  .accounts-pagination > div { display: flex; align-items: center; gap: 12px; }
+  .accounts-note { color: #69758a; font-size: 12px; line-height: 1.8; margin-top: 16px; overflow-wrap: anywhere; }
+  .accounts-empty { color: #69758a; font-size: 13px; padding: 24px 0; line-height: 1.7; }
+  .account-dialog { width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); padding: 28px; border: 1px solid #dce2e9; border-radius: 20px; background: #fff; color: #1d293b; overflow: auto; margin: auto; box-shadow: 0 24px 80px #16213130; }
+  .account-dialog::backdrop { background: #162131a6; backdrop-filter: blur(3px); }
+  .account-dialog-header { display: flex; align-items: start; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+  .accounts-eyebrow { display: block; color: #69758a; font-size: 10px; letter-spacing: 1.5px; font-weight: 750; margin-bottom: 6px; }
+  .account-dialog h2 { font-size: 22px; font-weight: 800; line-height: 1.4; overflow-wrap: anywhere; }
+  .account-dialog h3 { font-size: 15px; font-weight: 800; margin-bottom: 9px; }
+  .account-information { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-bottom: 22px; }
+  .account-information dt { color: #69758a; font-size: 11px; margin-bottom: 5px; }
+  .account-information dd { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+  .account-visibility { background: #f8f9fb; border: 1px solid #e3e7ed; border-radius: 14px; padding: 20px; margin-bottom: 22px; }
+  .account-visibility > p:not(.accounts-note) { font-size: 12px; line-height: 1.8; margin: 7px 0; }
+  .account-visibility button { margin-top: 16px; color: #952d35; border-color: #dcc4c7; }
+  .account-history-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 26px; }
+  .account-history-summary > div { border: 1px solid #e3e7ed; padding: 17px; border-radius: 12px; background: #fff; }
+  .account-history-summary span { display: block; font-size: 11px; line-height: 1.6; color: #69758a; }
+  .account-history-summary strong { display: block; font-size: 25px; margin-top: 6px; line-height: 1.4; overflow-wrap: anywhere; }
+  .account-history > .accounts-note { margin-top: 0; margin-bottom: 14px; }
+  .account-event { border: 1px solid #e3e7ed; border-radius: 13px; padding: 18px; margin-top: 12px; }
+  .account-event-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+  .account-event-heading h4 { font-size: 14px; font-weight: 750; line-height: 1.6; overflow-wrap: anywhere; }
+  .account-event-meta { color: #69758a; font-size: 11px; line-height: 1.7; margin-top: 7px; }
+  .account-event-states { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 15px; padding-top: 14px; border-top: 1px solid #e9edf2; }
+  .account-event-states strong { display: block; font-size: 11px; font-weight: 750; margin-bottom: 5px; }
+  .account-event-states span { display: block; color: #69758a; font-size: 11px; line-height: 1.7; }
+  @media (max-width: 760px) {
+    .accounts-panel { padding: 20px; }
+    .accounts-list-heading { display: none; }
+    .accounts-row { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 19px 0; }
+    .accounts-email { font-size: 13px; }
+    .accounts-search { flex-wrap: wrap; gap: 10px; }
+    .accounts-search label { flex-basis: 100%; max-width: none; }
+    .accounts-search button { min-height: 44px; }
+    .accounts-pagination { align-items: start; flex-direction: column; }
+    .accounts-pagination > div { width: 100%; justify-content: space-between; }
+    .account-dialog { padding: 21px; }
+    .account-information { grid-template-columns: minmax(0, 1fr); }
+    .account-visibility { padding: 16px; }
+    .account-history-summary strong { font-size: 23px; }
+  }
+  @media (max-width: 420px) {
+    .account-dialog h2 { font-size: 19px; }
+    .account-history-summary, .account-event-states { grid-template-columns: minmax(0, 1fr); }
+  }
+}

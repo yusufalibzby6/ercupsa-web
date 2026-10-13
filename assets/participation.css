@@ -23,6 +23,14 @@
 .participation-guide li p,.participation-note { font-size:.83rem; line-height:1.7; color:#647080; }
 .participation-note { border-top:1px solid #eeebeb; padding-top:1rem; margin-top:1.5rem; }
 .participation-status { min-height:1.5rem; font-weight:600; margin:1rem 0; }
+.participation-form-feedback { padding:.85rem 1rem; border:1px solid #bbdbc9; border-radius:.8rem; background:#f0faf5; color:#256345; font-size:.9rem; line-height:1.6; overflow-wrap:anywhere; }
+.participation-form-feedback.is-error { background:#fff0f1; border-color:#ebbac1; color:#8b2335; }
+.participation-field-feedback { color:#8b2335; font-size:.85rem; line-height:1.5; margin:.4rem 0 0; }
+.participation-profile-note { padding:.8rem 1rem; border-left:3px solid #a52b37; background:#fff6f4; color:#6f4d4d; font-size:.85rem; line-height:1.6; }
+#authPanel input[aria-invalid="true"],#resetPanel input[aria-invalid="true"] { border-color:#a52b37; outline:1px solid #a52b37; }
+html.dark .participation-form-feedback { background:#153528; border-color:#34614b; color:#bcdfcd; }
+html.dark .participation-form-feedback.is-error,html.dark .participation-profile-note { background:#402129; border-color:#805454; color:#ffc1c7; }
+html.dark .participation-field-feedback { color:#ffc1c7; }
 .participation-completion { margin:0 0 1.8rem; padding:clamp(1.1rem,4vw,1.8rem); border:2px solid #a52b37; border-radius:1.5rem; background:linear-gradient(135deg,#fff,#fff5f3); box-shadow:0 10px 28px #8b232313; scroll-margin-top:100px; }
 .participation-completion-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
 .participation-completion-heading h2 { color:#8b2323; font-size:clamp(1.35rem,4vw,1.8rem); font-weight:900; line-height:1.35; margin:.3rem 0 .5rem; }

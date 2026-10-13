@@ -5,7 +5,7 @@ async function fixture(page, { holdCatalog = false } = {}) {
   const event = { id: "cleanup-event", title: "Panel etkinliği", date: "2026-10-20", published: true, images: [] };
   const code = "ERC-AAAAAAAAAAAAAAAAAAAAAAAA";
   const batch = { id: "private-batch", event_id: event.id, event_title: event.title, created_at: "2026-10-12T12:00:00Z" };
-  const state = { actions: [], feedbackRequests: 0, catalogRequested: false, batchRequested: false, holdBatch: null };
+  const state = { actions: [], feedbackRequests: 0, accountRequests: 0, catalogRequested: false, batchRequested: false, holdBatch: null };
   let releaseCatalog;
   const catalog = holdCatalog ? new Promise(resolve => { releaseCatalog = resolve; }) : null;
   await page.route("https://**/*", route => route.abort());
@@ -15,6 +15,10 @@ async function fixture(page, { holdCatalog = false } = {}) {
   await page.route("**/api/feedback*", route => {
     state.feedbackRequests++;
     return route.fulfill({ status: 501, json: { error: "Retired admin section" } });
+  });
+  await page.route("**/api/accounts*", route => {
+    state.accountRequests++;
+    return route.fulfill({ status: 501, json: { error: "Accounts must load only when selected" } });
   });
   await page.route("**/api/community*", async route => {
     const action = new URL(route.request().url()).searchParams.get("action");
@@ -44,7 +48,11 @@ test("retired panels are absent and admin starts with ticket metadata instead of
   await expect(page.locator("#batchList button")).toHaveCount(1);
   await expect(page.locator('[data-tab="suggestions"], [data-tab="experiences"], [data-tab="feedback"]')).toHaveCount(0);
   await expect(page.locator("#suggestionsTab, #experiencesTab, #feedbackTab")).toHaveCount(0);
+  await expect(page.locator('[data-tab="members"], #membersTab, #memberForm, #memberList')).toHaveCount(0);
+  await expect(page.locator(".admin-navigation [data-tab]")).toHaveCount(7);
+  await expect(page.locator('[data-tab="accounts"]')).toHaveText("Kullanıcılar");
   expect(state.feedbackRequests).toBe(0);
+  expect(state.accountRequests).toBe(0);
   expect(state.actions).toEqual(["batches"]);
   await page.locator('[data-tab="tickets"]').click();
   await expect(page.locator('[data-tab="tickets"]')).toHaveAttribute("aria-current", "page");

@@ -11,6 +11,7 @@ import {
 import { db, user } from "../lib/database.mjs";
 import { readEvents } from "./events.mjs";
 import { operationsStore, readCheckins } from "../lib/checkins.mjs";
+import { accountsStore, readModeration, isNameBlocked, publicBadgeBoard } from "../lib/accounts.mjs";
 const classes = ["Hazırlık", "1", "2", "3", "4", "5", "Mezun"];
 export const badge = (n) =>
   n >= 5 ? "Altın" : n >= 4 ? "Gümüş" : n >= 3 ? "Bronz" : null;
@@ -32,7 +33,8 @@ async function rate(req, scope, max = 5, seconds = 3600) {
   )
     fail(429, "Çok fazla deneme yapıldı. Lütfen biraz sonra tekrar dene.");
 }
-export function createCommunityHandler({ read = db, events = readEvents, store = operationsStore } = {}) {
+export function createCommunityHandler({ read = db, events = readEvents, store = operationsStore,
+  moderation = accountsStore, currentUser = user } = {}) {
 return guarded(async (req) => {
   const db = read;
   const url = new URL(req.url),
@@ -47,12 +49,12 @@ return guarded(async (req) => {
       db(
         "submissions?kind=eq.experience&status=eq.approved&select=id,title,content,created_at&order=created_at.desc&limit=100",
       ),
-      db("rpc/badge_board", { method: "POST", data: {} }),
+      publicBadgeBoard(db, moderation()),
     ]);
     return response({
       members: [],
       experiences,
-      board: board.map((p) => ({ ...p, badge: badge(Number(p.total)) })),
+      board: board.map((p) => ({ name: p.name, total: p.total, badge: badge(p.total) })),
     });
   }
   if (action === "submit" && req.method === "POST") {
@@ -70,16 +72,19 @@ return guarded(async (req) => {
     return response({ ok: true }, 201);
   }
   if (action === "me") {
-    const u = await user(req);
+    const u = await currentUser(req);
     if (req.method === "GET") {
-      const [p, a] = await Promise.all([
+      const [p, a, visibility] = await Promise.all([
         db(`profiles?id=eq.${u.id}&select=name,public_name`),
         db(
           `attendance?user_id=eq.${u.id}&select=event_id,event_title,created_at&order=created_at.desc`,
         ),
+        readModeration(moderation()),
       ]);
+      const blocked = isNameBlocked(visibility, u.id);
       return response({
-        profile: p[0] || null,
+        profile: p[0] ? { ...p[0], public_name_blocked: blocked } : null,
+        public_name_blocked: blocked,
         attendance: a,
         total: a.length,
         badge: badge(a.length),
@@ -87,6 +92,8 @@ return guarded(async (req) => {
     }
     if (req.method === "POST") {
       const b = await body(req);
+      if (Object.hasOwn(b, "public_name_blocked") || Object.hasOwn(b, "publicNameBlocked"))
+        fail(400, "İsim görünürlüğünün yönetici ayarı bu bölümden değiştirilemez.");
       if (typeof b.public_name !== "boolean")
         fail(400, "Görünürlük tercihi gerekli.");
       await db("profiles?on_conflict=id", {
@@ -104,7 +111,7 @@ return guarded(async (req) => {
     }
   }
   if (action === "claim" && req.method === "POST") {
-    const u = await user(req),
+    const u = await currentUser(req),
       b = await body(req);
     const code = text(b.code, 40, true).toUpperCase().replace(/\s/g, "");
     await rate(req, "claim:" + u.id, 20, 3600);

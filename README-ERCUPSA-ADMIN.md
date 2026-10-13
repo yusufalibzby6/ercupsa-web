@@ -22,9 +22,15 @@ Bu sürüm, Netlify üzerinde çalışan küçük bir içerik yönetim sistemi e
 
 ## Panel bölümleri
 
-Panelde **Etkinlikler**, **Kayıt formları**, **Biletler**, **Çekilişler**, **Giriş ve görevliler** ve **Instagram** bölümleri bulunur. Geniş ekranda soldaki menüden, telefonda üstteki menüden geçiş yapılır. Öneriler, deneyimler ve değerlendirmeler sekmeleri kaldırılmıştır.
+Panelde **Etkinlikler**, **Kayıt formları**, **Biletler**, **Çekilişler**, **Giriş ve görevliler**, **Kullanıcılar** ve **Instagram** bölümleri bulunur. Geniş ekranda soldaki menüden, telefonda üstteki menüden geçiş yapılır. Öneriler, deneyimler ve değerlendirmeler sekmeleri kaldırılmıştır.
 
 Hesaplar ve QR bilet kurulumu için [SUPABASE-KURULUM.md](SUPABASE-KURULUM.md), kapı girişleri için [ETKINLIK-GIRIS.md](ETKINLIK-GIRIS.md), çekiliş kuralları için [CEKILISLER.md](CEKILISLER.md) belgesini izleyin. Yönetici parolası tarayıcı depolamasında tutulmaz. `npm ci`, `npm run build` ve `npm test` kullanılabilir.
+
+## Site kullanıcıları ve ad görünürlüğü
+
+**Kullanıcılar** sekmesinde siteye kayıt olan hesapların ad soyad ve e-posta bilgileri listelenir; ad veya e-posta ile arayıp sayfalar arasında ilerleyebilirsiniz. Henüz profil bilgilerini tamamlamamış hesaplar da görünür. Bir isme basınca açılan pencerede biletini hesabına eklediği etkinlikler ve kapıda doğrulanmış girişleri ayrı gösterilir. Bileti hesaba eklemek, etkinliğe gerçekten giriş yapmak anlamına gelmez. Kapı kayıtları okunamazsa giriş durumu doğrulanamadı olarak gösterilir.
+
+**Sitedeki adı gizle**, kişinin adının herkese açık katılım listelerinde gösterilmesini engeller. Hesabı, e-postası, biletleri, çekiliş hakları ve etkinlik geçmişi silinmez. Kullanıcı profilinde izin verse bile yönetici engeli devam eder. **Yönetici engelini kaldır** yalnızca bu engeli kaldırır; kişinin kendi görünürlük iznini değiştirmez. İzin vermemiş kullanıcıların adı gizli kalır. Bu ekran e-posta veya etkinlik geçmişini herkese açık hâle getirmez. Yönetici çıkışında liste ve açık pencerenin bilgileri temizlenir.
 
 ## Ana sayfanın Instagram paylaşımları
 

@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import handler from "../netlify/functions/community.mjs";
+import { createCommunityHandler } from "../netlify/functions/community.mjs";
 import { adminLogin } from "../netlify/lib/security.mjs";
 test("community handler integrates with SQL: moderation, profiles, ticket claim and private contact data", async () => {
+  const handler = createCommunityHandler({ moderation: () => ({ getWithMetadata: async () => null }) });
   const pg = new PGlite();
   await pg.exec(
     "create role anon;create role authenticated;create role service_role;create schema auth;create table auth.users(id uuid primary key);",
@@ -80,11 +81,18 @@ test("community handler integrates with SQL: moderation, profiles, ticket claim 
     for (const [key, v] of url.searchParams) {
       if (v.startsWith("eq.")) {
         assert.ok(
-          ["id", "kind", "status", "user_id", "batch_id"].includes(key),
+          ["id", "kind", "status", "user_id", "batch_id", "public_name"].includes(key),
         );
-        values.push(v.slice(3));
+        values.push(key === "public_name" ? v.slice(3) === "true" : v.slice(3));
         conditions.push(`${key}=$${values.length}`);
       }
+    }
+    const after = url.searchParams.get("and");
+    if (after) {
+      const match = after.match(/^\((id|event_id)\.gt\.([A-Za-z0-9_-]+)\)$/);
+      assert.ok(match, "unexpected cursor filter");
+      values.push(match[2]);
+      conditions.push(`${match[1]}>$${values.length}`);
     }
     const where = conditions.length ? " where " + conditions.join(" and ") : "";
     if (options.method === "PATCH") {
@@ -98,7 +106,12 @@ test("community handler integrates with SQL: moderation, profiles, ticket claim 
         ).rows,
       );
     }
-    const rows = (await pg.query("select * from " + table + where, values))
+    const order = url.searchParams.get("order");
+    assert.ok(!order || /^(id|event_id|user_id|created_at)\.(asc|desc)(,(id|event_id|user_id)\.(asc|desc))*$/.test(order));
+    const sorting = order ? " order by " + order.replaceAll(".", " ") : "";
+    const limit = Number(url.searchParams.get("limit") || 1000), offset = Number(url.searchParams.get("offset") || 0);
+    assert.ok(Number.isInteger(limit) && limit > 0 && Number.isInteger(offset) && offset >= 0);
+    const rows = (await pg.query("select * from " + table + where + sorting + ` limit ${limit} offset ${offset}`, values))
       .rows;
     // Honor the projection used by the API; email never leaves auth lookup.
     const select = url.searchParams.get("select");

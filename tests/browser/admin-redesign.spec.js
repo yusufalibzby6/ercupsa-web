@@ -11,7 +11,7 @@ const form = {
 };
 const sections = [
   ["events", "Etkinlikler"], ["registrations", "Kayıt formları"], ["tickets", "Biletler"],
-  ["raffles", "Çekilişler"], ["attendance", "Giriş ve görevliler"], ["instagram", "Instagram"],
+  ["raffles", "Çekilişler"], ["attendance", "Giriş ve görevliler"], ["accounts", "Kullanıcılar"], ["instagram", "Instagram"],
 ];
 
 async function fixture(page, authenticated = true) {
@@ -40,6 +40,7 @@ async function fixture(page, authenticated = true) {
   await page.route("**/api/gate*", route => route.fulfill({ json: { participants: [], entries: [], summary: { claimed: 0, entered: 0 } } }));
   await page.route("**/api/staff*", route => route.fulfill({ json: { accounts: [] } }));
   await page.route("**/api/site-content*", route => route.fulfill({ json: { instagram: { revision: "test-revision", posts: [1, 2, 3, 4].map(n => `https://www.instagram.com/p/modern${n}/`) } } }));
+  await page.route("**/api/accounts*", route => route.fulfill({ json: { accounts: [], page: 1, pageSize: 50, total: 0, pages: 1 } }));
   await page.goto("/admin.html");
   await expect(page.locator(authenticated ? "#app" : "#login")).toBeVisible();
   return state;

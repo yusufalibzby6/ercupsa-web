@@ -3,6 +3,7 @@ import "./admin-registrations.js";
 import "./admin-raffles.js";
 import "./admin-gate.js";
 import "./admin-instagram.js";
+import "./admin-accounts.js";
 import { $, escape, api, status, onAdminEvent } from "./common.js";
 import {
   ticketCard,
@@ -17,7 +18,7 @@ let ready = false, authGeneration = 0, catalogLoadVersion = 0;
 let designBusy = false, batchBusy = false, fileReading = false, candidate = null, candidateFile = null;
 let designLoadVersion = 0, fileReadVersion = 0, batchLoadVersion = 0, cardsVersion = 0;
 let designPromise = null, openedBatch = null;
-const tabs = ["events", "registrations", "tickets", "raffles", "attendance", "instagram"];
+const tabs = ["events", "registrations", "tickets", "raffles", "attendance", "accounts", "instagram"];
 function tab(name) {
   if (!tabs.includes(name)) return;
   for (const t of tabs) {
