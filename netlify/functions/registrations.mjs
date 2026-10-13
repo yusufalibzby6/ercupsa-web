@@ -4,10 +4,10 @@ import { readEvents as readStoredEvents } from "./events.mjs";
 import { db as database } from "../lib/database.mjs";
 import { fail, guarded, identifier, requireAdmin, response } from "../lib/security.mjs";
 import {
-  REGISTRATION_STORE, REGISTRATION_RECEIPT_STORE, REGISTRATION_FULL_MESSAGE,
+  REGISTRATION_STORE, REGISTRATION_RECEIPT_STORE, REGISTRATION_PHOTO_STORE, REGISTRATION_FULL_MESSAGE,
   defaultRegistrationForm, normalizeRegistrationForm, registrationIsAvailable,
   formKey, entryKey, entryPrefix, registrationStateKey,
-  validateRegistrationAnswers, validateRegistrationReceipt, readRegistrationJson,
+  validateRegistrationAnswers, validateRegistrationReceipt, validateRegistrationPhoto, readRegistrationJson,
   readRegistrationSubmission, entryForAdmin, registrationSummary, registrationCsv,
   mapConcurrent, annotateRegistrationDuplicates,
 } from "../lib/registrations.mjs";
@@ -16,7 +16,7 @@ import { reserveRegistrationTicket, ensureRegistrationTicket, savedRegistrationT
 
 const READ_JSON = { type: "json", consistency: "strong" };
 const hash = (value) => createHash("sha256").update(value).digest("hex");
-const ADMIN_ACTIONS = new Set(["admin", "form", "delete", "summary", "receipt", "export", "ticket"]);
+const ADMIN_ACTIONS = new Set(["admin", "form", "delete", "summary", "receipt", "photo", "export", "ticket"]);
 const RETRY_CONFLICT = "Önceki kayıt isteğin alınmış. Farklı bilgilerle tekrar gönderilemedi. Kaydını düzenlemek için organizatörlerle iletişime geç.";
 const DELETED_CONFLICT = "Bu kayıt yönetici tarafından silinmiş. Yeni bir kayıt için sayfayı yenileyin.";
 const withLimit = (form) => form ? { ...form, maxRegistrations: form.maxRegistrations ?? null } : null;
@@ -33,12 +33,22 @@ const writeOptions = (snap) => {
   return snap.exists ? { onlyIfMatch: snap.etag } : { onlyIfNew: true };
 };
 
-async function prepareSubmission(submission, fields, file) {
+async function prepareSubmission(submission, fields, file, photos = {}) {
   const answers = validateRegistrationAnswers(submission.answers, fields);
+  const photoFields = new Map(fields.filter((field) => field.type === "photo").map((field) => [field.id, field]));
+  for (const id of Object.keys(submission.photos || {})) {
+    if (!photoFields.has(id)) fail(400, "Form değişmiş olabilir. Sayfayı yenileyip fotoğrafları tekrar seçin.");
+  }
+  for (const field of photoFields.values()) {
+    if (field.required && !photos[field.id]) fail(400, `${field.label}: fotoğraf yükleyin.`);
+  }
   const stableAnswers = Object.keys(answers).sort().map((key) => [key,
     Array.isArray(answers[key]) ? [...answers[key]].sort() : answers[key]]);
   const fingerprint = hash(JSON.stringify({ answers: stableAnswers,
-    receipt: file ? [file.metadata.mime, hash(file.bytes)] : null }));
+    receipt: file ? [file.metadata.mime, hash(file.bytes)] : null,
+    ...(Object.keys(photos).length ? { photos: Object.keys(photos).sort().map((id) =>
+      [id, photos[id].metadata.mime, hash(photos[id].bytes)]) } : {}) }));
+  for (const field of photoFields.values()) answers[field.id] = photos[field.id]?.metadata.name || "";
   return { answers, fingerprint };
 }
 
@@ -99,9 +109,9 @@ const submissionResponse = (entry) => response({ ok: true, reference: entry.id,
   event: { id: entry.eventId, title: entry.eventTitle, date: entry.eventDate,
     time: entry.eventTime || "", location: entry.eventLocation || "" } });
 
-async function verifyRetry(submission, entry, file) {
+async function verifyRetry(submission, entry, file, photos) {
   let prepared;
-  try { prepared = await prepareSubmission(submission, entry.fields, file); }
+  try { prepared = await prepareSubmission(submission, entry.fields, file, photos); }
   catch (error) {
     if (error.status) fail(409, RETRY_CONFLICT);
     throw error;
@@ -125,7 +135,7 @@ export function createRegistrationsHandler({
       if (!ADMIN_ACTIONS.has(action)) fail(400, "Geçersiz kayıt işlemi.");
     }
     if ((["submit", "delete"].includes(action) && method !== "POST") ||
-      (["admin", "summary", "receipt", "export"].includes(action) && method !== "GET") ||
+      (["admin", "summary", "receipt", "photo", "export"].includes(action) && method !== "GET") ||
       (["form", "ticket"].includes(action) && !["GET", "POST"].includes(method)))
       fail(405, "Desteklenmeyen işlem.");
     const store = getStore(REGISTRATION_STORE);
@@ -145,21 +155,24 @@ export function createRegistrationsHandler({
     }
     const eventId = identifier(url.searchParams.get("event_id"));
     let snap = await readState(store, eventId);
-    if (action === "receipt") {
+    if (["receipt", "photo"].includes(action)) {
       const id = identifier(url.searchParams.get("id"));
       const entry = snap.data.entries.find((item) => item.id === id);
-      if (!entry?.receipt) fail(404, "Dekont bulunamadı.");
-      const receipt = entry.receipt;
-      const bytes = await getStore(REGISTRATION_RECEIPT_STORE).get(receipt.key, {
+      const fieldId = action === "photo" ? identifier(url.searchParams.get("field_id")) : null;
+      const receipt = action === "photo" ? (entry?.photos && Object.hasOwn(entry.photos, fieldId) ? entry.photos[fieldId] : null) : entry?.receipt;
+      if (!receipt) fail(404, action === "photo" ? "Fotoğraf bulunamadı." : "Dekont bulunamadı.");
+      const bytes = await getStore(action === "photo" ? REGISTRATION_PHOTO_STORE : REGISTRATION_RECEIPT_STORE).get(receipt.key, {
         type: "arrayBuffer", consistency: "strong",
       });
-      if (!bytes) fail(404, "Dekont bulunamadı.");
+      if (!bytes) fail(404, action === "photo" ? "Fotoğraf bulunamadı." : "Dekont bulunamadı.");
       const disposition = receipt.mime === "application/pdf" ? "attachment" : "inline";
-      const encodedName = encodeURIComponent(receipt.name).replace(/[!'()*]/g, (char) =>
+      // Older truncated names can contain an unpaired UTF-16 surrogate. Keep
+      // the private file readable while emitting a valid RFC 5987 filename.
+      const encodedName = encodeURIComponent(String(receipt.name).replace(/[\uD800-\uDFFF]/gu, "\uFFFD")).replace(/[!'()*]/g, (char) =>
         `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
       return new Response(bytes, { headers: {
         "Content-Type": receipt.mime,
-        "Content-Disposition": `${disposition}; filename="dekont"; filename*=UTF-8''${encodedName}`,
+        "Content-Disposition": `${disposition}; filename="${action === "photo" ? "fotograf" : "dekont"}"; filename*=UTF-8''${encodedName}`,
         "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "default-src 'none'; sandbox",
         "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY",
@@ -174,6 +187,7 @@ export function createRegistrationsHandler({
         if (!entry && !deleted) fail(404, "Kayıt bulunamadı.");
         if (entry) {
           deleted = { id, name: entry.name, ...(entry.receipt ? { receiptKey: entry.receipt.key } : {}),
+            ...(entry.photos ? { photoKeys: Object.values(entry.photos).map((photo) => photo.key) } : {}),
             ...(entry.ticket ? { ticket: entry.ticket } : {}) };
           const data = { ...snap.data, entries: snap.data.entries.filter((item) => item.id !== id),
             deleted: [...snap.data.deleted, deleted] };
@@ -191,6 +205,10 @@ export function createRegistrationsHandler({
         if (deleted.receiptKey) {
           try { await getStore(REGISTRATION_RECEIPT_STORE).delete(deleted.receiptKey); }
           catch { /* Tombstone retains the key for a subsequent cleanup retry. */ }
+        }
+        for (const key of deleted.photoKeys || []) {
+          try { await getStore(REGISTRATION_PHOTO_STORE).delete(key); }
+          catch { /* Canonical tombstone denies access until cleanup can be retried. */ }
         }
         try { await store.delete(entryKey(eventId, id)); }
         catch { /* Canonical tombstone prevents any legacy resurrection. */ }
@@ -336,55 +354,76 @@ export function createRegistrationsHandler({
     const existing = snap.data.entries.find((entry) => entry.id === id);
     if (snap.data.deleted.some((entry) => entry.id === id)) fail(409, DELETED_CONFLICT);
     let file;
-    try { file = submission.receipt ? await validateRegistrationReceipt(submission.receipt) : null; }
+    const photoFiles = Object.create(null);
+    try {
+      file = submission.receipt ? await validateRegistrationReceipt(submission.receipt) : null;
+      for (const [fieldId, photo] of Object.entries(submission.photos))
+        photoFiles[fieldId] = await validateRegistrationPhoto(photo);
+    }
     catch (error) {
       if (existing && error.status) fail(409, RETRY_CONFLICT);
       throw error;
     }
-    if (existing) return verifyRetry(submission, existing, file);
+    if (existing) return verifyRetry(submission, existing, file, photoFiles);
     if (!registrationIsAvailable(event, snap.data.form, now()))
       fail(409, "Bu etkinliğin kayıt formu şu anda açık değil.");
     if (full(snap.data)) return fullResponse();
-    await prepareSubmission(submission, snap.data.form.fields, file);
+    await prepareSubmission(submission, snap.data.form.fields, file, photoFiles);
     await rateLimit(req, getStore("ercupsa-security"), now());
     const createdAt = now().toISOString();
-    const receiptStore = file ? getStore(REGISTRATION_RECEIPT_STORE) : null;
+    const staged = [];
+    const photos = Object.create(null);
     let receipt = null;
-    if (file) {
-      receipt = { ...file.metadata, key: `${eventId}/${id}/${identifier(uuid())}` };
-      try {
-        const uploaded = await receiptStore.set(receipt.key, file.bytes, { onlyIfNew: true });
-        if (!uploaded.modified) fail(503, "Dekont kaydedilemedi. Lütfen tekrar deneyin.");
-      } catch (error) {
-        try { await receiptStore.delete(receipt.key); } catch { /* Retryable private cleanup. */ }
-        throw error;
-      }
-    }
-    const cleanup = async () => {
-      if (receipt) {
-        try { await receiptStore.delete(receipt.key); }
+    const cleanup = async (accepted) => {
+      const keep = new Set([accepted?.receipt?.key,
+        ...Object.values(accepted?.photos || {}).map((photo) => photo.key)].filter(Boolean));
+      for (const upload of staged) {
+        if (keep.has(upload.key)) continue;
+        try { await upload.store.delete(upload.key); }
         catch { /* Unreferenced private uploads never affect an accepted record. */ }
       }
     };
+    const upload = async (storeName, source) => {
+      const target = getStore(storeName);
+      const metadata = { ...source.metadata, key: `${eventId}/${id}/${identifier(uuid())}` };
+      let uploaded;
+      try {
+        uploaded = await target.set(metadata.key, source.bytes, { onlyIfNew: true });
+      } catch (error) {
+        // A uniquely named upload may have completed before its response was lost.
+        try { await target.delete(metadata.key); } catch { /* Retryable private cleanup. */ }
+        throw error;
+      }
+      // A failed conditional create belongs to somebody else; never delete it.
+      if (!uploaded.modified) fail(503, "Dosya kaydedilemedi. Lütfen tekrar deneyin.");
+      staged.push({ store: target, key: metadata.key });
+      return metadata;
+    };
+    try {
+      if (file) receipt = await upload(REGISTRATION_RECEIPT_STORE, file);
+      for (const [fieldId, source] of Object.entries(photoFiles))
+        photos[fieldId] = await upload(REGISTRATION_PHOTO_STORE, source);
+    } catch (error) { await cleanup(); throw error; }
     try {
       for (let attempt = 0; attempt < 64; attempt++) {
         const accepted = snap.data.entries.find((entry) => entry.id === id);
         if (accepted) {
-          const result = await verifyRetry(submission, accepted, file);
-          await cleanup(); return result;
+          const result = await verifyRetry(submission, accepted, file, photoFiles);
+          await cleanup(accepted); return result;
         }
         if (snap.data.deleted.some((entry) => entry.id === id)) fail(409, DELETED_CONFLICT);
         const form = snap.data.form;
         if (!registrationIsAvailable(event, form, now()))
           fail(409, "Bu etkinliğin kayıt formu şu anda açık değil.");
         if (full(snap.data)) { await cleanup(); return fullResponse(); }
-        const { answers, fingerprint } = await prepareSubmission(submission, form.fields, file);
+        const { answers, fingerprint } = await prepareSubmission(submission, form.fields, file, photoFiles);
         if (receipt && !form.receipt.enabled) fail(400, "Bu formda dekont yüklemesi açık değil.");
         if (!receipt && form.receipt.enabled && form.receipt.required) fail(400, "Dekont dosyanızı yükleyin.");
         const entry = { id, eventId, eventTitle: event.title, eventDate: event.date,
           eventTime: event.time || "", eventLocation: event.location || "",
           name: answers.full_name, classYear: answers.class_year, phone: answers.phone,
-          answers, fields: structuredClone(form.fields), fingerprint, createdAt, receipt };
+          answers, fields: structuredClone(form.fields), fingerprint, createdAt, receipt,
+          ...(Object.keys(photos).length ? { photos } : {}) };
         // Form settings, all accepted records and deletion tombstones share a
         // single conditional write. No concurrent submission can oversubscribe
         // the last slot, or race a newly lowered limit or closed form.
@@ -402,8 +441,8 @@ export function createRegistrationsHandler({
       catch { throw error; }
       const accepted = confirmed.data.entries.find((entry) => entry.id === id);
       if (accepted) {
-        if (accepted.receipt?.key !== receipt?.key) await cleanup();
-        return verifyRetry(submission, accepted, file);
+        await cleanup(accepted);
+        return verifyRetry(submission, accepted, file, photoFiles);
       }
       await cleanup(); throw error;
     }

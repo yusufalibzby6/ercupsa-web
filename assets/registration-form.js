@@ -1,9 +1,32 @@
-/* Native event registrations. Answers and receipts are submitted only to the private registration API. */
+/* Native event registrations. Answers and files are submitted only to the private registration API. */
 window.ercupsaRegistration = (() => {
   const receiptLimit = 4 * 1024 * 1024;
   const fullMessage = 'İlginiz için teşekkür ederiz. Kontenjanımız dolmuştur. Bir sonraki etkinliklerimize bekleriz.';
-  const supportedTypes = new Set(['text', 'textarea', 'email', 'tel', 'select', 'radio', 'checkboxes']);
+  const supportedTypes = new Set(['text', 'textarea', 'email', 'tel', 'select', 'radio', 'checkboxes', 'photo']);
   const choiceTypes = new Set(['select', 'radio', 'checkboxes']);
+  const mounts = new WeakMap();
+  const isOptionImage = value => {
+    if (typeof value !== 'string' || value.length > 2000) return false;
+    if (!value) return true;
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' && url.hostname === 'res.cloudinary.com'
+        && !url.username && !url.password && !url.port && !url.hash && !url.search
+        && url.pathname.startsWith('/w2trki15/image/upload/');
+    } catch { return false; }
+  };
+  const photoFileError = file => {
+    if (!file) return '';
+    if (file.size > receiptLimit) return 'Dosya en fazla 4 MB olabilir.';
+    if (!file.size) return 'Fotoğraf dosyası boş. Başka bir dosya seç.';
+    const mime = file.type.toLowerCase();
+    if (/\.svg$/i.test(file.name) || (mime.startsWith('image/') && !['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/jfif', 'image/png', 'image/x-png', 'image/webp'].includes(mime))) {
+      return 'Fotoğraf için JPG, PNG veya WebP dosyası seç.';
+    }
+    // Android providers may leave the MIME empty or report a generic type.
+    // The API checks the actual image bytes before accepting any upload.
+    return '';
+  };
   const endpoint = (action, eventId) => `/api/registrations?action=${encodeURIComponent(action)}&event_id=${encodeURIComponent(eventId)}`;
   const timedFetch = async (url, options = {}) => {
     const controller = new AbortController();
@@ -58,8 +81,11 @@ window.ercupsaRegistration = (() => {
         || !supportedTypes.has(field.type) || (Object.hasOwn(coreTypes, field.id) && coreTypes[field.id] !== field.type)
         || typeof field.label !== 'string' || !field.label.trim() || field.label.length > 160) return false;
       ids.add(field.id);
-      return !choiceTypes.has(field.type) || (Array.isArray(field.options) && field.options.length > 0
-        && field.options.length <= 40 && field.options.every(value => typeof value === 'string' && value.trim() && value.length <= 160));
+      if (!choiceTypes.has(field.type)) return field.optionImages === undefined;
+      return Array.isArray(field.options) && field.options.length > 0
+        && field.options.length <= 40 && field.options.every(value => typeof value === 'string' && value.trim() && value.length <= 160)
+        && (field.optionImages === undefined || (Array.isArray(field.optionImages)
+          && field.optionImages.length === field.options.length && field.optionImages.every(isOptionImage)));
     }) && ['full_name', 'class_year', 'phone'].every(id => ids.has(id));
   }
 
@@ -140,6 +166,18 @@ window.ercupsaRegistration = (() => {
   }
 
   function renderForm(container, config, event) {
+    let pending = false;
+    let disposed = false;
+    const photoPreviews = new Map();
+    const revokePreview = input => {
+      const url = photoPreviews.get(input);
+      if (url) URL.revokeObjectURL(url);
+      photoPreviews.delete(input);
+    };
+    const dispose = () => {
+      disposed = true;
+      for (const input of photoPreviews.keys()) revokePreview(input);
+    };
     const form = node('form', 'registration-form');
     form.id = 'nativeRegistrationForm';
     form.noValidate = true;
@@ -147,13 +185,19 @@ window.ercupsaRegistration = (() => {
     const description = node('p', 'registration-description', config.description || 'Etkinliğe katılmak için aşağıdaki bilgileri doldur.');
     description.id = 'registrationDescription';
     intro.append(description, node('p', 'registration-required-note', '* işaretli alanların doldurulması zorunludur.'));
+    if (config.receipt?.enabled || config.fields.some(field => field.type === 'photo')) {
+      const budget = node('p', 'registration-upload-budget', 'Fotoğraflar ve dekont için toplam dosya sınırı 4 MB. Daha küçük dosyalar seçebilirsin.');
+      budget.id = 'registrationUploadBudget';
+      intro.append(budget);
+    }
     form.append(intro);
     const fieldsContainer = node('div', 'registration-fields');
     const controls = new Map();
 
     for (const field of config.fields) {
-      const grouped = field.type === 'radio' || field.type === 'checkboxes';
-      const wrap = node(grouped ? 'fieldset' : 'div', `registration-field${field.type === 'textarea' ? ' registration-field-wide' : ''}`);
+      const imageChoices = choiceTypes.has(field.type) && field.optionImages?.some(Boolean);
+      const grouped = field.type === 'radio' || field.type === 'checkboxes' || imageChoices;
+      const wrap = node(grouped ? 'fieldset' : 'div', `registration-field${field.type === 'textarea' || field.type === 'photo' || imageChoices ? ' registration-field-wide' : ''}${field.type === 'photo' ? ' registration-photo' : ''}`);
       wrap.id = `registration-field-${field.id}`;
       const required = field.id === 'full_name' || field.required === true;
       const label = node(grouped ? 'legend' : 'label', 'registration-label', field.label);
@@ -165,10 +209,11 @@ window.ercupsaRegistration = (() => {
       }
       wrap.append(label);
       const inputs = [];
+      let removePhoto, updatePhotoPreview;
       if (grouped) {
-        const choices = node('div', 'registration-choices');
+        const choices = node('div', `registration-choices${imageChoices ? ' registration-image-choices' : ''}`);
         for (const [index, option] of field.options.entries()) {
-          const choice = node('label', 'registration-choice');
+          const choice = node('label', `registration-choice${imageChoices ? ' registration-image-choice' : ''}`);
           const input = node('input');
           input.type = field.type === 'checkboxes' ? 'checkbox' : 'radio';
           input.name = field.id;
@@ -176,11 +221,93 @@ window.ercupsaRegistration = (() => {
           input.value = option;
           input.setAttribute('aria-describedby', `registration-error-${field.id}`);
           if (required) input.setAttribute('aria-required', 'true');
-          choice.append(input, node('span', '', option));
+          if (imageChoices) {
+            const media = node('div', 'registration-choice-media');
+            const imageUrl = field.optionImages[index];
+            if (imageUrl) {
+              const image = node('img');
+              image.src = imageUrl;
+              image.alt = `${option} görseli`;
+              image.loading = 'lazy';
+              image.referrerPolicy = 'no-referrer';
+              image.addEventListener('error', () => {
+                image.remove();
+                media.append(node('span', 'registration-choice-image-fallback', 'Görsel yüklenemedi'));
+              }, { once: true });
+              media.append(image);
+            } else media.append(node('span', 'registration-choice-image-fallback', 'Görselsiz seçenek'));
+            const caption = node('span', 'registration-choice-caption');
+            const text = node('span', '', option);
+            text.id = `registration-option-${field.id}-${index}`;
+            input.setAttribute('aria-labelledby', text.id);
+            caption.append(input, text);
+            choice.append(media, caption);
+          } else choice.append(input, node('span', '', option));
           choices.append(choice);
           inputs.push(input);
         }
         wrap.append(choices);
+        if (imageChoices && field.type === 'select' && !required) {
+          const clear = node('button', 'registration-choice-clear', 'Seçimi temizle');
+          clear.type = 'button';
+          clear.setAttribute('aria-label', `${field.label}: seçimi temizle`);
+          clear.addEventListener('click', () => {
+            if (pending || disposed) return;
+            for (const input of inputs) input.checked = false;
+            inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+            inputs[0].focus();
+          });
+          wrap.append(clear);
+        }
+      } else if (field.type === 'photo') {
+        const help = node('p', 'registration-help', 'JPG, PNG veya WebP · Yalnızca etkinlik organizatörleri görüntüleyebilir. Fotoğraflar ve dekont toplam en fazla 4 MB olabilir.');
+        help.id = `registration-help-${field.id}`;
+        const input = node('input', 'registration-file');
+        input.type = 'file';
+        input.id = `registration-${field.id}`;
+        input.name = `photo:${field.id}`;
+        input.accept = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
+        input.required = required;
+        input.setAttribute('aria-describedby', `${help.id} registration-error-${field.id}`);
+        const preview = node('div', 'registration-photo-preview hidden');
+        const previewImage = node('img');
+        previewImage.alt = `${field.label} için seçtiğin fotoğraf`;
+        const previewStatus = node('p', 'registration-help');
+        previewStatus.setAttribute('role', 'status');
+        removePhoto = node('button', 'registration-photo-remove', 'Fotoğrafı kaldır');
+        removePhoto.type = 'button';
+        removePhoto.setAttribute('aria-label', `${field.label}: seçilen fotoğrafı kaldır`);
+        previewImage.addEventListener('error', () => {
+          previewImage.classList.add('hidden');
+          previewStatus.textContent = 'Önizleme gösterilemiyor. Fotoğrafın dosya türü gönderildiğinde kontrol edilecek.';
+        });
+        const updatePreview = () => {
+          revokePreview(input);
+          previewImage.removeAttribute('src');
+          previewImage.classList.add('hidden');
+          previewStatus.textContent = '';
+          const file = input.files?.[0];
+          preview.classList.toggle('hidden', !file);
+          if (!file) return;
+          previewStatus.textContent = file.name;
+          if (photoFileError(file)) return;
+          const url = URL.createObjectURL(file);
+          photoPreviews.set(input, url);
+          previewImage.classList.remove('hidden');
+          previewImage.src = url;
+        };
+        updatePhotoPreview = updatePreview;
+        input.addEventListener('change', updatePreview);
+        removePhoto.addEventListener('click', () => {
+          if (pending || disposed) return;
+          input.value = '';
+          updatePreview();
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.focus();
+        });
+        preview.append(previewImage, previewStatus, removePhoto);
+        wrap.append(help, input, preview);
+        inputs.push(input);
       } else {
         const input = node(field.type === 'textarea' ? 'textarea' : field.type === 'select' ? 'select' : 'input', 'registration-control');
         input.name = field.id;
@@ -215,7 +342,7 @@ window.ercupsaRegistration = (() => {
       const error = node('p', 'registration-field-error hidden');
       error.id = `registration-error-${field.id}`;
       wrap.append(error);
-      controls.set(field.id, { field, required, inputs, error });
+      controls.set(field.id, { field, required, inputs, error, grouped, removePhoto, updatePhotoPreview });
       fieldsContainer.append(wrap);
     }
     form.append(fieldsContainer);
@@ -230,7 +357,7 @@ window.ercupsaRegistration = (() => {
         marker.setAttribute('aria-hidden', 'true');
         label.append(marker);
       }
-      const note = node('p', 'registration-help', 'JPG, PNG veya PDF · En fazla 4 MB. Dosyanı yalnızca etkinlik organizatörleri görüntüleyebilir.');
+      const note = node('p', 'registration-help', 'JPG, PNG veya PDF · En fazla 4 MB. Fotoğraflar ve dekont birlikte toplam 4 MB sınırına dahildir. Dosyanı yalnızca etkinlik organizatörleri görüntüleyebilir.');
       note.id = 'registrationReceiptHelp';
       receiptInput = node('input', 'registration-file');
       receiptInput.type = 'file';
@@ -258,7 +385,7 @@ window.ercupsaRegistration = (() => {
     trap.append(trapLabel, trapInput);
     form.append(trap);
 
-    const privacy = node('p', 'registration-privacy', 'Bilgilerin ve varsa dekontun bu etkinliğin kayıtlarını yönetmek amacıyla organizatörlere iletilir. Kayıt için site hesabı oluşturman gerekmez.');
+    const privacy = node('p', 'registration-privacy', 'Bilgilerin, varsa fotoğrafların ve dekontun bu etkinliğin kayıtlarını yönetmek amacıyla organizatörlere iletilir. Yüklediğin dosyalar sitede herkese açık paylaşılmaz. Kayıt için site hesabı oluşturman gerekmez.');
     const feedback = node('p', 'registration-feedback hidden');
     feedback.id = 'registrationFeedback';
     feedback.setAttribute('role', 'alert');
@@ -269,7 +396,6 @@ window.ercupsaRegistration = (() => {
     form.append(privacy, feedback, submit);
     container.replaceChildren(form);
     const idempotencyKey = requestId();
-    let pending = false;
 
     const clearError = ({ inputs, error }) => {
       error.textContent = '';
@@ -285,20 +411,39 @@ window.ercupsaRegistration = (() => {
       for (const input of control.inputs) input.addEventListener('input', () => clearError(control));
     }
     if (receiptInput) receiptInput.addEventListener('change', () => clearError({ inputs: [receiptInput], error: receiptError }));
+    form.addEventListener('reset', () => queueMicrotask(() => {
+      if (disposed) return;
+      for (const control of controls.values()) {
+        control.updatePhotoPreview?.();
+        clearError(control);
+      }
+      if (receiptInput) clearError({ inputs: [receiptInput], error: receiptError });
+    }));
 
     form.addEventListener('submit', async submission => {
       submission.preventDefault();
-      if (pending) return;
+      if (pending || disposed) return;
       feedback.classList.add('hidden');
       feedback.textContent = '';
       const answers = Object.create(null);
+      const photos = [];
       let firstInvalid;
       for (const control of controls.values()) {
         clearError(control);
-        const { field, inputs, required } = control;
+        const { field, inputs, required, grouped } = control;
+        if (field.type === 'photo') {
+          const file = inputs[0].files?.[0];
+          const error = required && !file ? 'Bu alan için bir fotoğraf yüklemelisin.' : photoFileError(file);
+          if (error) {
+            setError(control, error);
+            firstInvalid ||= inputs[0];
+          }
+          if (file) photos.push({ control, file });
+          continue;
+        }
         const value = field.type === 'checkboxes'
           ? inputs.filter(input => input.checked).map(input => input.value)
-          : field.type === 'radio' ? inputs.find(input => input.checked)?.value || '' : inputs[0].value.trim();
+          : grouped ? inputs.find(input => input.checked)?.value || '' : inputs[0].value.trim();
         answers[field.id] = value;
         let error = '';
         if (required && (Array.isArray(value) ? !value.length : !value)) error = 'Bu alanı doldurmalısın.';
@@ -325,6 +470,13 @@ window.ercupsaRegistration = (() => {
           firstInvalid ||= receiptInput;
         }
       }
+      const uploads = [...photos.map(photo => photo.file), ...(file ? [file] : [])];
+      if (uploads.every(upload => upload.size <= receiptLimit)
+        && uploads.reduce((total, upload) => total + upload.size, 0) > receiptLimit) {
+        const control = photos[0]?.control || { inputs: [receiptInput], error: receiptError };
+        setError(control, 'Fotoğraflar ve dekont toplam en fazla 4 MB olabilir. Daha küçük dosyalar seç.');
+        firstInvalid ||= control.inputs[0];
+      }
       if (firstInvalid) {
         feedback.textContent = 'İşaretli alanları kontrol edip tekrar deneyebilirsin.';
         feedback.classList.remove('hidden');
@@ -337,19 +489,24 @@ window.ercupsaRegistration = (() => {
       payload.set('requestId', idempotencyKey);
       payload.set('website', trapInput.value);
       if (file) payload.set('receipt', file, file.name);
+      for (const { control, file: photo } of photos) payload.set(`photo:${control.field.id}`, photo, photo.name);
       pending = true;
       submit.disabled = true;
       submit.textContent = 'Kaydın gönderiliyor…';
       form.setAttribute('aria-busy', 'true');
       // Keep the exact submitted values visible while the request is pending.
-      const editable = [...form.querySelectorAll('input, textarea, select')];
+      const editable = [...form.querySelectorAll('input, textarea, select, button')].filter(input => input !== submit);
       editable.forEach(input => { input.disabled = true; });
       try {
         const response = await timedFetch(endpoint('submit', event.id), { method: 'POST', body: payload });
         let result;
         try { result = await response.json(); } catch {}
+        if (disposed) return;
         if (!response.ok || result?.ok !== true) {
-          if (response.status === 409 && result?.code === 'REGISTRATION_FULL') return full(container, true);
+          if (response.status === 409 && result?.code === 'REGISTRATION_FULL') {
+            dispose();
+            return full(container, true);
+          }
           if (response.status === 409 || response.status === 404) {
             throw new Error(typeof result?.error === 'string' ? result.error
               : 'Bu etkinlik için artık kayıt alınmıyor. Girdiğin bilgiler gönderilemedi.');
@@ -358,9 +515,11 @@ window.ercupsaRegistration = (() => {
           throw new Error(typeof result?.error === 'string' ? result.error : 'Kaydın gönderilemedi. Bilgilerini koruduk; tekrar deneyebilirsin.');
         }
         const success = registrationSummary(result, event);
+        dispose();
         container.replaceChildren(success);
         success.focus();
       } catch (error) {
+        if (disposed) return;
         feedback.textContent = error.name === 'AbortError'
           ? 'Sunucudan yanıt alınamadı. Bilgilerini koruduk; tekrar deneyebilirsin.'
           : error instanceof TypeError
@@ -376,9 +535,13 @@ window.ercupsaRegistration = (() => {
         editable.forEach(input => { input.disabled = false; });
       }
     });
+    return dispose;
   }
 
   async function mount({ event, container }) {
+    mounts.get(container)?.dispose?.();
+    const state = { dispose: null };
+    mounts.set(container, state);
     const loading = node('p', 'registration-loading', 'Kayıt formu yükleniyor…');
     loading.setAttribute('role', 'status');
     container.replaceChildren(loading);
@@ -386,15 +549,17 @@ window.ercupsaRegistration = (() => {
       const response = await timedFetch(endpoint('form', event.id));
       let data;
       try { data = await response.json(); } catch {}
+      if (mounts.get(container) !== state) return;
       if ((response.ok && data?.full === true) || (response.status === 409 && data?.code === 'REGISTRATION_FULL')) return full(container);
       if (response.status === 404 || response.status === 409) return unavailable(container);
       if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Kayıt formu şu anda yüklenemedi. Tekrar deneyebilirsin.');
       if (!data) throw new Error('Kayıt formu bilgileri okunamadı. Tekrar deneyebilirsin.');
       if (!data.available || !data.form?.enabled) return unavailable(container);
       if (!validateConfig(data.form)) throw new Error('Form bilgileri geçersiz.');
-      renderForm(container, data.form, event);
+      state.dispose = renderForm(container, data.form, event);
     } catch (error) {
-      const state = node('div', 'registration-load-error');
+      if (mounts.get(container) !== state) return;
+      const errorState = node('div', 'registration-load-error');
       const message = node('p', '', error.name === 'AbortError'
         ? 'Kayıt formu zamanında yüklenemedi. Tekrar deneyebilirsin.'
         : error instanceof TypeError
@@ -406,8 +571,8 @@ window.ercupsaRegistration = (() => {
       retry.type = 'button';
       retry.id = 'nativeFormRetry';
       retry.addEventListener('click', () => mount({ event, container }));
-      state.append(message, retry);
-      container.replaceChildren(state);
+      errorState.append(message, retry);
+      container.replaceChildren(errorState);
     }
   }
   return { mount };

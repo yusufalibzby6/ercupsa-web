@@ -385,7 +385,8 @@ test("an admin configures the top description, optional core fields and required
   const id = await question.getAttribute("data-registration-field");
   await question.locator('[data-field-prop="label"]').fill("Katılım oturumu");
   await question.locator('[data-field-prop="type"]').selectOption("select");
-  await question.locator('[data-field-prop="options"]').fill("Sabah\nAkşam");
+  await question.locator('[data-option-label]').nth(0).fill("Sabah");
+  await question.locator('[data-option-label]').nth(1).fill("Akşam");
   await question.locator('[data-field-prop="required"]').check();
   await page.locator("#registrationSave").click();
   await expect(page.locator("#registrationFeedback")).toContainText(/kaydedildi/i);

@@ -8,8 +8,8 @@ Katılımcılar site hesabı açmadan etkinliğin kendi formunu doldurabilir. Bi
 2. Etkinlik kartındaki **Kayıt formu** düğmesine veya üstteki **Kayıt formları** sekmesine girin ve etkinliği seçin.
 3. **Formun üst açıklaması** alanına katılımcının görmesini istediğiniz açıklamayı, ücret ve ödeme bilgilerini yazın. Açıklama formun üstünde görünür; satır sonları korunur.
 4. Ad soyad, sınıf ve telefon alanları hazır gelir. Ad soyad her zaman zorunludur; sınıf ve telefonun zorunluluğunu değiştirebilirsiniz. Sınıf seçeneklerini de düzenleyebilirsiniz.
-5. **Soru ekle** ile kısa/uzun cevap, e-posta, telefon, açılır liste, tek seçim veya çoklu seçim soruları ekleyin. Sorunun başlığını, seçeneklerini ve zorunluluğunu belirleyin. Temel alanlarla birlikte en fazla 25 soru olabilir.
-6. İsterseniz dekont yüklemeyi açın ve zorunlu yapın. PNG, JPEG veya PDF dosyaları kabul edilir; sınır 4 MB'dir. Dosya türü gerçek içeriğinden belirlenir; telefonun farklı tür veya uzantı bildirmesi geçerli dekontun reddedilmesine yol açmaz. Dekontlar herkese açık görsel bağlantısına dönüştürülmez.
+5. **Soru ekle** ile kısa/uzun cevap, e-posta, telefon, açılır liste, tek seçim, çoklu seçim veya **Fotoğraf yükleme** soruları ekleyin. Sorunun başlığını, seçeneklerini ve zorunluluğunu belirleyin. Temel alanlarla birlikte en fazla 25 soru olabilir.
+6. İsterseniz dekont yüklemeyi açın ve zorunlu yapın. PNG, JPEG veya PDF dekontları kabul edilir. Fotoğraflar ve dekontun toplam dosya boyutu en fazla **4 MB** olabilir; tek başına dekontun sınırı da 4 MB'dir. Dosya türü gerçek içeriğinden belirlenir; telefonun farklı tür veya uzantı bildirmesi geçerli dekontun reddedilmesine yol açmaz. Gönderilen dosyalar herkese açık bağlantılara dönüştürülmez.
 7. **Kayıt üst sınırı** alanına örneğin `40` yazın. Toplam kayıt sayısı bu sınıra ulaştığında form otomatik kapanır. Sınır istemiyorsanız alanı boş bırakın. Önceden alınmış kayıtlar da toplam sayıya dahildir.
 8. **Kayıt formunu erişime aç** seçeneğini işaretleyip **Formu kaydet** düğmesine basın. Etkinliği de yayımlayın. Etkinlik kartındaki **Kayıt linkini kopyala** düğmesi paylaşabileceğiniz bağlantıyı verir.
 
@@ -20,6 +20,14 @@ Form erişimini kapatmak mevcut kayıtları silmez. Türkiye tarihine göre gün
 Kontenjan dolduğunda katılımcı şu mesajı görür: **“İlginiz için teşekkür ederiz. Kontenjanımız dolmuştur. Bir sonraki etkinliklerimize bekleriz.”** Her kayıt bir yer kullanır. Aynı anda gelen başvurular da sınırı aşamaz; aynı gönderimin tekrar denenmesi yeni bir yer kullanmaz. Mevcut kayıt sayısından daha düşük bir sınır belirlerseniz eski kayıtlar korunur, yeni kayıt alınmaz. Sınırı yükseltmek veya boş bırakmak formun diğer erişim koşulları uygunsa tekrar açılmasını sağlar.
 
 Kaydedilmemiş form değişiklikleri etkinlikler arasında geçiş yaparken korunur. Sayfayı kapatmadan önce kaydedin. Soruları sonradan değiştirseniz de eski kayıtların soru başlıkları ve cevapları korunur.
+
+## Fotoğraflı seçenekler ve fotoğraf cevapları
+
+**Açılır liste**, **Tek seçim** ve **Çoklu seçim** sorularında her seçeneğin adını kendi satırında düzenleyebilirsiniz. Satırdaki **Fotoğraf ekle** düğmesiyle o seçeneğe görsel yükleyin. Görseli değiştirebilir veya kaldırabilir, seçenekleri yukarı/aşağı taşıyabilir ve yeni seçenek ekleyebilirsiniz. Fotoğraf ile adı aynı seçeneğe bağlı kalır. Formu kaydedince katılımcılar fotoğrafı ve seçeneğin adını birlikte görür. Görsel içeren açılır liste soruları tek seçim yapılabilen kartlar olarak gösterilir; görsel eklenmeyen eski açılır listeler normal görünümünü korur.
+
+Katılımcının kendi fotoğrafını göndermesi için ayrı bir soru ekleyip cevap türünü **Fotoğraf yükleme** seçin. Başlığı örneğin “Çalışmanızın fotoğrafını gönderin” olarak değiştirin ve gerekiyorsa **Zorunlu alan**ı açın. Bu soru dekont alanından bağımsızdır. JPEG, PNG ve WebP fotoğrafları desteklenir; PDF yalnızca dekont alanında kullanılabilir. Tüm fotoğraflar ve dekont birlikte en fazla 4 MB olmalıdır.
+
+Gönderilen fotoğrafları kayıtların cevapları bölümündeki **Fotoğrafı görüntüle** düğmesinden açabilirsiniz. Yalnızca yönetici oturumuyla erişilir; CSV'ye dosya adı yazılır, özel dosyanın bağlantısı eklenmez. Kaydı silmek o kayda bağlı fotoğraflara ve dekonta erişimi de kaldırır. Katılımcının başarı özetinde fotoğraflar veya özel cevaplar bulunmaz.
 
 ## Kayıtları inceleme
 

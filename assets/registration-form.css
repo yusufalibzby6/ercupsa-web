@@ -13,6 +13,7 @@
 .registration-intro { margin-bottom: 1.5rem; padding-bottom: 1.3rem; border-bottom: 1px solid #e9ecf1; }
 .registration-description { color: #3c4656; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
 .registration-required-note { color: #697386; font-size: .78rem; margin-top: 1rem; }
+.registration-upload-budget { color:#53637a; font-size:.8rem; line-height:1.65; margin-top:.65rem; }
 .registration-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem 1.1rem; }
 .registration-field { min-width: 0; margin: 0; padding: 0; border: 0; }
 .registration-field-wide { grid-column: 1 / -1; }
@@ -27,6 +28,23 @@ textarea.registration-control { resize: vertical; min-height: 112px; }
 .registration-choice { display: flex; align-items: flex-start; gap: .65rem; padding: .7rem .8rem; border: 1px solid #dbe0e9; border-radius: 10px; background: #fbfcfe; cursor: pointer; font-size: .9rem; line-height: 1.5; overflow-wrap: anywhere; }
 .registration-choice input { margin-top: .22rem; flex-shrink: 0; accent-color: #b62b36; width: 16px; height: 16px; }
 .registration-choice:focus-within { border-color: #b62b36; outline: 2px solid rgb(182 43 54 / 12%); }
+.registration-choice:has(input:checked) { border-color:#b62b36; background:#fff3f4; }
+.registration-image-choices { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.85rem; }
+.registration-image-choice { display:flex; flex-direction:column; gap:0; padding:0; overflow:hidden; border-radius:14px; }
+.registration-choice-media { display:flex; align-items:center; justify-content:center; width:100%; aspect-ratio:4 / 3; background:#f0f3f7; }
+.registration-choice-media img { display:block; width:100%; height:100%; object-fit:contain; }
+.registration-choice-image-fallback { color:#68768a; font-size:.78rem; padding:1rem; text-align:center; }
+.registration-choice-caption { display:flex; align-items:flex-start; gap:.6rem; padding:.8rem; width:100%; box-sizing:border-box; }
+.registration-choice-caption > span { min-width:0; }
+.registration-photo { border:1px dashed #cdd4df; border-radius:14px; padding:1.1rem; background:#f8fafc; }
+.registration-photo-preview { display:flex; flex-wrap:wrap; align-items:center; gap:.7rem; margin-top:.85rem; }
+.registration-photo-preview img { display:block; width:120px; height:100px; object-fit:contain; border-radius:9px; background:#e9eef4; }
+.registration-photo-preview.hidden,.registration-photo-preview img.hidden { display:none; }
+.registration-photo-preview p { min-width:0; flex:1 1 170px; overflow-wrap:anywhere; }
+.registration-photo-remove,.registration-choice-clear { padding:.5rem .7rem; border:1px solid #cbd3df; border-radius:8px; font:inherit; font-size:.8rem; color:#7f2731; background:#fff; cursor:pointer; }
+.registration-choice-clear { margin-top:.65rem; }
+.registration-photo-remove:focus-visible,.registration-choice-clear:focus-visible { outline:2px solid #b62b36; outline-offset:3px; }
+.registration-photo-remove:disabled,.registration-choice-clear:disabled { cursor:wait; opacity:.65; }
 .registration-field-error { color: #a52230; font-size: .8rem; line-height: 1.5; margin-top: .4rem; }
 .registration-receipt { margin-top: 1.5rem; padding: 1.15rem; border: 1px dashed #cdd4df; border-radius: 14px; background: #f8fafc; }
 .registration-help, .registration-privacy { color: #647084; font-size: .8rem; line-height: 1.7; }
@@ -59,8 +77,12 @@ textarea.registration-control { resize: vertical; min-height: 112px; }
 .dark .registration-label { color: #edf2fa; }
 .dark .registration-description, .dark .registration-success p, .dark .registration-full p, .dark .registration-unavailable p, .dark .registration-load-error p { color: #c4cede; }
 .dark .registration-control, .dark .registration-choice { background: #101b2c; color: #e2e9f4; border-color: #44526a; }
-.dark .registration-receipt { background: #101b2c; border-color: #44526a; }
-.dark .registration-help, .dark .registration-privacy, .dark .registration-required-note { color: #aab9cf; }
+.dark .registration-receipt, .dark .registration-photo { background: #101b2c; border-color: #44526a; }
+.dark .registration-help, .dark .registration-privacy, .dark .registration-required-note, .dark .registration-upload-budget { color: #aab9cf; }
+.dark .registration-choice:has(input:checked) { background:#34212e; border-color:#ed929c; }
+.dark .registration-choice-media,.dark .registration-photo-preview img { background:#1c2a3f; }
+.dark .registration-choice-image-fallback { color:#aab9cf; }
+.dark .registration-photo-remove,.dark .registration-choice-clear { background:#25334a; color:#ffd0d5; border-color:#53637c; }
 .dark .native-event-details > summary { color: #f3a9ae; }
 .dark .registration-file::file-selector-button { background: #25334a; border-color: #53637c; color: #e2e9f4; }
 .dark .registration-field-error { color: #ffb3bb; }
@@ -76,6 +98,8 @@ textarea.registration-control { resize: vertical; min-height: 112px; }
   .registration-fields { grid-template-columns: 1fr; }
   .registration-submit { width: 100%; }
   .registration-receipt { padding: .9rem; }
+  .registration-photo { padding:.9rem; }
+  .registration-choice-caption { font-size:.83rem; padding:.7rem .6rem; }
   .registration-file { font-size: .75rem; }
   .registration-summary-facts { grid-template-columns:1fr; }
   .registration-summary-actions { flex-direction:column; }

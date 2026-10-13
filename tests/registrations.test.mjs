@@ -5,7 +5,7 @@ import { createRegistrationsHandler } from "../netlify/functions/registrations.m
 import { adminLogin } from "../netlify/lib/security.mjs";
 import {
   CLASS_OPTIONS, RECEIPT_MAX_BYTES, REGISTRATION_MAX_BYTES, REGISTRATION_STORE,
-  REGISTRATION_RECEIPT_STORE, REGISTRATION_FULL_MESSAGE, defaultRegistrationForm, entryKey, formKey, registrationStateKey,
+  REGISTRATION_RECEIPT_STORE, REGISTRATION_PHOTO_STORE, REGISTRATION_FULL_MESSAGE, defaultRegistrationForm, entryKey, formKey, registrationStateKey,
   hydrateRegistrationFlags, registrationCsv, turkeyToday,
 } from "../netlify/lib/registrations.mjs";
 
@@ -24,6 +24,8 @@ const pdf = Buffer.from("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\
 const jpeg = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDzuiiiuE+pP//Z", "base64");
 const progressiveJpeg = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wgARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAVAQEBAAAAAAAAAAAAAAAAAAADBf/aAAwDAQACEAMQAAABnQFT/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABAH/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPxB//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPxB//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxB//9k=", "base64");
 const validAnswers = { full_name: "Deniz Test", class_year: "2. Sınıf", phone: "+90 (555) 123 45 67" };
+const photoQuestion = (id = "portrait", required = true) => ({ id, type: "photo", label: "Fotoğraf", required });
+const withPhotos = (form) => ({ ...form, fields: [...form.fields, photoQuestion(), photoQuestion("optional", false)] });
 
 function fixture() {
   const stores = new Map();
@@ -101,6 +103,7 @@ function fixture() {
       },
       async set(key, data, options = {}) {
         calls.push({ name, action: "set", key, options });
+        await hooks.beforeReceiptSet?.({ name, key, data, records });
         if (options.onlyIfNew && records.has(key)) return { modified: false };
         const tag = String(++etag);
         records.set(key, { data: Uint8Array.from(data), etag: tag });
@@ -144,6 +147,8 @@ function fixture() {
     data.set("requestId", options.requestId ?? randomUUID());
     data.set("website", options.website ?? "");
     if (options.receipt) data.set("receipt", new Blob([options.receipt], { type: options.mime ?? "image/png" }), options.filename ?? "dekont.png");
+    for (const [id, photo] of Object.entries(options.photos || {}))
+      data.set(`photo:${id}`, new Blob([photo.bytes], { type: photo.mime ?? "image/png" }), photo.name ?? "fotograf.png");
     return request("submit", { method: "POST", eventId: options.eventId, form: data,
       headers: options.headers, extra: options.extra });
   };
@@ -153,7 +158,7 @@ function fixture() {
 
 test("administrator lists, configuration, deletion, summaries, exports and private receipts require signed cookies", async () => {
   const { request, calls } = fixture();
-  for (const action of ["admin", "summary", "receipt", "export", "delete", "form", "ticket"]) {
+  for (const action of ["admin", "summary", "receipt", "photo", "export", "delete", "form", "ticket"]) {
     const result = await request(action, {
       method: ["delete", "form"].includes(action) ? "POST" : "GET",
       input: { id: "entry-one", status: "approved" },
@@ -964,4 +969,240 @@ test("idempotent submission summary retains its original event details after the
   events[0].title = "Yeni başlık"; events[0].time = "14:00"; events[0].location = "Yeni yer";
   assert.deepEqual(await (await submit({ requestId })).json(), first);
   assert.equal(first.event.location, "Eczacılık Fakültesi");
+});
+
+test("photo questions and aligned option images normalize without changing legacy choices", async () => {
+  const { open, request } = fixture();
+  const image = "https://res.cloudinary.com/w2trki15/image/upload/v1/example.jpg";
+  const form = await open("event-one", (current) => ({ ...withPhotos(current), fields: [
+    ...current.fields, photoQuestion(),
+    { id: "choice", type: "radio", label: "Renk", required: true,
+      options: ["Seçenek 1", "Seçenek 2"], optionImages: [image, ""] },
+  ] }));
+  assert.equal(form.fields[3].type, "photo");
+  assert.deepEqual(form.fields[4].options, ["Seçenek 1", "Seçenek 2"]);
+  assert.deepEqual(form.fields[4].optionImages, [image, ""]);
+  assert.ok(!Object.hasOwn(form.fields[1], "optionImages"));
+  const publicForm = (await (await request()).json()).form;
+  assert.deepEqual(publicForm.fields, form.fields);
+  for (const images of [[image], [image, null], ["http://res.cloudinary.com/w2trki15/image/upload/x.jpg", ""],
+    ["https://res.cloudinary.com/other/image/upload/x.jpg", ""],
+    [image + "?download=1", ""], [image + "#x", ""],
+    ["https://user:password@res.cloudinary.com/w2trki15/image/upload/x.jpg", ""],
+    ["https://res.cloudinary.com:444/w2trki15/image/upload/x.jpg", ""],
+    ["https://res.cloudinary.com.attacker.test/w2trki15/image/upload/x.jpg", ""]]) {
+    const altered = structuredClone(form); altered.fields[4].optionImages = images;
+    assert.equal((await request("form", { auth: true, method: "POST", input: altered })).status, 400);
+  }
+  const empty = structuredClone(form); empty.fields[4].optionImages = ["", ""];
+  assert.ok(!Object.hasOwn((await (await request("form", { auth: true, method: "POST", input: empty })).json()).form.fields[4], "optionImages"));
+  const invalidPhoto = structuredClone(form); invalidPhoto.fields[3].optionImages = [];
+  assert.equal((await request("form", { auth: true, method: "POST", input: invalidPhoto })).status, 400);
+});
+
+test("private photo uploads enforce required fields, actual images and the shared file budget", async () => {
+  const { open, submit, request, stores } = fixture();
+  await open("event-one", withPhotos);
+  assert.equal((await submit()).status, 400);
+  assert.equal((await submit({ answers: { ...validAnswers, portrait: "fake.png" }, photos: { portrait: { bytes: png } } })).status, 400);
+  assert.equal((await submit({ photos: { portrait: { bytes: png }, stale: { bytes: png } } })).status, 400);
+  for (const bytes of [pdf, Buffer.from("<svg>fake</svg>"), Buffer.from("not a photo"), png.subarray(0, -1)])
+    assert.equal((await submit({ photos: { portrait: { bytes, mime: "image/jpeg" } } })).status, 415);
+  assert.equal((await submit({ photos: { portrait: { bytes: Buffer.alloc(0) } } })).status, 415);
+  const padded = Buffer.concat([png, Buffer.alloc(RECEIPT_MAX_BYTES / 2 - png.length)]);
+  const overflow = await submit({ receipt: padded, photos: { portrait: { bytes: padded }, optional: { bytes: png } } });
+  assert.equal(overflow.status, 413); assert.match((await overflow.json()).error, /toplam/);
+  assert.equal((await (await request("admin", { auth: true })).json()).entries.length, 0);
+  assert.equal(stores.get(REGISTRATION_PHOTO_STORE)?.size || 0, 0);
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0, 0);
+});
+
+test("photo metadata and CSV use safe names while originals are available only through the private endpoint", async () => {
+  const { open, submit, request, stores, events } = fixture();
+  await open("event-one", (form) => ({ ...withPhotos(form), receipt: { enabled: false, required: false } }));
+  const result = await submit({ photos: { portrait: { bytes: png, mime: "image/pjpeg", name: '../../resim".jpg' } } });
+  assert.equal(result.status, 200);
+  const { reference } = await result.json();
+  const admin = await (await request("admin", { auth: true })).json();
+  const entry = admin.entries[0];
+  assert.deepEqual(entry.photos, { portrait: { name: "resim.png", mime: "image/png", size: png.length } });
+  assert.equal(entry.answers.portrait, "resim.png"); assert.equal(entry.answers.optional, "");
+  assert.ok(!JSON.stringify(entry).includes('"key"'));
+  const get = (auth = true, field = "portrait") => request("photo", { auth, extra: `&id=${reference}&field_id=${field}` });
+  assert.equal((await get(false)).status, 401);
+  assert.equal((await get(true, "optional")).status, 404);
+  assert.equal((await get(true, "constructor")).status, 404);
+  const photo = await get(); assert.equal(photo.status, 200);
+  assert.equal(photo.headers.get("content-type"), "image/png");
+  assert.equal(photo.headers.get("cache-control"), "private, no-store");
+  assert.equal(photo.headers.get("x-content-type-options"), "nosniff");
+  assert.deepEqual(Buffer.from(await photo.arrayBuffer()), png);
+  const csv = await (await request("export", { auth: true })).text();
+  assert.ok(csv.includes('"resim.png"'));
+  const saved = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries[0];
+  assert.ok(!csv.includes(saved.photos.portrait.key));
+  const publicText = await (await request()).text(); assert.ok(!publicText.includes(reference));
+  events.splice(0, 1); assert.equal((await get()).status, 200);
+});
+
+test("photo retries bind field IDs and canonical bytes but ignore renamed picker hints and edited live questions", async () => {
+  const { open, submit, request, stores } = fixture();
+  await open("event-one", withPhotos);
+  const requestId = randomUUID();
+  const accepted = await submit({ requestId, photos: { portrait: { bytes: png, name: "one.jpg", mime: "image/jpeg" } } });
+  assert.equal(accepted.status, 200); const expected = await accepted.json();
+  assert.deepEqual(await (await submit({ requestId, photos: { portrait: { bytes: png, name: "two.png", mime: "" } } })).json(), expected);
+  for (const photos of [{ portrait: { bytes: jpeg } }, { optional: { bytes: png } }, {},
+    { portrait: { bytes: png }, optional: { bytes: png } }])
+    assert.equal((await submit({ requestId, photos })).status, 409);
+  await open("event-one", (form) => ({ ...form, enabled: false, fields: [...form.fields,
+    { id: "new", type: "text", label: "Yeni", required: true }] }));
+  assert.deepEqual(await (await submit({ requestId, photos: { portrait: { bytes: png } } })).json(), expected);
+  const entry = (await (await request("admin", { auth: true })).json()).entries[0];
+  assert.equal(entry.answers.portrait, "one.png");
+  assert.equal(stores.get(REGISTRATION_PHOTO_STORE).size, 1);
+});
+
+test("legacy receipt-only fingerprints remain byte-for-byte unchanged when photos are absent", async () => {
+  for (const receipt of [null, png]) {
+    const { open, submit, stores } = fixture(); await open();
+    const accepted = await submit({ receipt }); assert.equal(accepted.status, 200);
+    const entry = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries[0];
+    const stableAnswers = Object.keys(validAnswers).sort().map((key) => [key, validAnswers[key]]);
+    const hash = (data) => createHash("sha256").update(data).digest("hex");
+    const old = hash(JSON.stringify({ answers: stableAnswers, receipt: receipt ? ["image/png", hash(png)] : null }));
+    assert.equal(entry.fingerprint, old); assert.ok(!Object.hasOwn(entry, "photos"));
+  }
+});
+
+test("concurrent photo submissions preserve canonical uploads, changed content conflicts and capacity stays atomic", async () => {
+  const { open, submit, request, stores } = fixture();
+  await open("event-one", (form) => ({ ...withPhotos(form), maxRegistrations: 1 }));
+  const requestId = randomUUID();
+  const same = await Promise.all(Array.from({ length: 4 }, () =>
+    submit({ requestId, receipt: png, photos: { portrait: { bytes: png }, optional: { bytes: jpeg } } })));
+  assert.ok(same.every((result) => result.status === 200));
+  assert.equal(new Set(await Promise.all(same.map(async (result) => (await result.json()).reference))).size, 1);
+  assert.equal(stores.get(REGISTRATION_PHOTO_STORE).size, 2);
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
+  assert.equal((await submit({ requestId, receipt: png, photos: { portrait: { bytes: jpeg }, optional: { bytes: jpeg } } })).status, 409);
+  assert.equal((await submit({ photos: { portrait: { bytes: png } } })).status, 409);
+  const entry = (await (await request("admin", { auth: true })).json()).entries[0];
+  for (const fieldId of ["portrait", "optional"])
+    assert.equal((await request("photo", { auth: true, extra: `&id=${entry.id}&field_id=${fieldId}` })).status, 200);
+});
+
+test("partial private uploads are cleaned and conditional-create collisions never delete the existing file", async () => {
+  const { open, submit, stores, hooks } = fixture(); await open("event-one", withPhotos);
+  let count = 0;
+  hooks.afterReceiptSet = ({ name }) => {
+    if (name === REGISTRATION_PHOTO_STORE && ++count === 2) throw Error("lost upload response");
+  };
+  assert.equal((await submit({ receipt: png, photos: { portrait: { bytes: png }, optional: { bytes: jpeg } } })).status, 503);
+  assert.equal(stores.get(REGISTRATION_PHOTO_STORE).size, 0);
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 0);
+  hooks.afterReceiptSet = null;
+  let protectedKey;
+  hooks.beforeReceiptSet = ({ name, key, records }) => {
+    if (name === REGISTRATION_PHOTO_STORE) {
+      protectedKey = key; records.set(key, { etag: "existing", data: Uint8Array.from(jpeg) });
+    }
+  };
+  assert.equal((await submit({ photos: { portrait: { bytes: png } } })).status, 503);
+  assert.deepEqual(Buffer.from(stores.get(REGISTRATION_PHOTO_STORE).get(protectedKey).data), jpeg);
+});
+
+test("lost CAS responses retain accepted photos and unconfirmed ownership preserves potentially committed uploads", async () => {
+  for (const unreadable of [false, true]) {
+    const { open, submit, stores, hooks } = fixture(); await open("event-one", withPhotos);
+    let wrote = false;
+    hooks.afterSet = ({ name, key }) => {
+      if (name === REGISTRATION_STORE && key.startsWith("state/")) { wrote = true; throw Error("lost commit"); }
+    };
+    if (unreadable) hooks.get = ({ name, key }) => {
+      if (wrote && name === REGISTRATION_STORE && key.startsWith("state/")) throw Error("confirmation unavailable");
+    };
+    assert.equal((await submit({ receipt: png, photos: { portrait: { bytes: png }, optional: { bytes: jpeg } } })).status, unreadable ? 503 : 200);
+    const entry = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries[0];
+    assert.ok(entry); assert.equal(stores.get(REGISTRATION_PHOTO_STORE).size, 2);
+    for (const photo of Object.values(entry.photos)) assert.ok(stores.get(REGISTRATION_PHOTO_STORE).has(photo.key));
+    assert.ok(stores.get(REGISTRATION_RECEIPT_STORE).has(entry.receipt.key));
+  }
+});
+
+test("photo tombstones deny access immediately and deletion retries remove leftover private files", async () => {
+  const { open, submit, request, stores, hooks, getStore } = fixture(); await open("event-one", withPhotos);
+  const requestId = randomUUID();
+  const { reference } = await (await submit({ requestId, photos: { portrait: { bytes: png }, optional: { bytes: jpeg } } })).json();
+  const original = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries[0];
+  await getStore(REGISTRATION_STORE).setJSON(entryKey("event-one", reference), original);
+  hooks.afterSet = ({ name, key, data }) => {
+    if (name === REGISTRATION_STORE && key.startsWith("state/") && data.deleted.length) {
+      hooks.afterSet = null; throw Error("lost delete response");
+    }
+  };
+  hooks.beforeDelete = () => { throw Error("cleanup unavailable"); };
+  assert.equal((await request("delete", { auth: true, method: "POST", input: { id: reference } })).status, 200);
+  assert.equal(stores.get(REGISTRATION_PHOTO_STORE).size, 2);
+  for (const fieldId of ["portrait", "optional"])
+    assert.equal((await request("photo", { auth: true, extra: `&id=${reference}&field_id=${fieldId}` })).status, 404);
+  assert.equal((await submit({ requestId, photos: { portrait: { bytes: png } } })).status, 409);
+  const tombstone = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.deleted[0];
+  assert.deepEqual(tombstone.photoKeys.sort(), Object.values(original.photos).map((photo) => photo.key).sort());
+  hooks.beforeDelete = null;
+  assert.equal((await request("delete", { auth: true, method: "POST", input: { id: reference } })).status, 200);
+  assert.equal(stores.get(REGISTRATION_PHOTO_STORE).size, 0);
+  assert.ok(!stores.get(REGISTRATION_STORE).has(entryKey("event-one", reference)));
+});
+
+test("an administrator changing photo questions during upload wins the same CAS fence without leaving files or filling a slot", async () => {
+  const { open, submit, stores, hooks, request } = fixture();
+  await open("event-one", (form) => ({ ...withPhotos(form), maxRegistrations: 1 }));
+  let edited = false;
+  hooks.afterReceiptSet = async ({ name }) => {
+    if (name === REGISTRATION_PHOTO_STORE && !edited) {
+      edited = true;
+      await open("event-one", (form) => ({ ...form, maxRegistrations: 1, fields: [...form.fields, photoQuestion("replacement")] }));
+    }
+  };
+  const result = await submit({ receipt: png, photos: { portrait: { bytes: png } } });
+  assert.equal(result.status, 400);
+  assert.equal(stores.get(REGISTRATION_PHOTO_STORE).size, 0);
+  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 0);
+  const admin = await (await request("admin", { auth: true })).json();
+  assert.equal(admin.entries.length, 0); assert.equal(admin.form.fields.at(-1).id, "replacement");
+  assert.equal((await (await request()).json()).full, false);
+  assert.equal((await submit({ photos: { replacement: { bytes: png } } })).status, 200);
+});
+
+test("emoji filenames survive the truncation boundary and malformed legacy names still download with valid UTF-8 headers", async () => {
+  const { open, submit, request, getStore } = fixture();
+  await open("event-one", withPhotos);
+  const filename = "a".repeat(149) + "🌸" + "z.png";
+  const expectedName = "a".repeat(149) + "🌸.png";
+  const result = await submit({ receipt: png, filename, photos: { portrait: { bytes: png, name: filename } } });
+  assert.equal(result.status, 200); const { reference } = await result.json();
+  const admin = await (await request("admin", { auth: true })).json();
+  assert.equal(admin.entries[0].receipt.name, expectedName);
+  assert.equal(admin.entries[0].photos.portrait.name, expectedName);
+  const download = (action) => request(action, { auth: true,
+    extra: `&id=${reference}${action === "photo" ? "&field_id=portrait" : ""}` });
+  for (const action of ["receipt", "photo"]) {
+    const file = await download(action); assert.equal(file.status, 200);
+    assert.deepEqual(Buffer.from(await file.arrayBuffer()), png);
+    const encoded = file.headers.get("content-disposition").split("filename*=UTF-8''")[1];
+    assert.equal(decodeURIComponent(encoded), expectedName);
+  }
+  const store = getStore(REGISTRATION_STORE);
+  const state = await store.get(registrationStateKey("event-one"), { type: "json" });
+  const entry = state.entries[0];
+  const legacyName = "a".repeat(149) + "\uD83C.png";
+  entry.receipt.name = legacyName; entry.photos.portrait.name = legacyName;
+  await store.setJSON(registrationStateKey("event-one"), state);
+  for (const action of ["receipt", "photo"]) {
+    const file = await download(action); assert.equal(file.status, 200);
+    const encoded = file.headers.get("content-disposition").split("filename*=UTF-8''")[1];
+    assert.equal(decodeURIComponent(encoded), "a".repeat(149) + "\uFFFD.png");
+    assert.deepEqual(Buffer.from(await file.arrayBuffer()), png);
+  }
 });

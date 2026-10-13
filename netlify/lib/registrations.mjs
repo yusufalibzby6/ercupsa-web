@@ -1,16 +1,19 @@
 import { fail, identifier, text } from "./security.mjs";
 import { receiptFormat } from "./receipt-format.mjs";
+import { photoFormat } from "./photo-format.mjs";
 
 export const REGISTRATION_STORE = "ercupsa-registrations";
 export const REGISTRATION_RECEIPT_STORE = "ercupsa-registration-receipts";
+export const REGISTRATION_PHOTO_STORE = "ercupsa-registration-photos";
 export const RECEIPT_MAX_BYTES = 4 * 1024 * 1024;
+export const REGISTRATION_FILES_MAX_BYTES = RECEIPT_MAX_BYTES;
 export const REGISTRATION_MAX_BYTES = RECEIPT_MAX_BYTES + 128 * 1024;
 export const REGISTRATION_FULL_MESSAGE = "İlginiz için teşekkür ederiz. Kontenjanımız dolmuştur. Bir sonraki etkinliklerimize bekleriz.";
 export const CLASS_OPTIONS = [
   "Hazırlık", "1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf",
   "5. Sınıf", "Mezun", "Diğer",
 ];
-const TYPES = new Set(["text", "textarea", "email", "tel", "select", "radio", "checkboxes"]);
+const TYPES = new Set(["text", "textarea", "email", "tel", "select", "radio", "checkboxes", "photo"]);
 const CHOICES = new Set(["select", "radio", "checkboxes"]);
 const CORE_TYPES = { full_name: "text", class_year: "select", phone: "tel" };
 const UNSAFE_IDS = new Set(["__proto__", "constructor", "prototype"]);
@@ -66,6 +69,24 @@ export function normalizeRegistrationForm(input, eventId, updatedAt) {
       const options = field.options.map((option) => text(option, 160, true));
       if (new Set(options).size !== options.length) fail(400, "Soru seçenekleri tekrarlanmamalı.");
       result.options = options;
+      if (field.optionImages != null) {
+        if (!Array.isArray(field.optionImages) || field.optionImages.length !== options.length)
+          fail(400, "Seçenek fotoğrafları seçeneklerle aynı sayıda olmalı.");
+        const images = field.optionImages.map((value) => {
+          if (value === "") return "";
+          const image = text(value, 2000, true);
+          let url;
+          try { url = new URL(image); } catch { fail(400, "Geçersiz seçenek fotoğrafı."); }
+          if (url.protocol !== "https:" || url.hostname !== "res.cloudinary.com" ||
+              url.username || url.password || url.port || url.hash || url.search ||
+              !url.pathname.startsWith("/w2trki15/image/upload/"))
+            fail(400, "Seçenek fotoğrafını yükleme düğmesiyle ekleyin.");
+          return url.href;
+        });
+        if (images.some(Boolean)) result.optionImages = images;
+      }
+    } else if (field.optionImages != null) {
+      fail(400, "Seçenek fotoğrafları yalnızca seçenekli sorularda kullanılabilir.");
     }
     return result;
   });
@@ -125,6 +146,10 @@ export function validateRegistrationAnswers(raw, fields) {
   const answers = Object.create(null);
   for (const field of fields) {
     const value = Object.hasOwn(raw, field.id) ? raw[field.id] : undefined;
+    if (field.type === "photo") {
+      if (Object.hasOwn(raw, field.id)) fail(400, `${field.label}: fotoğrafı dosya olarak yükleyin.`);
+      continue;
+    }
     if (field.type === "checkboxes") {
       if (value != null && !Array.isArray(value)) fail(400, `${field.label}: seçenekler geçersiz.`);
       const selected = value || [];
@@ -190,13 +215,14 @@ export async function readRegistrationJson(req) {
 export async function readRegistrationSubmission(req) {
   const contentType = req.headers.get("content-type") || "";
   if (!/^multipart\/form-data\s*;/i.test(contentType)) fail(415, "Form ve dosya yüklemesi gerekli.");
-  const bytes = await readLimitedBytes(req, REGISTRATION_MAX_BYTES, "Dekont en fazla 4 MB olabilir.");
+  const bytes = await readLimitedBytes(req, REGISTRATION_MAX_BYTES, "Fotoğraflar ve dekont toplam en fazla 4 MB olabilir.");
   let data;
   try { data = await new Response(bytes, { headers: { "Content-Type": contentType } }).formData(); }
   catch { fail(400, "Form içeriği okunamadı. Lütfen tekrar deneyin."); }
   const allowed = new Set(["answers", "receipt", "requestId", "website"]);
   for (const name of data.keys()) {
-    if (!allowed.has(name) || data.getAll(name).length !== 1) fail(400, "Geçersiz form alanı.");
+    if ((!allowed.has(name) && !/^photo:[A-Za-z][A-Za-z0-9_-]{0,59}$/.test(name)) ||
+        data.getAll(name).length !== 1) fail(400, "Geçersiz form alanı.");
   }
   const website = data.get("website");
   if (website != null && (typeof website !== "string" || website.trim()))
@@ -212,7 +238,18 @@ export async function readRegistrationSubmission(req) {
   catch { fail(400, "Form cevapları okunamadı."); }
   const receipt = data.get("receipt");
   if (receipt != null && !(receipt instanceof Blob)) fail(400, "Dekont dosyası geçersiz.");
-  return { requestId: requestId.toLowerCase(), answers, receipt: receipt?.size ? receipt : null };
+  const photos = Object.create(null);
+  let total = receipt?.size || 0;
+  for (const name of data.keys()) {
+    if (!name.startsWith("photo:")) continue;
+    const file = data.get(name), id = name.slice(6);
+    if (UNSAFE_IDS.has(id) || !(file instanceof Blob)) fail(400, "Fotoğraf dosyası geçersiz.");
+    total += file.size;
+    photos[id] = file;
+  }
+  if (total > REGISTRATION_FILES_MAX_BYTES)
+    fail(413, "Fotoğraflar ve dekont toplam en fazla 4 MB olabilir.");
+  return { requestId: requestId.toLowerCase(), answers, receipt: receipt?.size ? receipt : null, photos };
 }
 
 export async function validateRegistrationReceipt(file) {
@@ -222,14 +259,27 @@ export async function validateRegistrationReceipt(file) {
   const { bytes, mime, extension } = detected;
   const rawName = typeof file.name === "string" ? file.name : "dekont";
   const cleanName = rawName.split(/[\\/]/).at(-1).replace(/[\x00-\x1f\x7f"<>]/g, "").trim();
-  const stem = cleanName.replace(/\.[^.]+$/, '').slice(0, 150).trim() || 'dekont';
+  const stem = [...cleanName.replace(/\.[^.]+$/, "")].slice(0, 150).join("").trim() || "dekont";
   return { bytes, metadata: { name: `${stem}.${extension}`, mime, size: bytes.length } };
 }
 
+export async function validateRegistrationPhoto(file) {
+  if (file.size > REGISTRATION_FILES_MAX_BYTES) fail(413, "Fotoğraf en fazla 4 MB olabilir.");
+  const detected = photoFormat(Buffer.from(await file.arrayBuffer()));
+  if (!detected) fail(415, "Fotoğraf okunamadı. Geçerli bir JPG, PNG veya WebP seçin. HEIC dosyaları için JPG olarak kaydedin ya da ekran görüntüsü alın.");
+  const rawName = typeof file.name === "string" ? file.name : "fotograf";
+  const cleanName = rawName.split(/[\\/]/).at(-1).replace(/[\x00-\x1f\x7f\"<>]/g, "").trim();
+  const stem = [...cleanName.replace(/\.[^.]+$/, "")].slice(0, 150).join("").trim() || "fotograf";
+  return { bytes: detected.bytes, metadata: { name: `${stem}.${detected.extension}`,
+    mime: detected.mime, size: detected.bytes.length } };
+}
+
 export function entryForAdmin(entry) {
-  const { receipt, fingerprint, status, ticket, ...rest } = entry;
+  const { receipt, photos, fingerprint, status, ticket, ...rest } = entry;
   return { ...rest, ...(ticket ? { ticket: { batchId: ticket.batchId, status: ticket.status,
     ...(ticket.issuedAt ? { issuedAt: ticket.issuedAt } : {}) } } : {}),
+    ...(photos ? { photos: Object.fromEntries(Object.entries(photos).map(([id, photo]) =>
+      [id, { name: photo.name, mime: photo.mime, size: photo.size }])) } : {}),
     receipt: receipt ? { name: receipt.name, mime: receipt.mime, size: receipt.size } : null };
 }
 
