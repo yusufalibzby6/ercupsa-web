@@ -1,7 +1,7 @@
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { createEventsHandler } from "../netlify/functions/events.mjs";
-import { admin, adminLogin } from "../netlify/lib/security.mjs";
+import { admin, adminLogin, signedAdminCookie, ownerUsername } from "../netlify/lib/security.mjs";
 import { activeEvents, eventRevision, registrationRecovery } from "../netlify/lib/event-state.mjs";
 
 const oldPassword = process.env.ADMIN_PASSWORD;
@@ -17,7 +17,7 @@ const example = (id = "first") => ({ id, title: `Etkinlik ${id}`, category: "Kon
 
 function fixture(initial = [example(), example("second")]) {
   const state = { events: structuredClone(initial), etag: initial == null ? 0 : 1, writes: 0, reads: [],
-    registrations: new Map(), login: new Map(), failWrites: 0, missingEtag: false, sequence: 0 };
+    registrations: new Map(), login: new Map(), admins: new Map(), failWrites: 0, missingEtag: false, sequence: 0 };
   const content = {
     async get(key, options) { assert.equal(key, "events.json"); state.reads.push(["content", key, options]); return structuredClone(state.events); },
     async getWithMetadata(key, options) {
@@ -44,10 +44,15 @@ function fixture(initial = [example(), example("second")]) {
       state.login.set(key, { data: structuredClone(data), etag: (record?.etag || 0) + 1 }); return { modified: true };
     },
   };
+  const admins = {
+    async get(key, options) { state.reads.push(["admins", key, options]); return structuredClone(state.admins.get(key) || null); },
+    async setJSON(key, value) { state.admins.set(key, structuredClone(value)); return { modified: true }; },
+  };
   const handler = createEventsHandler({ getStore(name) {
     if (name === "ercupsa-content") return content;
     if (name === "ercupsa-registrations") return registrations;
     if (name === "ercupsa-security") return security;
+    if (name === "ercupsa-admin-accounts") return admins;
     throw Error(`Unexpected store ${name}`);
   }, now: () => new Date("2026-10-14T12:00:00.000Z"), uuid: () => `event-revision-${++state.sequence}`, hydrate: async events => events });
   const request = async (method = "GET", path = "/api/events?admin=true", input, headers = {}) => {
@@ -59,7 +64,14 @@ function fixture(initial = [example(), example("second")]) {
   const event = id => activeEvents(state.events || [example()]).find(event => event.id === id);
   const save = (value, revision = event(value.id)?.revision) => request("POST", "/api/events", { event: value, expectedRevision: revision });
   const remove = (id, revision = event(id)?.revision) => request("DELETE", `/api/events?id=${id}&expectedRevision=${encodeURIComponent(revision || "")}`);
-  return { state, request, event, save, remove };
+  const delegate = (permissions, role = "admin") => {
+    const account = { id: role === "treasurer" ? "sayman" : "delegate", username: role === "treasurer" ? "sayman" : "delegate",
+      name: "Test yöneticisi", role, active: true, version: "version-one", permissions,
+      ...(role === "treasurer" ? { fixedPreset: true } : {}), salt: "a".repeat(32), passwordHash: "b".repeat(64) };
+    state.admins.set("accounts/state.json", { revision: "registry-one", accounts: [account] });
+    return { Cookie: signedAdminCookie(new Request(origin), account).split(";")[0] };
+  };
+  return { state, request, event, save, remove, delegate };
 }
 
 test("legacy and seed event revisions are stable and GET reads do not migrate storage", async () => {
@@ -107,7 +119,7 @@ test("new events use server-generated IDs; update, publish and delete require th
   const f = fixture(), created = await f.request("POST", "/api/events", { event: { ...example(), id: undefined } });
   assert.equal(created.status, 200); assert.equal(created.data.event.id, "event-revision-1");
   assert.equal(created.data.event.revision, "event-revision-2");
-  assert.deepEqual(created.data.event.lastOperation, { type: "create", at: "2026-10-14T12:00:00.000Z" });
+  assert.deepEqual(created.data.event.lastOperation, { type: "create", at: "2026-10-14T12:00:00.000Z", actor: { id: "owner", username: ownerUsername() } });
   for (const expectedRevision of [undefined, "", "stale"]) {
     assert.equal((await f.request("POST", "/api/events", { event: example(), expectedRevision })).status, 409);
     assert.equal((await f.request("POST", "/api/events?action=publish", { id: "first", published: false, expectedRevision })).status, 409);
@@ -286,12 +298,110 @@ test("mutation input validation rejects malformed JSON, invalid publication and 
   assert.equal(f.state.writes, 0);
 });
 
-test("admin login retains IP-scoped conditional-write rate limiting", async () => {
+test("legacy password-header login cannot issue an owner or delegate session", async () => {
   const f = fixture();
-  for (let attempt = 0; attempt < 10; attempt++)
-    assert.equal((await f.request("POST", "/api/events?action=auth", undefined, { "x-admin-password": "wrong", "x-nf-client-connection-ip": "198.51.100.1" })).status, 401);
-  assert.equal((await f.request("POST", "/api/events?action=auth", undefined, { "x-admin-password": process.env.ADMIN_PASSWORD, "x-nf-client-connection-ip": "198.51.100.1" })).status, 429);
-  const login = await f.request("POST", "/api/events?action=auth", undefined, { "x-admin-password": process.env.ADMIN_PASSWORD, "x-nf-client-connection-ip": "198.51.100.2" });
-  assert.equal(login.status, 200); assert.match(login.headers.get("set-cookie"), /HttpOnly/);
+  for (const password of ["wrong", process.env.ADMIN_PASSWORD]) {
+    const login = await f.request("POST", "/api/events?action=auth", undefined, { "x-admin-password": password });
+    assert.equal(login.status, 401); assert.equal(login.headers.get("set-cookie"), null);
+    assert.match(login.data.error, /Kullanıcı adınız/);
+  }
+  assert.equal(f.state.writes, 0); assert.equal(f.state.reads.length, 0);
+});
+
+test("delegated catalog access is scoped and Instagram-only sessions get no event metadata", async () => {
+  const f = fixture();
+  const instagram = f.delegate(["instagram.view"]);
+  assert.deepEqual((await f.request("GET", "/api/events?admin=true", undefined, instagram)).data, { events: [] });
+  const treasurer = f.delegate(["registrations.view", "registrations.receipts"], "treasurer");
+  const limited = await f.request("GET", "/api/events?admin=true", undefined, treasurer);
+  assert.equal(limited.status, 200); assert.equal(limited.data.events.length, 2);
+  assert.equal(limited.data.events[0].title, example().title);
+  for (const key of ["description", "images", "registrationUrl", "revision", "lastOperation", "operations"])
+    assert.equal(key in limited.data.events[0], false);
+  const editor = f.delegate(["events.view"]);
+  const full = await f.request("GET", "/api/events?admin=true", undefined, editor);
+  assert.equal(full.status, 200); assert.equal(full.data.events[0].description, example().description);
+  assert.equal(full.data.events[0].revision, f.event("first").revision);
+});
+
+test("only the owner can delete, restore, list trash or purge even fully privileged delegates", async () => {
+  const f = fixture();
+  const headers = f.delegate(["events.view", "events.manage", "events.publish"]);
+  for (const [method, path, input] of [["GET", "/api/events?action=trash"],
+    ["DELETE", "/api/events?id=first"], ["POST", "/api/events?action=restore", { id: "first" }],
+    ["POST", "/api/events?action=purge", { id: "first", confirmation: example().title }]])
+    assert.equal((await f.request(method, path, input, headers)).status, 403);
   assert.equal(f.state.writes, 0);
+});
+
+test("view-only staff cannot mutate events and managers cannot bypass publication through saves", async () => {
+  const f = fixture(); let headers = f.delegate(["events.view"]);
+  assert.equal((await f.request("POST", "/api/events", { event: example(), expectedRevision: f.event("first").revision }, headers)).status, 403);
+  assert.equal((await f.request("POST", "/api/events?action=publish", { id: "first", published: false }, headers)).status, 403);
+  headers = f.delegate(["events.view", "events.manage"]);
+  const revision = f.event("first").revision;
+  assert.equal((await f.request("POST", "/api/events", { event: { ...example(), published: false }, expectedRevision: revision }, headers)).status, 403);
+  const update = await f.request("POST", "/api/events", { event: { ...example(), title: "Yetkili düzenleme", published: undefined }, expectedRevision: revision }, headers);
+  assert.equal(update.status, 200); assert.equal(update.data.event.published, true);
+  assert.deepEqual(update.data.event.lastOperation.actor, { id: "delegate", username: "delegate" });
+  const draft = await f.request("POST", "/api/events", { event: { ...example(), id: undefined, published: true } }, headers);
+  assert.equal(draft.status, 200); assert.equal(draft.data.event.published, false);
+  assert.equal((await f.request("POST", "/api/events?action=publish", { id: "first", published: false, expectedRevision: f.event("first").revision }, headers)).status, 403);
+  headers = f.delegate(["events.view", "events.publish"]);
+  const unpublish = await f.request("POST", "/api/events?action=publish", { id: "first", published: false, expectedRevision: f.event("first").revision }, headers);
+  assert.equal(unpublish.status, 200); assert.equal(unpublish.data.event.published, false);
+  const legacy = fixture([{ ...example(), published: undefined }]);
+  const legacyEditor = legacy.delegate(["events.view", "events.manage"]);
+  const legacyUpdate = await legacy.request("POST", "/api/events", { event: { ...example(), title: "Eski etkinlik düzenlendi" },
+    expectedRevision: legacy.event("first").revision }, legacyEditor);
+  assert.equal(legacyUpdate.status, 200); assert.equal(legacyUpdate.data.event.published, true);
+});
+
+test("purging removes archived metadata permanently without deleting form or ticket records", async () => {
+  const f = fixture(); const snapshot = { event: example(), entries: [{ name: "PRIVATE_PERSON", ticket: { code: "PRIVATE_TICKET" } }] };
+  f.state.registrations.set("state/first.json", snapshot);
+  await f.remove("first"); const item = (await f.request("GET", "/api/events?action=trash")).data.trash[0];
+  assert.equal((await f.request("POST", "/api/events?action=purge", { id: item.id, expectedRevision: "stale", confirmation: item.event.title })).status, 409);
+  assert.equal((await f.request("POST", "/api/events?action=purge", { id: item.id, expectedRevision: item.revision, confirmation: "wrong" })).status, 400);
+  const purged = await f.request("POST", "/api/events?action=purge", { id: item.id, expectedRevision: item.revision, confirmation: item.event.title });
+  assert.equal(purged.status, 200);
+  const marker = f.state.events.find(event => event.id === item.id);
+  assert.deepEqual(Object.keys(marker).sort(), ["deleted", "deletedAt", "id", "purged", "purgedAt", "revision"]);
+  assert.equal(marker.purged, true); assert.equal(marker.event, undefined);
+  assert.ok(!JSON.stringify(f.state.events).includes(item.event.title));
+  assert.deepEqual(f.state.registrations.get("state/first.json"), snapshot);
+  assert.deepEqual((await f.request("GET", "/api/events?action=trash")).data, { trash: [], recoverable: [] });
+  assert.equal((await f.request("POST", "/api/events?action=restore", { id: item.id, expectedRevision: marker.revision })).status, 404);
+  assert.equal((await f.save(example(), marker.revision)).status, 409);
+  assert.equal((await f.request("POST", "/api/events?action=purge", { id: item.id, expectedRevision: marker.revision, confirmation: item.event.title })).status, 409);
+});
+
+test("legacy recovery candidates can be purged and never reappear from retained registration snapshots", async () => {
+  const f = fixture([example("second")]); f.state.registrations.set("state/first.json", { event: example() });
+  const candidate = (await f.request("GET", "/api/events?action=trash")).data.recoverable[0];
+  const result = await f.request("POST", "/api/events?action=purge", { id: candidate.id, expectedRevision: candidate.revision, confirmation: candidate.event.title });
+  assert.equal(result.status, 200); assert.equal(f.state.events.find(event => event.id === "first").purged, true);
+  assert.deepEqual((await f.request("GET", "/api/events?action=trash")).data, { trash: [], recoverable: [] });
+  assert.equal((await f.request("POST", "/api/events?action=restore", { id: candidate.id, expectedRevision: candidate.revision })).status, 404);
+});
+
+test("concurrent purge and restore have one winner without accidentally resurrecting a purged event", async () => {
+  const f = fixture(); await f.remove("first");
+  const item = (await f.request("GET", "/api/events?action=trash")).data.trash[0];
+  const results = await Promise.all([
+    f.request("POST", "/api/events?action=purge", { id: item.id, expectedRevision: item.revision, confirmation: item.event.title }),
+    f.request("POST", "/api/events?action=restore", { id: item.id, expectedRevision: item.revision }),
+  ]);
+  assert.equal(results.filter(result => result.status === 200).length, 1);
+  assert.ok(results.every(result => [200, 404, 409].includes(result.status)));
+  assert.equal(f.state.events.filter(event => event.id === "first").length, 1);
+  const current = f.state.events.find(event => event.id === "first");
+  if (current.purged) assert.equal(f.event("first"), undefined); else assert.equal(current.published, false);
+});
+
+test("legacy logout revokes a delegated session instead of only removing the browser cookie", async () => {
+  const f = fixture(); const headers = f.delegate(["events.view"]);
+  assert.equal((await f.request("GET", "/api/events?admin=true", undefined, headers)).status, 200);
+  assert.equal((await f.request("POST", "/api/events?action=logout", undefined, headers)).status, 200);
+  assert.equal((await f.request("GET", "/api/events?admin=true", undefined, headers)).status, 401);
 });

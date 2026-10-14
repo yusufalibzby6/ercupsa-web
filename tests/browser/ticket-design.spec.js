@@ -1,3 +1,4 @@
+import { mockOwnerSession } from "./admin-session-fixture.js";
 import { test, expect } from "@playwright/test";
 import { PNG } from "pngjs";
 
@@ -11,6 +12,7 @@ async function fixture(page) {
   const old = { id: "old", event_id: "e1", event_title: events[0].title, codes: ["ERC-AAAAAAAAAAAAAAAAAAAAAAAA"], tickets: [] };
   state.batches.set(old.id, old);
   await page.route("https://**/*", route => route.abort());
+  await mockOwnerSession(page, { state });
   await page.route("**/api/events*", route => route.fulfill({ json: { events } }));
   await page.route("**/api/community*", route => {
     const url = new URL(route.request().url());

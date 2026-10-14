@@ -1,3 +1,4 @@
+import { mockOwnerSession } from "./admin-session-fixture.js";
 import { test, expect } from "@playwright/test";
 import { PNG } from "pngjs";
 
@@ -70,6 +71,7 @@ async function fixture(page, { design = null } = {}) {
   await page.route("https://**/*", route => route.abort());
   // Every API is intercepted, including APIs owned by other administrator tabs.
   await page.route("**/api/**", route => route.fulfill({ status: 501, json: { error: "Unmocked registration ticket fixture API" } }));
+  await mockOwnerSession(page, { state });
   await page.route("**/api/events*", route => route.fulfill({ json: { events: currentEvents } }));
   await page.route("**/api/community*", route => route.fulfill({ json: { members: [], submissions: [], batches: [] } }));
   await page.route("**/api/ticket-design*", route => route.fulfill({ json: { design: state.design } }));

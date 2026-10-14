@@ -1,3 +1,4 @@
+import { mockOwnerSession } from "./admin-session-fixture.js";
 import { test, expect } from "@playwright/test";
 
 const defaults = ["https://www.instagram.com/p/DYNe6W6Cmk4/", "https://www.instagram.com/p/DYU7z9ECgxc/", "https://www.instagram.com/p/DRkMhWUiLtv/", "https://www.instagram.com/p/DP_JtyLCBAy/"];
@@ -8,6 +9,7 @@ async function fixture(page, { holdRead = false, holdSave = false } = {}) {
   const saveGate = new Promise(resolve => { state.releaseSave = resolve; });
   await page.route("https://**/*", route => route.abort());
   await page.route("**/api/**", route => route.fulfill({ status: 501, json: { error: "Unmocked Instagram fixture endpoint" } }));
+  await mockOwnerSession(page, { state });
   await page.route("**/api/events*", route => route.fulfill({ json: { events: [] } }));
   await page.route("**/api/community*", route => route.fulfill({ json: { batches: [], submissions: [], members: [] } }));
   await page.route("**/api/site-content*", async route => {

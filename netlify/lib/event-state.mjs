@@ -3,9 +3,14 @@ import { eventInput, fail, identifier } from "./security.mjs";
 
 export const EVENTS_KEY = "events.json";
 export const CONTENT_STORE = "ercupsa-content";
-const OPERATIONS = new Set(["create", "update", "publish", "unpublish", "delete", "restore", "recover"]);
+const OPERATIONS = new Set(["create", "update", "publish", "unpublish", "delete", "restore", "recover", "purge"]);
 const dateStamp = value => typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : undefined;
 export const isDeletedEvent = event => event?.deleted === true;
+export const isPurgedEvent = event => isDeletedEvent(event) && event.purged === true;
+const operationActor = actor => actor && typeof actor.id === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(actor.id) &&
+  typeof actor.username === "string" && /^[a-z0-9][a-z0-9._-]{2,49}$/.test(actor.username)
+  ? { id: actor.id, username: actor.username } : undefined;
+export const eventOperation = (type, at, actor) => ({ type, at, ...(operationActor(actor) ? { actor: operationActor(actor) } : {}) });
 
 export function eventRevision(event) {
   if (typeof event.revision === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(event.revision)) return event.revision;
@@ -18,7 +23,7 @@ export function projectEvent(event, admin = false) {
     ...(dateStamp(event.createdAt) ? { createdAt: event.createdAt } : {}),
     ...(dateStamp(event.updatedAt) ? { updatedAt: event.updatedAt } : {}), revision: eventRevision(event) };
   if (admin && OPERATIONS.has(event.lastOperation?.type) && dateStamp(event.lastOperation.at))
-    value.lastOperation = { type: event.lastOperation.type, at: event.lastOperation.at };
+    value.lastOperation = eventOperation(event.lastOperation.type, event.lastOperation.at, event.lastOperation.actor);
   return value;
 }
 
@@ -34,9 +39,14 @@ export function eventArray(value, fallback) {
       if (ids.has(id)) throw Error("Duplicate event");
       ids.add(id);
       if (isDeletedEvent(event)) {
-        if (event.event?.id !== id || !dateStamp(event.deletedAt) ||
+        if (!dateStamp(event.deletedAt) ||
             typeof event.revision !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(event.revision)) throw Error("Invalid archive");
-        projectEvent(event.event);
+        if (isPurgedEvent(event)) {
+          if (!dateStamp(event.purgedAt) || event.event != null) throw Error("Invalid purge marker");
+        } else {
+          if (event.event?.id !== id) throw Error("Invalid archive");
+          projectEvent(event.event);
+        }
       } else projectEvent(event);
     }
   } catch { fail(503, "Etkinlik listesi doğrulanamadı."); }
@@ -48,10 +58,10 @@ export function assertEventRevision(expected, actual) {
   if (typeof expected !== "string" || expected !== actual)
     fail(409, "Etkinlik başka bir işlemde değişmiş. Listeyi yenileyip tekrar deneyin.");
 }
-export function operationHistory(event, type, at) {
+export function operationHistory(event, type, at, actor) {
   const previous = Array.isArray(event?.operations) ? event.operations.filter(operation =>
     OPERATIONS.has(operation?.type) && dateStamp(operation.at)).slice(-19) : [];
-  return [...previous.map(operation => ({ type: operation.type, at: operation.at })), { type, at }];
+  return [...previous.map(operation => eventOperation(operation.type, operation.at, operation.actor)), eventOperation(type, at, actor)];
 }
 
 // Only the dedicated event snapshot is used. Participant names, answers,

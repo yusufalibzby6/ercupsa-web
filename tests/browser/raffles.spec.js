@@ -1,3 +1,4 @@
+import { mockOwnerSession } from "./admin-session-fixture.js";
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -39,6 +40,7 @@ async function fixture(page, options = {}) {
   }
   await page.route('https://**/*', route => route.abort());
   await page.route('**/api/**', route => route.fulfill({ status: 501, json: { error: 'Unmocked API' } }));
+  await mockOwnerSession(page, { state });
   await page.route('**/api/events*', route => route.fulfill({ json: { events: state.events } }));
   await page.route('**/api/community*', route => route.fulfill({ json: { submissions: [], batches: [] } }));
   await page.route('**/api/ticket-design*', route => route.fulfill({ json: { design: null } }));

@@ -1,3 +1,4 @@
+import { mockOwnerSession } from "./admin-session-fixture.js";
 import { test, expect } from "@playwright/test";
 
 const event = (id, extra = {}) => ({ id, title: `Etkinlik ${id}`, category: "Konferans", date: "2026-10-22", time: "15:30", location: "Kırmızı Salon", description: "Orijinal açıklama", registrationUrl: "", published: true, poster: "https://res.cloudinary.com/w2trki15/image/upload/test.jpg", images: [], revision: `revision-${id}`, ...extra });
@@ -14,6 +15,7 @@ async function fixture(page) {
   await page.route("**/api/**", route => route.fulfill({ status: 501, json: { error: "Unmocked API" } }));
   await page.route("**/api/community*", route => route.fulfill({ json: { members: [], submissions: [], batches: [] } }));
   await page.route("**/api/ticket-design*", route => route.fulfill({ json: { design: null } }));
+  await mockOwnerSession(page, { state });
   await page.route("**/api/events*", async route => {
     const request = route.request(), url = new URL(request.url()), action = url.searchParams.get("action");
     if (action === "auth") { state.authenticated = true; return route.fulfill({ json: { ok: true } }); }
@@ -201,6 +203,7 @@ for (const action of ["save", "publish", "delete", "restore"]) test(`a delayed $
   await expect(page.locator("#newBtn")).toBeDisabled();
   await page.evaluate(() => document.dispatchEvent(new Event("admin-logout")));
   await expect(page.locator("#login")).toBeVisible();
+  await page.locator("#username").fill("basadmin");
   await page.locator("#password").fill("Mocked-local-password"); await page.locator("#loginBtn").click();
   await expect(page.locator("#app")).toBeVisible();
   await page.locator("#newBtn").click(); await page.locator("#title").fill("Yeni oturum taslağı");

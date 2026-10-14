@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mockOwnerSession } from "./admin-session-fixture.js";
 test.beforeEach(async ({ page }) => {
   await page.route("https://**/*", (route) => route.abort());
 });
@@ -65,6 +66,7 @@ test("admin keeps cookie session and supports safe event preview", async ({
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/admin.html");
   // Local password comes only from the test launcher environment.
+  await page.locator("#username").fill(process.env.ADMIN_USERNAME || "basadmin");
   await page.locator("#password").fill(process.env.ADMIN_PASSWORD);
   await page.getByRole("button", { name: "Giriş yap", exact: true }).click();
   await expect(page.locator("#app")).toBeVisible();
@@ -381,6 +383,7 @@ test("admin omits retired sections and supports 50 QR tickets and print action",
     return route.fulfill({ json: { ok: true } });
   });
   await page.goto("/admin.html");
+  await page.locator("#username").fill(process.env.ADMIN_USERNAME || "basadmin");
   await page.locator("#password").fill(process.env.ADMIN_PASSWORD);
   await page.locator("#loginBtn").click();
   await expect(page.locator("#app")).toBeVisible();
@@ -415,6 +418,7 @@ test("admin omits retired sections and supports 50 QR tickets and print action",
   await expect(page.locator("body")).not.toHaveClass(/printing-tickets/);
 });
 test("admin copies separate registration links for current published events and exposes a fallback", async ({ page }) => {
+  await mockOwnerSession(page);
   await page.clock.install({ time: new Date("2026-10-04T19:00:00+03:00") });
   const events = [
     { id: "first", title: "İlk etkinlik", date: "2026-10-04", time: "18:00", registrationUrl: "https://docs.google.com/forms/d/e/first/viewform", published: true },
@@ -447,6 +451,7 @@ test("A4 ticket layout keeps long titles and the final ticket complete", async (
     status: 501,
     json: { error: "Unmocked A4 fixture" },
   }));
+  await mockOwnerSession(page);
   await page.route("**/api/events*", route => route.fulfill({ json: { events: [] } }));
   await page.route("**/api/community*", route => route.fulfill({ json: { submissions: [], batches: [] } }));
   await page.goto("/admin.html");

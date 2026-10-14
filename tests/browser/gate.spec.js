@@ -11,11 +11,16 @@ const people = [
   { id: 'b', name: 'Bora Daş', ticketId: 'ticket-b', claimedAt: '2026-10-07T13:00:00Z', enteredAt: null },
 ];
 async function fixture(page, options = {}) {
-  const state = { operator: options.loggedOut ? null : { id: 'staff-a', name: 'Görevli', role: options.admin ? 'admin' : 'staff', eventIds: ['one'] },
-    participants: structuredClone(people), entries: [], scans: [], logouts: [], accounts: [], created: [], removed: [], gateGets: [],
+  const state = { operator: options.loggedOut ? null : { id: 'staff-a', name: 'Görevli', role: options.admin ? 'admin' : 'staff', eventIds: ['one'], canManage: options.readonly !== true },
+    participants: structuredClone(people), entries: [], scans: [], logouts: [], accounts: [], created: [], removed: [], gateGets: [], registrationGets: [], staffGets: [],
     eventErrors: [...(options.eventErrors || [])], scanErrors: [...(options.scanErrors || [])], accountErrors: [...(options.accountErrors || [])], holdGate: null };
   await page.route('https://**/*', route => route.abort());
   await page.route('**/api/**', route => route.fulfill({ status: 501, json: { error: 'Unmocked API' } }));
+  await page.route('**/api/admin-auth*', route => {
+    const action = new URL(route.request().url()).searchParams.get('action');
+    if (action === 'logout') { state.logouts.push('admin'); state.operator = null; return route.fulfill({ json: { ok: true } }); }
+    return route.fulfill({ json: { session: options.panelPermissions ? { id: 'delegate', username: 'other-admin', name: 'Diğer yönetici', role: 'admin', permissions: options.panelPermissions } : { id: 'owner', username: 'basadmin', name: 'Baş yönetici', role: 'owner', permissions: [] } } });
+  });
   await page.route('**/api/events*', route => {
     const req = route.request(), action = new URL(req.url()).searchParams.get('action');
     if (action === 'logout') { state.logouts.push('admin'); return route.fulfill({ json: { ok: true } }); }
@@ -25,7 +30,7 @@ async function fixture(page, options = {}) {
   await page.route('**/api/ticket-design*', route => route.fulfill({ json: { design: null } }));
   await page.route('**/api/raffles*', route => route.fulfill({ json: { event: events[0], participants: [], poolVersion: '1'.repeat(64), draws: [] } }));
   await page.route('**/api/registrations*', route => {
-    const url = new URL(route.request().url());
+    const url = new URL(route.request().url()); state.registrationGets.push(url.searchParams.get('action'));
     if (url.searchParams.get('action') === 'summary') return route.fulfill({ json: { events: [] } });
     return route.fulfill({ json: { form: null, event: events.find(event => event.id === url.searchParams.get('event_id')), entries: [], summary: { total: url.searchParams.get('event_id') === 'one' ? 7 : 3, byClass: [] }, page: 1, totalPages: 1 } });
   });
@@ -40,7 +45,7 @@ async function fixture(page, options = {}) {
     }
     if (action === 'logout') { state.logouts.push('staff'); state.operator = null; return route.fulfill({ json: { ok: true } }); }
     if (action === 'accounts') {
-      if (req.method() === 'GET') return route.fulfill({ json: { accounts: state.accounts, events } });
+      if (req.method() === 'GET') { state.staffGets.push(action); return route.fulfill({ json: { accounts: state.accounts, events } }); }
       const error = state.accountErrors.shift();
       if (error) return route.fulfill({ status: error, json: { error: 'Görevli işlemi tamamlanamadı.' } });
       if (req.method() === 'POST') {
@@ -200,4 +205,35 @@ test('admin overview stays lazy, compares registration/claim/entry and scopes st
   await page.locator('[data-staff-delete]').click(); expect(state.removed).toHaveLength(0);
   await page.locator('[data-staff-confirm]').click(); await expect(page.locator('#staffStatus')).toContainText('hesabı kaldırıldı'); expect(state.removed).toEqual(['new-staff']);
   await page.locator('#attendanceEvent').selectOption('two'); await expect(page.locator('#attendanceRegistered')).toHaveText('3'); await expect(page.locator('#attendanceClaimed')).toHaveText('0'); await expect(page.locator('#attendanceEntered')).toHaveText('0');
+});
+
+
+test('a delegated attendance viewer cannot open staff controls or scanner actions, and does not fetch private form records', async ({ page }) => {
+  const state = await fixture(page, { admin: true, readonly: true, panelPermissions: ['attendance.view'] });
+  await page.goto('/admin.html'); await expect(page.locator('#app')).toBeVisible();
+  await expect(page.locator('#attendanceClaimed')).toHaveText('2');
+  await expect(page.locator('#attendanceScanner')).toBeHidden();
+  await expect(page.locator('#staffOwnerSection')).toBeHidden();
+  await expect(page.locator('#attendanceRegistered')).toHaveText('—');
+  expect(state.registrationGets).toEqual([]); expect(state.staffGets).toEqual([]);
+  await page.evaluate(() => {
+    document.querySelector('#staffForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    document.querySelector('#staffReload').click();
+  });
+  expect(state.created).toEqual([]); expect(state.staffGets).toEqual([]);
+});
+
+test('readonly scanner shows participants while preventing camera, code and manual entry even under synthetic clicks', async ({ page }) => {
+  const state = await scanner(page, { admin: true, readonly: true });
+  await expect(page.locator('#gateResultTitle')).toContainText('Katılımı görüntüleme');
+  await expect(page.locator('#gateCodeForm')).toBeHidden(); await expect(page.locator('#gateCameraStart')).toBeHidden();
+  await expect(page.locator('[data-manual]')).toHaveCount(0);
+  await page.evaluate(code => {
+    document.querySelector('#gateCode').value = code;
+    document.querySelector('#gateCodeForm').dispatchEvent(new Event('submit', { cancelable: true }));
+    document.querySelector('#gateCameraStart').click();
+    document.querySelector('#gateManualConfirm').click();
+  }, code);
+  expect(state.scans).toEqual([]);
+  await expect(page.locator('#gateEntered')).toHaveText('0');
 });

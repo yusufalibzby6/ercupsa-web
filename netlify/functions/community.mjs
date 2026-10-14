@@ -7,6 +7,7 @@ import {
   identifier,
   fail,
   requireAdmin,
+  requirePermission,
 } from "../lib/security.mjs";
 import { db, user } from "../lib/database.mjs";
 import { readEvents } from "./events.mjs";
@@ -34,7 +35,7 @@ async function rate(req, scope, max = 5, seconds = 3600) {
     fail(429, "Çok fazla deneme yapıldı. Lütfen biraz sonra tekrar dene.");
 }
 export function createCommunityHandler({ read = db, events = readEvents, store = operationsStore,
-  moderation = accountsStore, currentUser = user } = {}) {
+  moderation = accountsStore, currentUser = user, adminStore } = {}) {
 return guarded(async (req) => {
   const db = read;
   const url = new URL(req.url),
@@ -126,7 +127,9 @@ return guarded(async (req) => {
     if (result.error) fail(409, result.error);
     return response(result);
   }
-  requireAdmin(req);
+  if (["batches", "batch", "revoke"].includes(action))
+    await requirePermission(req, req.method === "GET" ? "tickets.view" : "tickets.manage", { getStore: adminStore });
+  else requireAdmin(req);
   if (action === "batches" && req.method === "GET") {
     const batches = await db(
       "ticket_batches?select=id,event_id,event_title,created_at&order=created_at.desc&limit=100",

@@ -1,3 +1,4 @@
+import { mockOwnerSession } from "./admin-session-fixture.js";
 import { test, expect } from "@playwright/test";
 
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=", "base64");
@@ -38,6 +39,7 @@ async function fixture(page) {
   await page.route("https://**/*", route => route.abort());
   await page.route("https://res.cloudinary.com/**", route => route.fulfill({ contentType: "image/png", body: png }));
   await page.route("**/api/**", route => route.fulfill({ status: 501, json: { error: "Unmocked local media editor fixture" } }));
+  await mockOwnerSession(page, { state });
   await page.route("**/api/events*", route => route.fulfill({ json: { events } }));
   await page.route("**/api/community*", route => route.fulfill({ json: { members: [], submissions: [], batches: [] } }));
   await page.route("**/api/ticket-design*", route => route.fulfill({ json: { design: null } }));

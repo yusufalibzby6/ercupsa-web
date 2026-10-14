@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual, randomBytes, scryptSync } from 'node:crypto';
-import { admin, fail, text } from './security.mjs';
+import { getAdminSession, hasPermission, fail, text } from './security.mjs';
 import { operationsStore } from './checkins.mjs';
 import { JSON_READ } from './blob-state.mjs';
 
@@ -30,8 +30,12 @@ export function staffCookie(req, account, now = new Date()) {
 export function logoutCookie(req) {
   return `ercupsa_gate=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${new URL(req.url).protocol === 'https:' ? '; Secure' : ''}`;
 }
-export async function operatorFor(req, eventId, storage = operationsStore(), now = new Date()) {
-  if (admin(req)) return { id: 'admin', name: 'Yönetici', role: 'admin', eventIds: [] };
+export async function operatorFor(req, eventId, storage = operationsStore(), now = new Date(), { adminGetStore } = {}) {
+  const session = await getAdminSession(req, { getStore: adminGetStore, now });
+  if (session) {
+    if (!hasPermission(session, 'attendance.view')) fail(403, 'Etkinlik girişlerini görüntüleme yetkiniz yok.');
+    return { id: session.id, name: session.name, role: 'admin', eventIds: [], canManage: hasPermission(session, 'attendance.manage') };
+  }
   const raw = (req.headers.get('cookie') || '').split(';').map(item => item.trim()).find(item => item.startsWith('ercupsa_gate='))?.slice(13);
   if (!process.env.ADMIN_PASSWORD || !raw || raw.length > 1024) fail(401, 'Görevli girişi gerekli.');
   const parts = raw.split('.'), expected = signature(parts[0]);
@@ -43,5 +47,5 @@ export async function operatorFor(req, eventId, storage = operationsStore(), now
   const account = (await storage.get(STAFF_KEY, JSON_READ))?.accounts?.find(item => item.id === token.id && item.version === token.version && item.active);
   if (!account) fail(401, 'Görevli hesabı kaldırılmış veya yetkisi değiştirilmiş.');
   if (eventId && !account.eventIds.includes(eventId)) fail(403, 'Bu etkinlik için görevli yetkiniz yok.');
-  return { id: account.id, name: account.name, role: 'staff', eventIds: account.eventIds };
+  return { id: account.id, name: account.name, role: 'staff', eventIds: account.eventIds, canManage: true };
 }

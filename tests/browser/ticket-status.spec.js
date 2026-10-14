@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mockOwnerSession } from "./admin-session-fixture.js";
 import { createHash } from "node:crypto";
 
 async function fixture(page) {
@@ -15,6 +16,7 @@ async function fixture(page) {
     })),
   };
   await page.route("https://**/*", route => route.abort());
+  await mockOwnerSession(page, { state });
   await page.route("**/api/events*", route => route.fulfill({ json: { events: [{
     id: state.event_id, title: state.event_title, date: "2026-10-20", published: true, images: [],
   }] } }));

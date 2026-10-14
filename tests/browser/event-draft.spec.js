@@ -1,3 +1,4 @@
+import { mockOwnerSession, ownerFixtureSession } from "./admin-session-fixture.js";
 import { test, expect } from "@playwright/test";
 
 const draftKey = "ercupsa_event_drafts_v1";
@@ -7,9 +8,10 @@ const catalog = [
   { id: "draft-second", title: "Araştırma buluşması", category: "Buluşma", date: "2026-10-22", time: "19:00", location: "Kayseri", registrationUrl: "", description: "İkinci etkinlik.", published: false, poster: "", images: [] },
 ];
 
-async function fixture(page, { holdInitialCatalog = false, initialCatalogStatus = 200 } = {}) {
+async function fixture(page, { holdInitialCatalog = false, initialCatalogStatus = 200, holdInitialSession = false, initialSessionStatus = 200 } = {}) {
   const state = { events: structuredClone(catalog), writes: [], reads: 0, saveError: 0, authenticated: true, dialogs: [] };
   const initialCatalog = new Promise(resolve => { state.releaseInitialCatalog = resolve; });
+  const initialSession = new Promise(resolve => { state.releaseInitialSession = resolve; });
   page.on("dialog", dialog => { state.dialogs.push(dialog.type()); dialog.accept(); });
   await page.addInitScript(() => {
     window.testUploads = [];
@@ -21,6 +23,13 @@ async function fixture(page, { holdInitialCatalog = false, initialCatalogStatus 
   await page.route("**/api/**", route => route.fulfill({ status: 501, json: { error: "Unmocked API in event draft test" } }));
   await page.route("**/api/community*", route => route.fulfill({ json: { members: [], submissions: [], batches: [] } }));
   await page.route("**/api/ticket-design*", route => route.fulfill({ json: { design: null } }));
+  let sessionReads = 0;
+  await mockOwnerSession(page, { state, onSession: async route => {
+    const firstSession = ++sessionReads === 1;
+    if (holdInitialSession && firstSession) { state.initialSessionPending = true; await initialSession; }
+    if (firstSession && initialSessionStatus !== 200) return route.fulfill({ status: initialSessionStatus, json: { error: "Yönetici girişi gerekli." } });
+    return route.fulfill({ json: { session: state.authenticated ? ownerFixtureSession : null } });
+  } });
   await page.route("**/api/events*", async route => {
     const request = route.request(), url = new URL(request.url());
     if (url.searchParams.get("action") === "logout") { state.authenticated = false; return route.fulfill({ json: { ok: true } }); }
@@ -45,7 +54,7 @@ async function fixture(page, { holdInitialCatalog = false, initialCatalogStatus 
     return route.fulfill({ status: 405, json: { error: "Unsupported event fixture request" } });
   });
   await page.goto("/admin.html");
-  if (!holdInitialCatalog) await expect(page.locator("#app")).toBeVisible();
+  if (!holdInitialCatalog && !holdInitialSession) await expect(page.locator("#app")).toBeVisible();
   return state;
 }
 async function edit(page, id = "draft-first") {
@@ -200,9 +209,8 @@ test("expired authentication and logout clear local event drafts without storing
   await expect(page.locator("#app")).toBeVisible();
   await edit(page);
   await page.locator("#title").fill("Çıkışta temizlenecek taslak");
-  // Logout first hides the authenticated app, then reloads the page.
-  // Wait for that reload instead of observing the outgoing document's login panel.
-  await Promise.all([page.waitForEvent("load"), page.locator("#adminLogout").click()]);
+  // Logout clears private data immediately and returns to the login form.
+  await page.locator("#adminLogout").click();
   await expect(page.locator("#login")).toBeVisible();
   expect(await savedDrafts(page)).toBeNull();
 });
@@ -260,6 +268,7 @@ test("published events copy their canonical preview URL while drafts offer no pu
 test("a delayed initial catalog response cannot reopen the admin app after logout", async ({ page }) => {
   const state = await fixture(page, { holdInitialCatalog: true });
   await expect.poll(() => state.initialCatalogPending).toBe(true);
+  const readyBeforeLogout = await page.evaluate(() => window.testAdminReady);
   await page.evaluate(() => document.dispatchEvent(new Event("admin-logout")));
   const response = page.waitForResponse(value => new URL(value.url()).pathname === "/api/events" && value.request().method() === "GET");
   state.releaseInitialCatalog();
@@ -268,23 +277,25 @@ test("a delayed initial catalog response cannot reopen the admin app after logou
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await expect(page.locator("#app")).toBeHidden();
   await expect(page.locator("#login")).toBeVisible();
-  expect(await page.evaluate(() => window.testAdminReady)).toBe(0);
+  expect(await page.evaluate(() => window.testAdminReady)).toBe(readyBeforeLogout);
   expect(await savedDrafts(page)).toBeNull();
+  await page.locator("#username").fill("basadmin");
   await page.locator("#password").fill("Local-mocked-admin-password");
   await page.locator("#loginBtn").click();
   await expect(page.locator("#app")).toBeVisible();
   await expect(page.locator("#login")).toBeHidden();
-  expect(await page.evaluate(() => window.testAdminReady)).toBe(1);
+  expect(await page.evaluate(() => window.testAdminReady)).toBe(readyBeforeLogout + 1);
   await edit(page);
   await expect(page.locator("#title")).toHaveValue(catalog[0].title);
 });
 
-test("an initial unauthorized cookie probe preserves a password already being typed and allows login", async ({ page }) => {
-  const state = await fixture(page, { holdInitialCatalog: true, initialCatalogStatus: 401 });
-  await expect.poll(() => state.initialCatalogPending).toBe(true);
+test("an initial unauthorized session probe preserves credentials already being typed and allows login", async ({ page }) => {
+  const state = await fixture(page, { holdInitialSession: true, initialSessionStatus: 401 });
+  await expect.poll(() => state.initialSessionPending).toBe(true);
+  await page.locator("#username").fill("basadmin");
   await page.locator("#password").fill("Local-mocked-admin-password");
-  const response = page.waitForResponse(value => new URL(value.url()).pathname === "/api/events" && value.request().method() === "GET");
-  state.releaseInitialCatalog();
+  const response = page.waitForResponse(value => new URL(value.url()).pathname === "/api/admin-auth" && value.request().method() === "GET");
+  state.releaseInitialSession();
   await (await response).finished();
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await expect(page.locator("#password")).toHaveValue("Local-mocked-admin-password");
@@ -296,13 +307,14 @@ test("an initial unauthorized cookie probe preserves a password already being ty
 });
 
 test("a late initial 401 cannot log out a newly authenticated admin session", async ({ page }) => {
-  const state = await fixture(page, { holdInitialCatalog: true, initialCatalogStatus: 401 });
-  await expect.poll(() => state.initialCatalogPending).toBe(true);
+  const state = await fixture(page, { holdInitialSession: true, initialSessionStatus: 401 });
+  await expect.poll(() => state.initialSessionPending).toBe(true);
+  await page.locator("#username").fill("basadmin");
   await page.locator("#password").fill("Local-mocked-admin-password");
   await page.locator("#loginBtn").click();
   await expect(page.locator("#app")).toBeVisible();
-  const response = page.waitForResponse(value => new URL(value.url()).pathname === "/api/events" && value.request().method() === "GET");
-  state.releaseInitialCatalog();
+  const response = page.waitForResponse(value => new URL(value.url()).pathname === "/api/admin-auth" && value.request().method() === "GET");
+  state.releaseInitialSession();
   await (await response).finished();
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await expect(page.locator("#app")).toBeVisible();

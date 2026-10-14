@@ -20,6 +20,8 @@ Netlify Project configuration / Environment variables'da aşağıdakileri ekleyi
 - `SUPABASE_SERVICE_ROLE_KEY`: yalnızca sunucunun kullandığı gizli service_role anahtarı.
 - `ADMIN_PASSWORD`: yönetici parolası; güçlü ve benzersiz bir değer kullanın.
 
+Baş yönetici `basadmin` kullanıcı adıyla bu parolayı kullanır; isteğe bağlı `ADMIN_USERNAME` kullanıcı adını değiştirir. Daha önce paylaşılan ortak parolayı yeni yetki sistemini yayımlamadan önce değiştirin. Diğer yöneticiler, baş yöneticinin **Yönetici hesapları** bölümünde oluşturduğu ayrı kullanıcı adı/şifreyle giriş yapar; bu hesaplar özel Netlify Blobs'ta saklanır. Sayman hesabını ve bölüm yetkilerini ayarlamak için [README-ERCUPSA-ADMIN.md](README-ERCUPSA-ADMIN.md) belgesine bakın. Bu yönetici hesapları Supabase e-posta hesaplarından ayrıdır ve yeni SQL gerektirmez.
+
 Yerel çalışma için `.env.example` dosyasından `.env` oluşturun ve değerleri güvenli şekilde girin. `.env` Git tarafından yok sayılır. Bulut ortamında da aynı değişkenler güvenli ortam ayarlarına eklenmelidir. Ağ ayarlarına **kendi projenizin tam Supabase alan adını** ekleyin; henüz proje olmadığı için örnek alan adına izin verilmedi.
 
 ## 3. Derleme ve çalışma
@@ -38,7 +40,7 @@ Yerel ve üretim Blobs ayrı ortamlardır; mevcut etkinlik verisi Netlify Blobs'
 
 ## 4. Yönetim ve kullanım
 
-- Admin girişi HttpOnly, SameSite=Strict, 8 saatlik imzalı çerez kullanır. Eski tarayıcı parola kaydı kaldırılır. Giriş denemeleri 15 dakikada 10 ile sınırlıdır.
+- Admin girişi kullanıcı adı/şifre ve HttpOnly, SameSite=Strict, 8 saatlik imzalı çerez kullanır. Eski tarayıcı parola kaydı ve eski yönetici çerezleri kabul edilmez. Giriş denemeleri 15 dakikada aynı IP/kullanıcı için 10, toplam IP için 50 ile sınırlıdır. Yetkili hesabın şifre, yetki veya aktifliği değişince eski oturumları geçersiz olur.
 - Üyeleri ad-soyad ve sınıfla ekleyin; aktif/pasif durumu yoktur. Üyenin yayımlama iznini alın.
 - Etkinlik önerileri yönetimde kalır. Anonim deneyimleri kişisel bilgileri ayıkladıktan sonra onaylayın. İsim/e-posta istenmez; kötüye kullanım sınırı için ham IP yerine tek yönlü bir türev tutulur.
 - İlgili etkinlikte **Bilet oluştur** seçin, 1–200 bilet üretin. 50 varsayılandır. Her yeni grup önceki kodları korur. Logolu, etkinlik başlıklı QR biletleri **Çıktı oluştur** ile dağıtın. A4 dikey sayfada 2 sütun × 5 sıra, toplam 10 bilet yerleşir; her bilet 49 mm yüksekliğindedir. Kesim için kesikli çerçeveler bulunur ve hiçbir bilet sayfalar arasında bölünmez. Tarayıcının yazdırma penceresi açılır; en iyi sonuç için A4, %100 ölçek ve üstbilgi/altbilgi kapalı kullanın. PDF için tarayıcının yazdırma penceresindeki PDF hedefini seçin.

@@ -36,9 +36,9 @@ for (const path of [
 ])
   await request(path);
 await request("/api/events?admin=true", { status: 401 });
-const login = await request("/api/events?action=auth", {
+const login = await request("/api/admin-auth?action=login", {
   method: "POST",
-  headers: { "x-admin-password": process.env.ADMIN_PASSWORD },
+  data: { username: process.env.ADMIN_USERNAME || "basadmin", password: process.env.ADMIN_PASSWORD },
 });
 cookie = login.headers.get("set-cookie").split(";")[0];
 assert.match(login.headers.get("set-cookie"), /HttpOnly/);

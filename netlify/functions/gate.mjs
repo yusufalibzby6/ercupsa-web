@@ -22,18 +22,19 @@ export function ticketCode(value, req) {
   return code;
 }
 const safeEntry = entry => ({ ticketId: entry.ticketId, userId: entry.userId, name: entry.name, enteredAt: entry.enteredAt, method: entry.method });
-export function createGateHandler({ read = db, events = readEvents, store = operationsStore, now = () => new Date() } = {}) {
+export function createGateHandler({ read = db, events = readEvents, store = operationsStore, now = () => new Date(), adminGetStore } = {}) {
   return guarded(async req => {
     try {
       const url = new URL(req.url), action = url.searchParams.get('action') || 'participants', storage = store();
       if (req.method === 'GET' && action === 'events') {
-        const operator = await operatorFor(req, undefined, storage, now());
+        const operator = await operatorFor(req, undefined, storage, now(), { adminGetStore });
         const catalog = (await events()).filter(event => operator.role === 'admin' || operator.eventIds.includes(event.id));
         return response({ events: catalog.map(({ id, title, date, time, location }) => ({ id, title, date, time, location })) });
       }
       const input = req.method === 'POST' ? await body(req) : null;
       const eventId = identifier(input?.eventId ?? url.searchParams.get('eventId'));
-      const operator = await operatorFor(req, eventId, storage, now());
+      const operator = await operatorFor(req, eventId, storage, now(), { adminGetStore });
+      if (req.method === 'POST' && !operator.canManage) fail(403, 'Etkinlik girişi kaydetme yetkiniz yok.');
       const event = (await events()).find(item => item.id === eventId);
       if (!event) fail(404, 'Etkinlik bulunamadı.');
       if (req.method === 'GET' && action === 'participants') {

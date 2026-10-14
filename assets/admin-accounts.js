@@ -1,4 +1,4 @@
-import { $, onAdminEvent } from "./common.js";
+import { $, onAdminEvent, canAdmin } from "./common.js";
 
 let ready = false, active = false, loading = false;
 let epoch = 0, listVersion = 0, detailVersion = 0;
@@ -37,7 +37,8 @@ function controls() {
     $(id).disabled = !ready || !active || loading;
   $("accountsPrevious").disabled = !ready || !active || loading || page <= 1;
   $("accountsNext").disabled = !ready || !active || loading || page >= pages;
-  $("accountVisibilityToggle").disabled = !ready || !active || !selectedAccount || mutations.has(selectedId);
+  $("accountVisibilityToggle").hidden = !canAdmin("accounts.manage");
+  $("accountVisibilityToggle").disabled = !canAdmin("accounts.manage") || !ready || !active || !selectedAccount || mutations.has(selectedId);
   $("accountDetailRetry").disabled = !ready || !active || mutations.has(selectedId);
 }
 function account(value) {
@@ -88,7 +89,7 @@ function clearList() {
   $("accountsPagination").hidden = true; $("accountsCount").textContent = ""; $("accountsPage").textContent = "";
 }
 async function loadList(nextPage = page) {
-  if (!ready || !active || loading) return;
+  if (!ready || !canAdmin("accounts.view") || !active || loading) return;
   const version = ++listVersion, auth = epoch;
   page = nextPage; loading = true; clearList(); controls(); message("Site kullanıcıları yükleniyor…");
   try {
@@ -146,6 +147,7 @@ function history(data) {
   });
 }
 async function loadDetail(id) {
+  if (!ready || !active || !canAdmin("accounts.view")) return;
   const version = ++detailVersion, auth = epoch;
   selectedAccount = null; $("accountDetail").hidden = true; $("accountDetailRetry").hidden = true;
   controls(); message("Hesap ve etkinlik geçmişi yükleniyor…", false, true);
@@ -175,17 +177,17 @@ async function loadDetail(id) {
   } finally { if (auth === epoch && version === detailVersion) controls(); }
 }
 function openDetail(value) {
-  if (!ready || !active) return;
+  if (!ready || !canAdmin("accounts.view") || !active) return;
   closeDetail(); selectedId = value.id;
   $("accountDialogTitle").textContent = fullName(value);
   dialog.showModal(); loadDetail(value.id);
 }
 $("accountsSearchForm").addEventListener("submit", event => {
-  event.preventDefault(); if (!ready || !active || loading) return;
+  event.preventDefault(); if (!ready || !canAdmin("accounts.view") || !active || loading) return;
   closeDetail(); search = $("accountsSearch").value.trim(); loadList(1);
 });
 $("accountsSearchReset").addEventListener("click", () => {
-  if (!ready || !active || loading) return;
+  if (!ready || !canAdmin("accounts.view") || !active || loading) return;
   closeDetail(); search = ""; $("accountsSearch").value = ""; loadList(1);
 });
 $("accountsRefresh").addEventListener("click", () => { closeDetail(); loadList(); });
@@ -196,7 +198,7 @@ dialog.addEventListener("cancel", event => { event.preventDefault(); closeDetail
 dialog.addEventListener("close", () => { if (!dialog.open && selectedId) clearDetail(); });
 $("accountDetailRetry").addEventListener("click", () => { if (selectedId && ready && active) loadDetail(selectedId); });
 $("accountVisibilityToggle").addEventListener("click", async () => {
-  if (!ready || !active || !selectedAccount || mutations.has(selectedId)) return;
+  if (!ready || !canAdmin("accounts.manage") || !active || !selectedAccount || mutations.has(selectedId)) return;
   const id = selectedId, hidden = !selectedAccount.publicNameBlocked;
   const text = hidden
     ? "Bu kullanıcının adını sitedeki herkese açık listelerden gizlemek istiyor musunuz? Hesabı, izni, biletleri ve geçmişi korunur. Kullanıcı yönetici engelini kendi profilinden kaldıramaz."
@@ -226,9 +228,9 @@ $("accountVisibilityToggle").addEventListener("click", async () => {
     }
   }
 });
-onAdminEvent("admin-ready", () => { ready = true; controls(); if (active) loadList(); });
+onAdminEvent("admin-ready", () => { ready = canAdmin("accounts.view"); controls(); if (active && ready) loadList(); });
 document.addEventListener("admin-tab", event => {
-  const nextActive = event.detail === "accounts";
+  const nextActive = event.detail === "accounts" && canAdmin("accounts.view");
   if (nextActive === active) return;
   active = nextActive; listVersion++; loading = false; closeDetail(); clearList(); message(""); controls();
   if (active && ready) loadList();

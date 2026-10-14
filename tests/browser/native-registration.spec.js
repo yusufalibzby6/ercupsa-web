@@ -1,3 +1,4 @@
+import { mockOwnerSession } from "./admin-session-fixture.js";
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
@@ -72,6 +73,7 @@ async function fixture(page, { custom = false } = {}) {
   await page.route("https://**/*", route => route.abort());
   // Catch every local API first, so an omitted fixture cannot touch real storage.
   await page.route("**/api/**", route => route.fulfill({ status: 501, json: { error: "Unmocked local API in registration test" } }));
+  await mockOwnerSession(page, { state });
   await page.route("**/api/events*", route => route.fulfill({ json: { events } }));
   await page.route("**/api/community*", route => route.fulfill({ json: { members: [], submissions: [], batches: [] } }));
   await page.route("**/api/ticket-design*", route => route.fulfill({ json: { design: null } }));

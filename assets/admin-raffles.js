@@ -1,4 +1,4 @@
-import { $, escape, onAdminEvent } from './common.js';
+import { $, escape, onAdminEvent, canAdmin } from './common.js';
 
 const PENDING_KEY = 'ercupsa_raffle_pending_v1';
 const SOURCE_KEY = 'ercupsa_raffle_source_v1';
@@ -7,7 +7,7 @@ const eventSelect = $('raffleEvent'), countInput = $('raffleCount'), start = $('
 const entryToggle = $('raffleCheckedInOnly'), entryBonusToggle = $('raffleCheckinBonus');
 const sourceButtons = [$('raffleSourceQr'), $('raffleSourceRegistrations')].filter(Boolean);
 let events = [], participants = [], draws = [], excluded = new Set();
-let ready = false, loaded = false, busy = false, version = 0, loadedEventId = '', loadedSource = '', poolVersion = null, animationTimer = null;
+let ready = false, active = false, loaded = false, busy = false, version = 0, loadedEventId = '', loadedSource = '', poolVersion = null, animationTimer = null;
 let queuedCatalog = null, lastDraw = null, pending = recoverPending(), pendingStored = true;
 let source = pending ? sourceOf(pending) : recoverSource();
 let qrSettings = { loyaltyBonus: true, checkedInOnly: false, checkinBonus: false };
@@ -99,19 +99,25 @@ async function request(method, data, query) {
 }
 function controls() {
   const locked = busy || !!pending;
-  eventSelect.disabled = locked;
-  countInput.disabled = locked;
+  const readonly = !canAdmin('raffles.manage');
+  eventSelect.disabled = locked || !ready;
+  countInput.disabled = locked || readonly;
   sourceButtons.forEach(button => { button.disabled = locked || !ready; button.setAttribute('aria-pressed', String(button.dataset.source === source)); });
-  loyaltyToggle.disabled = locked || source === 'registrations';
-  entryToggle.disabled = locked || source === 'registrations';
-  entryBonusToggle.disabled = locked || source === 'registrations' || !loyaltyToggle.checked;
+  loyaltyToggle.disabled = locked || readonly || source === 'registrations';
+  entryToggle.disabled = locked || readonly || source === 'registrations';
+  entryBonusToggle.disabled = locked || readonly || source === 'registrations' || !loyaltyToggle.checked;
   $('raffleRefresh').disabled = locked || !eventSelect.value;
   $('raffleSearch').disabled = locked;
-  $('raffleIncludeAll').disabled = locked || !loaded;
-  $('raffleParticipants').querySelectorAll('input').forEach(input => input.disabled = locked);
-  $('raffleHistory').querySelectorAll('button').forEach(button => button.disabled = locked);
+  $('raffleIncludeAll').hidden = readonly;
+  $('raffleIncludeAll').disabled = locked || readonly || !loaded;
+  $('raffleParticipants').querySelectorAll('input').forEach(input => input.disabled = locked || readonly);
+  $('raffleHistory').querySelectorAll('button').forEach(button => {
+    const mutates = button.hasAttribute('data-delete-draw') || button.hasAttribute('data-prize-draw');
+    button.hidden = mutates && readonly; button.disabled = locked || (mutates && readonly);
+  });
   $('rafflePresentation').disabled = !ready || !(eventSelect.value || pending || lastDraw);
-  start.disabled = busy || (!pending && (!loaded || !eventSelect.value || !participants.some(p => !excluded.has(p.id))));
+  start.hidden = readonly;
+  start.disabled = !ready || readonly || busy || (!pending && (!loaded || !eventSelect.value || !participants.some(p => !excluded.has(p.id))));
   start.textContent = pending && !busy ? 'Aynı çekiliş sonucunu yeniden sorgula' : 'Çekilişi başlat';
 }
 function eventTitle(id = eventSelect.value) {
@@ -200,7 +206,7 @@ function populateCatalog() {
   stageTitle(); controls();
 }
 async function load({ keepResults = false } = {}) {
-  if (!ready || busy || pending) return;
+  if (!ready || !active || !canAdmin('raffles.view') || busy || pending) return;
   const current = ++version, eventId = eventSelect.value, selectedSource = source;
   const sameEvent = eventId === loadedEventId && selectedSource === loadedSource;
   loadedEventId = eventId; loadedSource = selectedSource; loaded = false; poolVersion = null;
@@ -243,7 +249,7 @@ function receiveCatalog(catalog) {
     if (pending) populateCatalog();
     return;
   }
-  populateCatalog(); load();
+  populateCatalog(); if (ready && active) load();
 }
 function finishCatalog() {
   if (pending || queuedCatalog === null) return;
@@ -254,14 +260,19 @@ function finishCatalog() {
 }
 onAdminEvent('events-loaded', event => receiveCatalog(event.detail));
 onAdminEvent('admin-ready', () => {
-  ready = true;
-  if (pending) {
+  ready = canAdmin('raffles.view');
+  if (!canAdmin('raffles.manage')) clearPending();
+  if (ready && pending) {
     excluded = new Set(pending.excluded);
     loadedEventId = pending.eventId; loadedSource = sourceOf(pending);
     populateCatalog();
     feedback('Önceki çekilişin sonucu henüz doğrulanmadı. Aynı çekiliş sonucunu yeniden sorgulayın; yeni çekiliş oluşturulmaz.', true);
-  } else load();
+  } else if (ready && active) load();
   controls();
+});
+document.addEventListener('admin-tab', event => {
+  active = event.detail === 'raffles' && canAdmin('raffles.view');
+  if (active && ready && !loaded) load();
 });
 eventSelect.addEventListener('change', () => load());
 sourceButtons.forEach(button => button.addEventListener('click', () => {
@@ -278,24 +289,24 @@ sourceButtons.forEach(button => button.addEventListener('click', () => {
 }));
 $('raffleRefresh').addEventListener('click', () => load());
 $('raffleSearch').addEventListener('input', renderParticipants);
-$('raffleIncludeAll').addEventListener('click', () => { excluded.clear(); renderParticipants(); });
+$('raffleIncludeAll').addEventListener('click', () => { if (!ready || !canAdmin('raffles.manage')) return; excluded.clear(); renderParticipants(); });
 loyaltyToggle.addEventListener('change', () => {
-  if (busy || pending) return;
+  if (!ready || !canAdmin('raffles.manage') || busy || pending) return;
   renderMode(); renderParticipants();
   if (entryBonusToggle.checked) load({ keepResults: !!lastDraw });
 });
 for (const toggle of [entryToggle, entryBonusToggle]) toggle.addEventListener('change', () => {
-  if (busy || pending) return;
+  if (!ready || !canAdmin('raffles.manage') || busy || pending) return;
   renderMode(); load({ keepResults: !!lastDraw });
 });
 $('raffleParticipants').addEventListener('change', event => {
   const id = event.target.dataset.person;
-  if (!id || busy || pending) return;
+  if (!ready || !canAdmin('raffles.manage') || !id || busy || pending) return;
   if (event.target.checked) excluded.delete(id); else excluded.add(id);
   renderParticipants();
 });
 start.addEventListener('click', async () => {
-  if (busy) return;
+  if (!ready || !active || !canAdmin('raffles.manage') || busy) return;
   const retry = !!pending;
   if (!pending) {
     const count = Number(countInput.value), included = participants.filter(person => !excluded.has(person.id));
@@ -374,8 +385,9 @@ function exportWinners(draw) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 $('raffleHistory').addEventListener('click', async event => {
+  if (!ready || !active || !canAdmin('raffles.view')) return;
   const prize = event.target.closest('[data-prize-draw]');
-  if (prize && !busy && !pending) {
+  if (prize && canAdmin('raffles.manage') && !busy && !pending) {
     const current = ++version, eventId = eventSelect.value, id = prize.dataset.prizeDraw, winnerId = prize.dataset.prizeWinner, delivered = prize.dataset.prizeDelivered === 'true';
     const original = draws.find(draw => draw.id === id);
     busy = true; controls();
@@ -399,7 +411,7 @@ $('raffleHistory').addEventListener('click', async event => {
     if (draw) exportWinners(draw); return;
   }
   const button = event.target.closest('[data-delete-draw]');
-  if (!button || busy || pending || !confirm('Bu çekiliş ve kazanan kaydı silinsin mi? Daha sonra yeni bir çekiliş yapabilirsiniz.')) return;
+  if (!button || !canAdmin('raffles.manage') || busy || pending || !confirm('Bu çekiliş ve kazanan kaydı silinsin mi? Daha sonra yeni bir çekiliş yapabilirsiniz.')) return;
   const current = ++version, eventId = eventSelect.value, id = button.dataset.deleteDraw;
   busy = true; controls();
   try {
@@ -427,7 +439,7 @@ function closePresentation() {
   presentationOrigin?.focus({ preventScroll: true });
 }
 $('rafflePresentation').addEventListener('click', () => {
-  if (presentation.open) return;
+  if (!ready || !active || !canAdmin('raffles.view') || presentation.open) return;
   presentationOrigin = document.activeElement;
   previousOverflow = document.body.style.overflow;
   placeholders = movedNodes.map(node => {
@@ -441,7 +453,7 @@ $('rafflePresentationExit').addEventListener('click', closePresentation);
 presentation.addEventListener('cancel', event => { event.preventDefault(); closePresentation(); });
 presentation.addEventListener('close', closePresentation);
 document.addEventListener('admin-logout', event => {
-  version++; ready = loaded = busy = false;
+  version++; ready = active = loaded = busy = false;
   if (animationTimer) clearInterval(animationTimer);
   animationTimer = null;
   closePresentation();

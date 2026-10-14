@@ -1,3 +1,4 @@
+import { mockOwnerSession } from "./admin-session-fixture.js";
 import { test, expect } from "@playwright/test";
 
 const event = { id: "modern-event", title: "Bilim, dayanışma ve birlikte öğrenme buluşması", category: "Atölye", date: "2026-11-01", time: "18:00", location: "Eczacılık Fakültesi", description: "Etkinlik açıklaması", published: true, images: [] };
@@ -18,6 +19,7 @@ async function fixture(page, authenticated = true) {
   const state = { authenticated, logout: 0 };
   await page.route("https://**/*", route => route.abort());
   await page.route("**/api/**", route => route.fulfill({ status: 501, json: { error: "Unmocked API in admin shell test" } }));
+  await mockOwnerSession(page, { state });
   await page.route("**/api/events*", route => {
     const action = new URL(route.request().url()).searchParams.get("action");
     if (action === "auth") { state.authenticated = true; return route.fulfill({ json: { ok: true } }); }
@@ -89,8 +91,9 @@ test("mobile navigation reaches every retained section without horizontal page o
 test("mobile login retains an accessible password label and opens the redesigned workspace", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await fixture(page, false);
-  await expect(page.locator("#loginError")).toHaveText("Yönetici girişi gerekli.");
-  await page.getByLabel("Yönetici şifresi", { exact: true }).fill("fixture-password");
+  await expect(page.locator("#login")).toBeVisible();
+  await page.locator("#login").getByLabel("Kullanıcı adı", { exact: true }).fill("basadmin");
+  await page.locator("#login").getByLabel("Şifre", { exact: true }).fill("fixture-password");
   await page.getByRole("button", { name: "Giriş yap", exact: true }).click();
   await expect(page.locator("#app")).toBeVisible();
   await expect(page.locator("#login")).toBeHidden();

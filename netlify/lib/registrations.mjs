@@ -113,7 +113,9 @@ export function turkeyToday(now = new Date()) {
 }
 
 export function registrationIsAvailable(event, form, now = new Date()) {
-  return Boolean(event && event.published !== false && form?.enabled && event.date >= turkeyToday(now));
+  // Form access is explicit and independent of the event's public listing.
+  // Removed events are absent from the canonical event catalog.
+  return Boolean(event && form?.enabled && event.date >= turkeyToday(now));
 }
 
 export async function hydrateRegistrationFlags(events, getStore) {
@@ -274,13 +276,15 @@ export async function validateRegistrationPhoto(file) {
     mime: detected.mime, size: detected.bytes.length } };
 }
 
-export function entryForAdmin(entry) {
+export function entryForAdmin(entry, { tickets = true, photoAccess = true, receiptAccess = true } = {}) {
   const { receipt, photos, fingerprint, status, ticket, ...rest } = entry;
-  return { ...rest, ...(ticket ? { ticket: { batchId: ticket.batchId, status: ticket.status,
+  const safeAnswers = photoAccess ? rest.answers : Object.fromEntries(Object.entries(rest.answers || {})
+    .filter(([id]) => !Object.hasOwn(photos || {}, id)));
+  return { ...rest, answers: safeAnswers, ...(tickets && ticket ? { ticket: { batchId: ticket.batchId, status: ticket.status,
     ...(ticket.issuedAt ? { issuedAt: ticket.issuedAt } : {}) } } : {}),
-    ...(photos ? { photos: Object.fromEntries(Object.entries(photos).map(([id, photo]) =>
+    ...(photoAccess && photos ? { photos: Object.fromEntries(Object.entries(photos).map(([id, photo]) =>
       [id, { name: photo.name, mime: photo.mime, size: photo.size }])) } : {}),
-    receipt: receipt ? { name: receipt.name, mime: receipt.mime, size: receipt.size } : null };
+    ...(receiptAccess ? { receipt: receipt ? { name: receipt.name, mime: receipt.mime, size: receipt.size } : null } : {}) };
 }
 
 export function normalizedRegistrationPhone(value) {

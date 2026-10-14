@@ -1,15 +1,16 @@
 import { getStore as getBlobStore } from "@netlify/blobs";
 import { readEvents as readStoredEvents } from "./events.mjs";
-import { guarded, requireAdmin, response, identifier, fail } from "../lib/security.mjs";
+import { guarded, requirePermission, response, identifier, fail } from "../lib/security.mjs";
 import { readTicketDesignBody, validateTicketDesign } from "../lib/ticket-design.mjs";
 
 export function createTicketDesignHandler({
   getStore = getBlobStore,
   readEvents = readStoredEvents,
   now = () => new Date(),
+  adminStore,
 } = {}) {
   return guarded(async (req) => {
-    requireAdmin(req);
+    await requirePermission(req, req.method === "GET" ? "tickets.view" : "tickets.manage", { getStore: adminStore });
     if (!["GET", "POST", "DELETE"].includes(req.method))
       fail(405, "Desteklenmeyen işlem.");
     const id = identifier(new URL(req.url).searchParams.get("event_id"));

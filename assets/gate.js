@@ -6,6 +6,7 @@ let listVersion = 0, sessionVersion = 0, visibleLimit = 100, manualPerson = null
 let stream = null, cameraVersion = 0, frameTimer = null, cameraStarting = false, detector = null;
 const video = $('gateVideo'), dialog = $('gateManualDialog');
 const canvas = document.createElement('canvas'), context = canvas.getContext('2d', { willReadFrequently: true });
+const canManage = () => !!operator && (operator.role === 'staff' || operator.canManage === true);
 const dateTime = value => value ? new Date(value).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
 async function request(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers }, signal: AbortSignal.timeout(15000) });
@@ -18,13 +19,15 @@ function result(state, title, detail) { $('gateResult').dataset.state = state; $
 function controls() {
   const disabled = !operator || !selectedId || busy;
   $('gateEvent').disabled = busy;
-  $('gateCodeSubmit').disabled = disabled;
-  $('gateCameraStart').disabled = disabled || cameraStarting;
+  $('gateCodeForm').hidden = !!operator && !canManage();
+  $('gateCameraStart').hidden = !!operator && !canManage();
+  $('gateCodeSubmit').disabled = disabled || !canManage();
+  $('gateCameraStart').disabled = disabled || !canManage() || cameraStarting;
   $('gateRefresh').disabled = disabled || listBusy;
   $('gateLogout').disabled = busy;
-  $('gateManualConfirm').disabled = busy;
+  $('gateManualConfirm').disabled = busy || !canManage();
   $('gateManualCancel').disabled = busy;
-  for (const button of $('gatePeople').querySelectorAll('button')) button.disabled = disabled;
+  for (const button of $('gatePeople').querySelectorAll('button')) button.disabled = disabled || !canManage();
 }
 function stopCamera() {
   cameraVersion++; cameraStarting = false;
@@ -66,7 +69,7 @@ async function enter(value) {
   clearPrivate();
   $('gateLogin').hidden = true; $('gateBootStatus').hidden = true; $('gateApp').hidden = false;
   $('gateLogout').hidden = false; $('gateAdminLink').hidden = value.role !== 'admin';
-  $('gateOperator').textContent = `${value.name || 'Görevli'} · ${value.role === 'admin' ? 'Yönetici' : 'Etkinlik görevlisi'}`;
+  $('gateOperator').textContent = `${value.name || 'Görevli'} · ${value.role === 'admin' ? (canManage() ? 'Yönetici' : 'Yönetici · Yalnızca görüntüleme') : 'Etkinlik görevlisi'}`;
   const data = await request('/api/gate?action=events');
   if (!Array.isArray(data.events)) throw new Error('Etkinlik listesi doğrulanamadı.');
   events = data.events;
@@ -82,14 +85,14 @@ function changeEvent() {
   $('gateSearch').value = ''; $('gateCode').value = ''; $('gateClaimed').textContent = '—'; $('gateEntered').textContent = '—';
   const event = events.find(item => item.id === selectedId);
   $('gateEventDetails').textContent = event ? [event.date, event.time, event.location].filter(Boolean).join(' · ') : '';
-  result('idle', 'Bir bilet okutun', 'Bu etkinliğin bilet QR’sini okutun. Her bilete yalnızca bir giriş kaydedilir.');
+  result('idle', canManage() ? 'Bir bilet okutun' : 'Katılımı görüntüleme', canManage() ? 'Bu etkinliğin bilet QR’sini okutun. Her bilete yalnızca bir giriş kaydedilir.' : 'Girişleri takip edebilirsiniz. QR okutma ve elle giriş kaydetme yetkiniz yok.');
   renderPeople(); controls(); loadPeople();
 }
 function renderPeople() {
   const query = $('gateSearch').value.trim().toLocaleLowerCase('tr');
   const matches = participants.filter(person => person.name.toLocaleLowerCase('tr').includes(query));
   $('gateSearchCount').textContent = participants.length ? `${matches.length} kişi gösteriliyor${matches.length > visibleLimit ? ` · ilk ${visibleLimit}` : ''}` : '';
-  $('gatePeople').innerHTML = matches.slice(0, visibleLimit).map(person => `<article class="gate-person"><div><strong>${escape(person.name)}</strong><small class="${person.enteredAt ? 'gate-entered' : ''}">${person.enteredAt ? `Giriş yaptı · ${escape(dateTime(person.enteredAt))}` : 'Biletini ekledi · Henüz giriş yapmadı'}</small></div>${person.enteredAt ? '' : `<button type="button" data-manual="${escape(person.id)}">Elle giriş</button>`}</article>`).join('') || '<p class="gate-muted">Katılımcı bulunamadı.</p>';
+  $('gatePeople').innerHTML = matches.slice(0, visibleLimit).map(person => `<article class="gate-person"><div><strong>${escape(person.name)}</strong><small class="${person.enteredAt ? 'gate-entered' : ''}">${person.enteredAt ? `Giriş yaptı · ${escape(dateTime(person.enteredAt))}` : 'Biletini ekledi · Henüz giriş yapmadı'}</small></div>${person.enteredAt || !canManage() ? '' : `<button type="button" data-manual="${escape(person.id)}">Elle giriş</button>`}</article>`).join('') || '<p class="gate-muted">Katılımcı bulunamadı.</p>';
   $('gateMore').hidden = matches.length <= visibleLimit; controls();
 }
 async function loadPeople({ quiet = false } = {}) {
@@ -110,7 +113,7 @@ async function loadPeople({ quiet = false } = {}) {
   } finally { if (version === listVersion) { listBusy = false; controls(); } }
 }
 async function scan(code, userId = null) {
-  if (busy || !operator || !selectedId) return;
+  if (busy || !canManage() || !selectedId) return;
   stopCamera(); busy = true; controls();
   const eventId = selectedId;
   result('idle', 'Bilet kontrol ediliyor…', 'Lütfen sonucu bekleyin.');
@@ -137,7 +140,7 @@ async function scan(code, userId = null) {
   } finally { busy = false; controls(); }
 }
 async function startCamera() {
-  if (busy || cameraStarting || !operator || !selectedId) return;
+  if (busy || cameraStarting || !canManage() || !selectedId) return;
   stopCamera(); const version = ++cameraVersion;
   cameraStarting = true; controls(); message('gateCameraStatus', 'Kamera açılıyor…');
   try {
@@ -198,7 +201,7 @@ $('gateLoginForm').addEventListener('submit', async event => {
 $('gateLogout').addEventListener('click', async () => {
   stopCamera(); $('gateLogout').disabled = true;
   try {
-    if (operator?.role === 'admin') await request('/api/events?action=logout', { method: 'POST' });
+    if (operator?.role === 'admin') await request('/api/admin-auth?action=logout', { method: 'POST' });
     await request('/api/staff?action=logout', { method: 'POST' });
     ++sessionVersion; operator = null; clearPrivate(); $('gateBootStatus').hidden = true; $('gateSessionRetry').hidden = true; $('gateLogin').hidden = false; message('gateLoginStatus', 'Çıkış yapıldı.');
   }
@@ -215,7 +218,7 @@ $('gateSearch').addEventListener('input', () => { visibleLimit = 100; renderPeop
 $('gateMore').addEventListener('click', () => { visibleLimit += 100; renderPeople(); });
 $('gatePeople').addEventListener('click', event => {
   const id = event.target.closest('[data-manual]')?.dataset.manual;
-  if (!id || busy) return;
+  if (!id || busy || !canManage()) return;
   manualPerson = participants.find(person => person.id === id && !person.enteredAt);
   if (!manualPerson) return;
   $('gateManualName').textContent = manualPerson.name; dialog.showModal();

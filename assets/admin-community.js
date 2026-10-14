@@ -4,7 +4,8 @@ import "./admin-raffles.js";
 import "./admin-gate.js";
 import "./admin-instagram.js";
 import "./admin-accounts.js";
-import { $, escape, api, status, onAdminEvent } from "./common.js";
+import "./admin-users.js";
+import { $, escape, api, status, onAdminEvent, canAdmin, isOwner } from "./common.js";
 import {
   ticketCard,
   ticketSheets,
@@ -18,9 +19,12 @@ let ready = false, authGeneration = 0, catalogLoadVersion = 0;
 let designBusy = false, batchBusy = false, fileReading = false, candidate = null, candidateFile = null;
 let designLoadVersion = 0, fileReadVersion = 0, batchLoadVersion = 0, cardsVersion = 0;
 let designPromise = null, openedBatch = null;
-const tabs = ["events", "registrations", "tickets", "raffles", "attendance", "accounts", "instagram"];
+const tabs = ["events", "registrations", "tickets", "raffles", "attendance", "accounts", "instagram", "adminUsers"];
+let currentTab = "";
+const tabAllowed = name => name === "adminUsers" ? isOwner() : canAdmin(`${name}.view`);
 function tab(name) {
-  if (!tabs.includes(name)) return;
+  if (!tabs.includes(name) || !tabAllowed(name)) return;
+  currentTab = name;
   for (const t of tabs) {
     const section = $(t + "Tab");
     if (section) section.hidden = t !== name;
@@ -37,14 +41,25 @@ function tab(name) {
   }
   document.dispatchEvent(new CustomEvent("admin-tab", { detail: name }));
 }
+function updateNavigation() {
+  for (const button of document.querySelectorAll("[data-tab]")) button.hidden = !tabAllowed(button.dataset.tab);
+  if (currentTab && tabAllowed(currentTab)) return;
+  currentTab = "";
+  for (const name of tabs) { const section = $(name + "Tab"); if (section) section.hidden = true; }
+  const allowed = tabs.find(tabAllowed);
+  if (allowed) tab(allowed);
+  else { $("adminSectionTitle").textContent = "Erişim bekleniyor"; $("adminSectionDescription").textContent = "Bu hesap için henüz bölüm erişimi tanımlanmamış. Baş admin erişimlerinizi düzenleyebilir."; }
+}
+onAdminEvent("admin-session", updateNavigation);
 document
   .querySelectorAll("[data-tab]")
   .forEach((b) => b.addEventListener("click", () => tab(b.dataset.tab)));
 onAdminEvent("events-loaded", (e) => {
   events = e.detail;
-  if (ready) updateEvents();
+  if (ready && canAdmin("tickets.view")) updateEvents();
 });
 function updateEvents() {
+  if (!ready || !canAdmin("tickets.view")) return;
   const previous = $("ticketEvent").value;
   $("ticketEvent").innerHTML = events
     .map((v) => `<option value="${escape(v.id)}">${escape(v.title)}</option>`)
@@ -55,6 +70,7 @@ function updateEvents() {
   }
 }
 document.addEventListener("ticket-event", (e) => {
+  if (!ready || !canAdmin("tickets.view")) return;
   tab("tickets");
   if (designBusy) {
     status("Tasarım işlemi tamamlandıktan sonra etkinliği değiştirebilirsiniz.", true);
@@ -71,15 +87,19 @@ function designStatus(message, error = false) {
 }
 function updateTicketControls() {
   const designReady = ready && designState === "ready" && designEventId === $("ticketEvent").value;
+  const manage = ready && canAdmin("tickets.manage");
   $("ticketEvent").disabled = !ready || designBusy;
-  $("ticketDesignFile").disabled = !designReady || designBusy;
-  $("ticketDesignSave").disabled = !designReady || !candidate || designBusy || fileReading;
-  $("ticketDesignReset").disabled = !ready || !$("ticketEvent").value || (designState !== "error" && (!designReady || !design)) || designBusy || fileReading;
+  $("ticketDesignFile").disabled = !manage || !designReady || designBusy;
+  $("ticketDesignSave").disabled = !manage || !designReady || !candidate || designBusy || fileReading;
+  $("ticketDesignReset").disabled = !manage || !$("ticketEvent").value || (designState !== "error" && (!designReady || !design)) || designBusy || fileReading;
+  $("ticketDesignForm").hidden = !manage;
+  $("ticketCount").closest("label").hidden = !manage;
+  $("createBatch").hidden = !manage;
   $("ticketDesignCancel").hidden = !candidate;
   $("ticketDesignCancel").disabled = designBusy;
   $("ticketDesignRetry").hidden = designState !== "error";
   $("ticketDesignRetry").disabled = designBusy;
-  $("createBatch").disabled = !designReady || designBusy || batchBusy || !!candidate || fileReading;
+  $("createBatch").disabled = !manage || !designReady || designBusy || batchBusy || !!candidate || fileReading;
   const print = $("printTickets");
   if (print) print.disabled = !designReady || designBusy || !!candidate || fileReading;
 }
@@ -154,6 +174,7 @@ $("ticketDesignCancel").onclick = () => {
   updateTicketControls();
 };
 $("ticketDesignFile").addEventListener("change", async () => {
+  if (!ready || !canAdmin("tickets.manage")) return;
   const file = $("ticketDesignFile").files[0];
   const eventId = $("ticketEvent").value;
   const version = ++fileReadVersion;
@@ -170,7 +191,7 @@ $("ticketDesignFile").addEventListener("change", async () => {
   designStatus("Görselin biçimi ve boyutları kontrol ediliyor…");
   try {
     const result = await readTicketDesign(file);
-    if (version !== fileReadVersion || eventId !== $("ticketEvent").value) return;
+    if (!ready || !canAdmin("tickets.manage") || version !== fileReadVersion || eventId !== $("ticketEvent").value) { releaseTicketArtwork(result); return; }
     candidate = result;
     candidateFile = file;
     designStatus(`${file.name}: önizleme hazır. Biletlerde kullanmak için “Tasarımı yükle”ye basın.`);
@@ -187,7 +208,7 @@ $("ticketDesignFile").addEventListener("change", async () => {
   }
 });
 async function saveDesign(method) {
-  if (!ready || designBusy || (designState !== "ready" && !(method === "DELETE" && designState === "error"))) return;
+  if (!ready || !canAdmin("tickets.manage") || designBusy || (designState !== "ready" && !(method === "DELETE" && designState === "error"))) return;
   const generation = authGeneration;
   const eventId = $("ticketEvent").value;
   if (method === "POST" && !candidateFile) return;
@@ -240,9 +261,10 @@ async function load() {
   }
 }
 onAdminEvent("admin-ready", () => {
-  ready = true;
-  updateEvents();
-  load();
+  ready = canAdmin("tickets.view");
+  updateNavigation();
+  if (ready) { updateEvents(); load(); }
+  updateTicketControls();
 });
 function render() {
   $("batchList").innerHTML = data.batches
@@ -258,7 +280,7 @@ document.addEventListener("click", async (e) => {
   const generation = authGeneration;
   try {
     if (b.dataset.batch) await showBatch(b.dataset.batch);
-    if (b.dataset.revoke && confirm("Bu bilet iptal edilsin mi?")) {
+    if (b.dataset.revoke && canAdmin("tickets.manage") && confirm("Bu bilet iptal edilsin mi?")) {
       await api("/api/community?action=revoke", {
         method: "POST",
         body: JSON.stringify({ id: b.dataset.revoke }),
@@ -273,7 +295,7 @@ document.addEventListener("click", async (e) => {
 $("batchForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const b = e.target.querySelector("button");
-  if (!ready || designState !== "ready" || designBusy || batchBusy || candidate || fileReading) {
+  if (!ready || !canAdmin("tickets.manage") || designState !== "ready" || designBusy || batchBusy || candidate || fileReading) {
     status("Biletleri oluşturmadan önce etkinliğin tasarımını kaydedin veya bağlantıyı yeniden deneyin.", true);
     return;
   }
@@ -365,7 +387,7 @@ async function renderOpenedBatch() {
       : ticket.entered_at ? "Kapıda giriş yaptı" : "Henüz giriş yapmadı";
     return {
       card: ticketCard({ code, qr, eventTitle: d.event_title, ticket, design: artwork }),
-      control: `<div class="ticket-controls no-print"><span>${ticket?.revoked ? "İptal" : claimState} · ${entryState}</span>${ticket && !ticket.revoked && !ticket.claimed_at ? `<button class="text-red-700" data-revoke="${escape(ticket.id)}">İptal et</button>` : ""}</div>`,
+      control: `<div class="ticket-controls no-print"><span>${ticket?.revoked ? "İptal" : claimState} · ${entryState}</span>${canAdmin("tickets.manage") && ticket && !ticket.revoked && !ticket.claimed_at ? `<button class="text-red-700" data-revoke="${escape(ticket.id)}">İptal et</button>` : ""}</div>`,
     };
   }));
   if (!ready || version !== cardsVersion || openedBatch !== d || d.event_id !== $("ticketEvent").value) return;
@@ -413,7 +435,8 @@ document.addEventListener("admin-logout", () => {
   renderDesignPreview();
   designStatus("");
   updateTicketControls();
-  tab("events");
+  currentTab = "";
+  updateNavigation();
 });
-tab("events");
+updateNavigation();
 updateTicketControls();

@@ -2,7 +2,8 @@ import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { createRegistrationsHandler } from "../netlify/functions/registrations.mjs";
-import { adminLogin } from "../netlify/lib/security.mjs";
+import { adminLogin, signedAdminCookie } from "../netlify/lib/security.mjs";
+import { ADMIN_STORE, ADMIN_ACCOUNTS_KEY, TREASURER_PERMISSIONS } from "../netlify/lib/admin-auth.mjs";
 import {
   CLASS_OPTIONS, RECEIPT_MAX_BYTES, REGISTRATION_MAX_BYTES, REGISTRATION_STORE,
   REGISTRATION_RECEIPT_STORE, REGISTRATION_PHOTO_STORE, REGISTRATION_FULL_MESSAGE, defaultRegistrationForm, entryKey, formKey, registrationStateKey,
@@ -156,6 +157,84 @@ function fixture() {
     setClock: (value) => { clock = new Date(value); } };
 }
 
+async function delegateCookie(f, permissions, { treasurer = false } = {}) {
+  const account = { id: treasurer ? "sayman" : randomUUID(), username: treasurer ? "sayman" : "yetkili",
+    name: treasurer ? "Sayman" : "Yetkili yönetici", role: treasurer ? "treasurer" : "admin", active: true,
+    version: randomUUID(), permissions, ...(treasurer ? { fixedPreset: true } : {}),
+    salt: "a".repeat(32), passwordHash: "b".repeat(64) };
+  await f.getStore(ADMIN_STORE).setJSON(ADMIN_ACCOUNTS_KEY, { revision: randomUUID(), accounts: [account] });
+  return signedAdminCookie(new Request(origin + "/admin.html"), account).split(";")[0];
+}
+
+test("Sayman only reads registration lists and receipts; other operations are rejected before private stores", async () => {
+  const f = fixture();
+  await f.open("event-one", withPhotos);
+  const submitted = await (await f.submit({ receipt: png, photos: { portrait: { bytes: png, name: "private-personal-photo.png" } } })).json();
+  await f.request("ticket", { method: "POST", auth: true, input: { id: submitted.reference } });
+  const signed = await delegateCookie(f, [...TREASURER_PERMISSIONS], { treasurer: true });
+  const headers = { cookie: signed };
+  const admin = await (await f.request("admin", { headers })).json();
+  const record = admin.entries[0];
+  assert.equal(record.name, "Deniz Test");
+  assert.deepEqual(record.receipt, { name: "dekont.png", mime: "image/png", size: png.length });
+  assert.ok(!Object.hasOwn(record, "ticket"));
+  assert.ok(!Object.hasOwn(record, "photos"));
+  assert.ok(!Object.hasOwn(record.answers, "portrait"));
+  assert.ok(!JSON.stringify(admin).includes("private-personal-photo"));
+  assert.deepEqual(admin.pendingTicketDeletions, []);
+  assert.deepEqual(admin.form.fields, defaultRegistrationForm("event-one").fields);
+  assert.equal(admin.form.description, "");
+  assert.equal((await f.request("summary", { headers })).status, 200);
+  const receipt = await f.request("receipt", { headers, extra: "&id=" + submitted.reference });
+  assert.equal(receipt.status, 200);
+  assert.deepEqual(Buffer.from(await receipt.arrayBuffer()), png);
+  for (const [action, method, input, extra = ""] of [
+    ["form", "POST", defaultRegistrationForm("event-one")],
+    ["photo", "GET", null, "&id=" + submitted.reference + "&field_id=portrait"],
+    ["export", "GET"], ["ticket", "GET", null, "&id=" + submitted.reference],
+    ["ticket", "POST", { id: submitted.reference }], ["delete", "POST", { id: submitted.reference }],
+  ]) {
+    f.calls.length = 0; f.databaseCalls.length = 0;
+    assert.equal((await f.request(action, { method, ...(method === "POST" ? { input } : {}), headers, extra })).status, 403, action);
+    assert.equal(f.calls.filter(call => call.name !== ADMIN_STORE).length, 0, action + " private storage");
+    assert.equal(f.databaseCalls.length, 0, action + " ticket database");
+  }
+});
+
+test("registration managers cannot delete entries, and ticket access additionally requires registration view", async () => {
+  const f = fixture();
+  await f.open();
+  const reference = (await (await f.submit()).json()).reference;
+  const manager = await delegateCookie(f, ["registrations.view", "registrations.manage"]);
+  assert.equal((await f.request("form", { method: "POST", input: { ...defaultRegistrationForm("event-one"), enabled: true }, headers: { cookie: manager } })).status, 200);
+  f.calls.length = 0;
+  assert.equal((await f.request("delete", { method: "POST", input: { id: reference }, headers: { cookie: manager } })).status, 403);
+  assert.equal(f.calls.length, 0);
+  const onlyTickets = await delegateCookie(f, ["tickets.view", "tickets.manage"]);
+  f.calls.length = 0; f.databaseCalls.length = 0;
+  for (const method of ["GET", "POST"]) {
+    assert.equal((await f.request("ticket", { method, ...(method === "POST" ? { input: { id: reference } } : { extra: "&id=" + reference }), headers: { cookie: onlyTickets } })).status, 403);
+  }
+  assert.equal(f.calls.filter(call => call.name !== ADMIN_STORE).length, 0);
+  assert.equal(f.databaseCalls.length, 0);
+  assert.equal((await f.request("delete", { method: "POST", input: { id: reference }, auth: true })).status, 200);
+});
+
+test("registration viewers without attachment permissions receive no file metadata or ticket cleanup names", async () => {
+  const f = fixture();
+  await f.open("event-one", withPhotos);
+  await f.submit({ receipt: png, filename: "private-receipt.png", photos: { portrait: { bytes: png, name: "private-photo.png" } } });
+  const viewer = await delegateCookie(f, ["registrations.view"]);
+  const result = await (await f.request("admin", { headers: { cookie: viewer } })).json();
+  assert.equal(result.entries.length, 1);
+  const record = result.entries[0];
+  assert.ok(!Object.hasOwn(record, "receipt"));
+  assert.ok(!Object.hasOwn(record, "photos"));
+  assert.ok(!Object.hasOwn(record.answers, "portrait"));
+  assert.ok(!JSON.stringify(result).includes("private-receipt"));
+  assert.ok(!JSON.stringify(result).includes("private-photo"));
+});
+
 test("administrator lists, configuration, deletion, summaries, exports and private receipts require signed cookies", async () => {
   const { request, calls } = fixture();
   for (const action of ["admin", "summary", "receipt", "photo", "export", "delete", "form", "ticket"]) {
@@ -211,13 +290,21 @@ test("config defaults, core fields, types, lengths and options are enforced with
   assert.equal((await request("form", { eventId: "unknown", method: "POST", auth: true, input: saved })).status, 404);
 });
 
-test("availability uses Türkiye calendar day, not start time, and hides unpublished or removed events", async () => {
+test("form access is independent of publication, uses Türkiye day, and blocks removed or closed draft events", async () => {
   const { request, open, submit, setClock, events } = fixture();
   for (const eventId of ["event-one", "hidden", "past"]) await open(eventId);
   assert.equal((await (await request()).json()).available, true);
   assert.equal((await submit()).status, 200);
   assert.equal((await (await request("form", { eventId: "past" })).json()).available, false);
   assert.equal((await submit({ eventId: "past" })).status, 409);
+  const hidden = await (await request("form", { eventId: "hidden" })).json();
+  assert.equal(hidden.available, true);
+  assert.equal(hidden.event.id, "hidden");
+  assert.equal(hidden.event.published, false);
+  assert.equal(hidden.event.registrationMode, "native");
+  assert.equal((await submit({ eventId: "hidden" })).status, 200);
+  await request("form", { eventId: "hidden", method: "POST", auth: true,
+    input: { ...defaultRegistrationForm("hidden"), enabled: false } });
   assert.equal((await request("form", { eventId: "hidden" })).status, 404);
   assert.equal((await submit({ eventId: "hidden" })).status, 404);
   setClock("2026-10-04T21:00:00.000Z");
@@ -298,7 +385,7 @@ test("a native submission is idempotent, private, class-counted and exportable",
   assert.ok(!csvText.includes('"Durum"'));
   assert.ok(!Object.hasOwn(admin.entries[0], "status"));
   const publicForm = await (await request()).json();
-  assert.deepEqual(Object.keys(publicForm).sort(), ["available", "form", "full"]);
+  assert.deepEqual(Object.keys(publicForm).sort(), ["available", "event", "form", "full"]);
   assert.ok(!JSON.stringify(publicForm).includes("Deniz Test"));
   assert.ok(calls.filter((call) => ["get", "getWithMetadata"].includes(call.action))
     .every((call) => call.options.consistency === "strong"));

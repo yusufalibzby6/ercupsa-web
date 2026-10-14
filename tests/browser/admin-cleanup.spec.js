@@ -1,3 +1,4 @@
+import { mockOwnerSession } from "./admin-session-fixture.js";
 import { test, expect } from "@playwright/test";
 import { createHash } from "node:crypto";
 
@@ -10,6 +11,7 @@ async function fixture(page, { holdCatalog = false } = {}) {
   const catalog = holdCatalog ? new Promise(resolve => { releaseCatalog = resolve; }) : null;
   await page.route("https://**/*", route => route.abort());
   await page.route("**/api/**", route => route.fulfill({ status: 501, json: { error: "Unmocked cleanup fixture" } }));
+  await mockOwnerSession(page, { state });
   await page.route("**/api/events*", route => route.fulfill({ json: { events: [event] } }));
   await page.route("**/api/ticket-design*", route => route.fulfill({ json: { design: null } }));
   await page.route("**/api/feedback*", route => {
@@ -49,7 +51,7 @@ test("retired panels are absent and admin starts with ticket metadata instead of
   await expect(page.locator('[data-tab="suggestions"], [data-tab="experiences"], [data-tab="feedback"]')).toHaveCount(0);
   await expect(page.locator("#suggestionsTab, #experiencesTab, #feedbackTab")).toHaveCount(0);
   await expect(page.locator('[data-tab="members"], #membersTab, #memberForm, #memberList')).toHaveCount(0);
-  await expect(page.locator(".admin-navigation [data-tab]")).toHaveCount(7);
+  await expect(page.locator(".admin-navigation [data-tab]")).toHaveCount(8);
   await expect(page.locator('[data-tab="accounts"]')).toHaveText("Kullanıcılar");
   expect(state.feedbackRequests).toBe(0);
   expect(state.accountRequests).toBe(0);

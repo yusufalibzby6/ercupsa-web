@@ -4,6 +4,8 @@ Yönetim panelindeki **Giriş ve görevliler** sekmesinden etkinliği seçin. Fo
 
 **Görevli hesabı oluştur** bölümünde ad, kullanıcı adı, şifre ve izin verilecek etkinlikleri seçin. Görevli, sitenin `/giris.html` adresinden giriş yapar. Yönetici de mevcut oturumuyla bu sayfayı açabilir. Görevlinin yalnızca seçilen etkinliklerde kapı girişi yapma yetkisi vardır; kayıt formlarına, dekontlara, çekilişlere veya diğer yönetim işlemlerine erişemez. Hesabı panelden kaldırmak açık görevli oturumlarını da geçersiz kılar. Yetki veya şifre değiştirmek için hesabı kaldırıp yeniden oluşturabilirsiniz.
 
+Kapı görevlisi hesaplarını yalnızca baş yönetici yönetir. Panelde ayrı **Yönetici hesapları** bölümünden verilen **Giriş ve katılımı görüntüle** yetkisi katılım listesini açar; QR veya elle giriş kaydetme için ayrıca işlem yetkisi gerekir. Kayıt formu görüntüleme yetkisi verilmediyse katılım ekranı form cevaplarını çekmez; kayıt sayısı bu hesapta gösterilmez. Hazır Sayman hesabının kapı yetkisi yoktur. Yönetici hesabıyla panelde oturum açıp bu sayfayı kullanmak, etkinlikle sınırlı kapı görevlisi hesabından farklıdır.
+
 Kapıda etkinliği seçip **Kamerayı aç** ile mevcut bilet QR kodunu okutun. Bilet bağlantısını ya da `ERC-` ile başlayan kodu elle girmek de mümkündür. Kamera için HTTPS ve tarayıcı kamera izni gerekir. Kamera kullanılamıyorsa kod girişi ve isimle giriş seçenekleri çalışmaya devam eder.
 
 - **Giriş başarılı:** Bilet ilk kez kapıda kullanılmıştır.

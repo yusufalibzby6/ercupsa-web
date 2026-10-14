@@ -1,15 +1,15 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { guarded, requireAdmin, response, body, fail, identifier, text } from '../lib/security.mjs';
+import { guarded, requireOwner, response, body, fail, identifier, text } from '../lib/security.mjs';
 import { operationsStore } from '../lib/checkins.mjs';
 import { JSON_READ, mutateJson } from '../lib/blob-state.mjs';
 import { STAFF_KEY, publicAccount, normalizedUsername, passwordRecord, passwordMatches, staffCookie, logoutCookie, operatorFor } from '../lib/staff.mjs';
 import { readEvents } from './events.mjs';
 
-export function createStaffHandler({ store = operationsStore, events = readEvents, now = () => new Date(), uuid = randomUUID } = {}) {
+export function createStaffHandler({ store = operationsStore, events = readEvents, now = () => new Date(), uuid = randomUUID, adminGetStore } = {}) {
   return guarded(async req => {
     const url = new URL(req.url), action = url.searchParams.get('action') || 'session';
     const storage = store();
-    if (action === 'session' && req.method === 'GET') return response({ operator: await operatorFor(req, undefined, storage, now()) });
+    if (action === 'session' && req.method === 'GET') return response({ operator: await operatorFor(req, undefined, storage, now(), { adminGetStore }) });
     if (action === 'logout' && req.method === 'POST') return response({ ok: true }, 200, { 'Set-Cookie': logoutCookie(req) });
     if (action === 'login' && req.method === 'POST') {
       const input = await body(req), username = normalizedUsername(input.username);
@@ -26,9 +26,9 @@ export function createStaffHandler({ store = operationsStore, events = readEvent
       }
       const account = (await storage.get(STAFF_KEY, JSON_READ))?.accounts?.find(item => item.username === username && item.active);
       if (!passwordMatches(input.password, account)) fail(401, 'Kullanıcı adı veya şifre geçersiz.');
-      return response({ operator: { ...publicAccount(account), role: 'staff' } }, 200, { 'Set-Cookie': staffCookie(req, account, now()) });
+      return response({ operator: { ...publicAccount(account), role: 'staff', canManage: true } }, 200, { 'Set-Cookie': staffCookie(req, account, now()) });
     }
-    requireAdmin(req);
+    await requireOwner(req, { getStore: adminGetStore, now: now() });
     if (action === 'accounts' && req.method === 'GET') return response({ accounts: ((await storage.get(STAFF_KEY, JSON_READ))?.accounts || []).map(publicAccount), events: await events() });
     if (action === 'accounts' && req.method === 'POST') {
       const input = await body(req), username = normalizedUsername(input.username), name = text(input.name, 120, true);

@@ -127,7 +127,9 @@
     const detailUrl = new URL(detailPath(target), location.href).href;
     // The public server-rendered page gives WhatsApp and other preview crawlers
     // this event's poster, date and location without running browser scripts.
-    const shareUrl = `https://ercupsa.com.tr/etkinlik/${encodeURIComponent(target.id)}`;
+    const shareUrl = target.published === false && target.registrationMode === 'native'
+      ? new URL(detailPath(target), 'https://ercupsa.com.tr/').href
+      : `https://ercupsa.com.tr/etkinlik/${encodeURIComponent(target.id)}`;
     const calendarText = calendar(target, detailUrl);
     if (calendarText) {
       const link = element('calendarLink');
@@ -236,6 +238,19 @@
         const target = events.find(event => event.id === requestedId);
         if (target) await renderEvent(target, todayDate);
         else {
+          // Opening a form and publishing an event are separate decisions.
+          // Only enabled native forms expose safe event metadata on this route;
+          // unpublished events stay out of the catalog and legacy form fallback.
+          if (requestedId) {
+            const direct = await fetch(`/api/registrations?action=form&event_id=${encodeURIComponent(requestedId)}`);
+            if (direct.ok) {
+              const data = await direct.json();
+              if (data.event?.id === requestedId && data.event.registrationMode === 'native') {
+                await renderEvent(data.event, todayDate);
+                return;
+              }
+            } else if (![400, 404, 409].includes(direct.status)) throw new Error('Kayıt formu yüklenemedi.');
+          }
           element('formEmptyMessage').textContent = 'Bu etkinlik bulunamadı. Diğer kayıt formlarına göz atabilirsin.';
           show('formEmpty');
         }

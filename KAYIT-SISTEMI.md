@@ -11,7 +11,9 @@ Katılımcılar site hesabı açmadan etkinliğin kendi formunu doldurabilir. Bi
 5. **Soru ekle** ile kısa/uzun cevap, e-posta, telefon, açılır liste, tek seçim, çoklu seçim veya **Fotoğraf yükleme** soruları ekleyin. Sorunun başlığını, seçeneklerini ve zorunluluğunu belirleyin. Temel alanlarla birlikte en fazla 25 soru olabilir.
 6. İsterseniz dekont yüklemeyi açın ve zorunlu yapın. PNG, JPEG veya PDF dekontları kabul edilir. Fotoğraflar ve dekontun toplam dosya boyutu en fazla **4 MB** olabilir; tek başına dekontun sınırı da 4 MB'dir. Dosya türü gerçek içeriğinden belirlenir; telefonun farklı tür veya uzantı bildirmesi geçerli dekontun reddedilmesine yol açmaz. Gönderilen dosyalar herkese açık bağlantılara dönüştürülmez.
 7. **Kayıt üst sınırı** alanına örneğin `40` yazın. Toplam kayıt sayısı bu sınıra ulaştığında form otomatik kapanır. Sınır istemiyorsanız alanı boş bırakın. Önceden alınmış kayıtlar da toplam sayıya dahildir.
-8. **Kayıt formunu erişime aç** seçeneğini işaretleyip **Formu kaydet** düğmesine basın. Etkinliği de yayımlayın. Etkinlik kartındaki **Kayıt linkini kopyala** düğmesi paylaşabileceğiniz bağlantıyı verir.
+8. **Kayıt formunu erişime aç** seçeneğini işaretleyip **Formu kaydet** düğmesine basın. Etkinlik yayımlanmamış olsa da kendi kayıt bağlantısı çalışır. Etkinlik kartındaki **Kayıt linkini kopyala** düğmesi paylaşabileceğiniz bağlantıyı verir.
+
+Etkinliğin yayın durumu ile formun açık/kapalı durumu ayrıdır. **Yayından kaldır**, etkinliği genel etkinlik ve form listelerinden gizler; açık formun doğrudan bağlantısını kapatmaz. Kayıt almayı durdurmak için **Kayıt formunu erişime aç** işaretini kaldırıp kaydedin. Kontenjanı dolan, geçmiş günlerde kalan veya silinen etkinliğin formu yeni kayıt almaz. Kapalı bir taslak etkinliğin bilgileri doğrudan bağlantıyla açıklanmaz.
 
 Bağlantı `form.html?event=ETKINLIK_KIMLIGI#registrationSection` biçimindedir. Katılımcı doğrudan o etkinliğin formuna ulaşır; formun önünde büyük bir afiş bulunmaz. Formlar sayfası açık olan tüm etkinlikleri listeler.
 
@@ -27,7 +29,7 @@ Kaydedilmemiş form değişiklikleri etkinlikler arasında geçiş yaparken koru
 
 Katılımcının kendi fotoğrafını göndermesi için ayrı bir soru ekleyip cevap türünü **Fotoğraf yükleme** seçin. Başlığı örneğin “Çalışmanızın fotoğrafını gönderin” olarak değiştirin ve gerekiyorsa **Zorunlu alan**ı açın. Bu soru dekont alanından bağımsızdır. JPEG, PNG ve WebP fotoğrafları desteklenir; PDF yalnızca dekont alanında kullanılabilir. Tüm fotoğraflar ve dekont birlikte en fazla 4 MB olmalıdır.
 
-Gönderilen fotoğrafları kayıtların cevapları bölümündeki **Fotoğrafı görüntüle** düğmesinden açabilirsiniz. Yalnızca yönetici oturumuyla erişilir; CSV'ye dosya adı yazılır, özel dosyanın bağlantısı eklenmez. Kaydı silmek o kayda bağlı fotoğraflara ve dekonta erişimi de kaldırır. Katılımcının başarı özetinde fotoğraflar veya özel cevaplar bulunmaz.
+Gönderilen fotoğrafları kayıtların cevapları bölümündeki **Fotoğrafı görüntüle** düğmesinden açabilirsiniz. Yalnızca fotoğraf görüntüleme yetkisi olan yönetici oturumuyla erişilir; CSV'ye dosya adı yazılır, özel dosyanın bağlantısı eklenmez. Kaydı yalnızca baş yönetici silebilir; silmek o kayda bağlı fotoğraflara ve dekonta erişimi de kaldırır. Katılımcının başarı özetinde fotoğraflar veya özel cevaplar bulunmaz. Sayman kayıtları ve dekontları inceler; formu değiştiremez, fotoğraf/CSV/bilet işlemi veya kayıt silme yapamaz.
 
 ## Kayıtları inceleme
 

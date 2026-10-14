@@ -2,7 +2,7 @@ import { getStore as getBlobStore } from "@netlify/blobs";
 import { createHash, randomUUID } from "node:crypto";
 import { readEvents as readStoredEvents } from "./events.mjs";
 import { db as database } from "../lib/database.mjs";
-import { fail, guarded, identifier, requireAdmin, response } from "../lib/security.mjs";
+import { fail, guarded, identifier, requireAdmin, requirePermission, response } from "../lib/security.mjs";
 import {
   REGISTRATION_STORE, REGISTRATION_RECEIPT_STORE, REGISTRATION_PHOTO_STORE, REGISTRATION_FULL_MESSAGE,
   defaultRegistrationForm, normalizeRegistrationForm, registrationIsAvailable,
@@ -105,6 +105,13 @@ function archivedEvent(eventId, entries, savedEvent) {
 
 const eventSnapshot = (event) => ({ id: event.id, title: event.title, date: event.date,
   time: event.time || "", location: event.location || "" });
+const publicFormEvent = (event) => ({ ...eventSnapshot(event), poster: event.poster || "",
+  category: event.category || "", description: event.description || "",
+  published: event.published !== false, registrationMode: "native", registrationEnabled: true });
+const allowed = (session, permission) => session?.role === "owner" || session?.permissions?.includes(permission);
+const viewForm = (form, eventId) => ({ ...defaultRegistrationForm(eventId),
+  enabled: !!form?.enabled, maxRegistrations: form?.maxRegistrations ?? null,
+  receipt: { enabled: !!form?.receipt?.enabled, required: false } });
 const submissionResponse = (entry) => response({ ok: true, reference: entry.id,
   event: { id: entry.eventId, title: entry.eventTitle, date: entry.eventDate,
     time: entry.eventTime || "", location: entry.eventLocation || "" } });
@@ -130,8 +137,17 @@ export function createRegistrationsHandler({
     const method = req.method;
     const isPublic = (method === "GET" && action === "form") ||
       (method === "POST" && action === "submit");
+    let session = null;
     if (!isPublic) {
-      requireAdmin(req);
+      // Authenticate and authorize before opening any registration, attachment,
+      // event, or ticket store. Deleting participant records is owner-only.
+      if (action === "delete") requireAdmin(req);
+      else {
+        const permission = action === "form" ? "registrations.manage" : action === "receipt" ? "registrations.receipts"
+          : action === "photo" ? "registrations.photos" : action === "export" ? "registrations.export" : "registrations.view";
+        session = await requirePermission(req, permission, { getStore });
+        if (action === "ticket") await requirePermission(req, method === "POST" ? "tickets.manage" : "tickets.view", { getStore });
+      }
       if (!ADMIN_ACTIONS.has(action)) fail(400, "Geçersiz kayıt işlemi.");
     }
     if ((["submit", "delete"].includes(action) && method !== "POST") ||
@@ -320,19 +336,24 @@ export function createRegistrationsHandler({
       const totalPages = Math.max(1, Math.ceil(filtered.length / 50));
       const page = Math.min(Number(rawPage), totalPages);
       const eventInfo = event || archivedEvent(eventId, entries, snap.data.event);
-      return response({ form: snap.data.form || defaultRegistrationForm(eventId),
+      const form = snap.data.form || defaultRegistrationForm(eventId);
+      return response({ form: allowed(session, "registrations.manage") ? form : viewForm(form, eventId),
         event: { id: eventInfo.id, title: eventInfo.title, date: eventInfo.date,
           published: eventInfo.published !== false, ...(eventInfo.archived ? { archived: true } : {}) },
-        entries: filtered.slice((page - 1) * 50, page * 50).map(entryForAdmin),
+        entries: filtered.slice((page - 1) * 50, page * 50).map((entry) => entryForAdmin(entry, {
+          tickets: allowed(session, "tickets.view") || allowed(session, "tickets.manage"),
+          photoAccess: allowed(session, "registrations.photos"), receiptAccess: allowed(session, "registrations.receipts"),
+        })),
         summary: registrationSummary(entries), page, totalPages,
-        pendingTicketDeletions: snap.data.deleted.filter((item) => item.ticket && !item.ticketCancelledAt)
+        pendingTicketDeletions: (session?.role === "owner" ? snap.data.deleted : []).filter((item) => item.ticket && !item.ticketCancelledAt)
           .map((item) => ({ id: item.id, name: item.name || "Silinen kayıt" })) });
     }
-    if (!event || (isPublic && event.published === false)) fail(404, "Etkinlik bulunamadı.");
+    if (!event || (isPublic && event.published === false && !snap.data.form?.enabled)) fail(404, "Etkinlik bulunamadı.");
     if (action === "form" && method === "GET") {
       const isFull = full(snap.data);
       const { maxRegistrations, ...publicForm } = snap.data.form || {};
       return response({ form: snap.data.form ? publicForm : null,
+        ...(snap.data.form?.enabled ? { event: publicFormEvent(event) } : {}),
         available: registrationIsAvailable(event, snap.data.form, now()) && !isFull,
         full: isFull, ...(isFull ? { message: REGISTRATION_FULL_MESSAGE } : {}) });
     }

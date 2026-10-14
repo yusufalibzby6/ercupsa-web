@@ -1,3 +1,4 @@
+import { mockOwnerSession } from "./admin-session-fixture.js";
 import { test, expect } from "@playwright/test";
 
 const firstId = "11111111-1111-4111-8111-111111111111";
@@ -13,6 +14,7 @@ async function fixture(page, { consent = true, checkinsAvailable = true } = {}) 
   };
   await page.route("https://**/*", route => route.abort());
   await page.route("**/api/**", route => route.fulfill({ status: 501, json: { error: "Unmocked accounts fixture" } }));
+  await mockOwnerSession(page, { state });
   await page.route("**/api/events*", route => route.fulfill({ json: { events: [] } }));
   await page.route("**/api/community*", route => route.fulfill({ json: { batches: [] } }));
   await page.route("**/api/accounts*", async route => {

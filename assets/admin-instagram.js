@@ -1,4 +1,4 @@
-import { $, api, onAdminEvent } from "./common.js";
+import { $, api, onAdminEvent, canAdmin } from "./common.js";
 
 let ready = false, active = false, loaded = false, dirty = false, loading = false, saving = false;
 let revision = "", baseline = [], epoch = 0, requestVersion = 0, editVersion = 0;
@@ -19,8 +19,9 @@ function message(value, error = false) {
   $("instagramMessage").dataset.error = String(error);
 }
 function controls() {
-  for (const input of inputs()) input.disabled = !ready || !loaded || saving;
-  $("instagramSave").disabled = !ready || !loaded || loading || saving || !dirty;
+  for (const input of inputs()) input.disabled = !ready || !loaded || saving || !canAdmin("instagram.manage");
+  $("instagramSave").hidden = !canAdmin("instagram.manage");
+  $("instagramSave").disabled = !canAdmin("instagram.manage") || !ready || !loaded || loading || saving || !dirty;
   $("instagramPreview").disabled = !ready || !loaded || saving;
   $("instagramReload").disabled = !ready || loading || saving;
 }
@@ -42,7 +43,7 @@ function content(data) {
   return { posts: value.posts.map(normalize), revision: value.revision };
 }
 async function load() {
-  if (!ready || !active || loading || saving) return;
+  if (!ready || !canAdmin("instagram.view") || !active || loading || saving) return;
   const version = ++requestVersion, auth = epoch, edit = editVersion;
   loading = true; controls(); message("Kaydedilmiş paylaşımlar yükleniyor…");
   try {
@@ -65,6 +66,7 @@ for (let number = 1; number <= 4; number++) {
   input.type = "url"; input.required = true; input.maxLength = 2048; input.inputMode = "url";
   input.placeholder = "https://www.instagram.com/p/…/"; input.autocomplete = "off"; input.spellcheck = false;
   input.addEventListener("input", () => {
+    if (!ready || !canAdmin("instagram.manage")) return;
     editVersion++;
     dirty = inputs().some((field, index) => field.value.trim() !== baseline[index]);
     message("Kaydedilmemiş değişiklikler var. Önizleyip 4 paylaşımı birlikte kaydedebilirsiniz."); controls();
@@ -82,7 +84,7 @@ $("instagramPreview").addEventListener("click", () => {
 });
 $("instagramForm").addEventListener("submit", async event => {
   event.preventDefault();
-  if (!ready || !loaded || loading || saving || !dirty) return;
+  if (!ready || !canAdmin("instagram.manage") || !loaded || loading || saving || !dirty) return;
   let posts;
   try { posts = values(); } catch (error) { message(error.message, true); return; }
   const auth = epoch, edit = editVersion;
@@ -97,9 +99,9 @@ $("instagramForm").addEventListener("submit", async event => {
     if (auth === epoch && ready) message(`${error.message} Girdiğiniz bağlantılar korundu.`, true);
   } finally { if (auth === epoch) { saving = false; controls(); } }
 });
-onAdminEvent("admin-ready", () => { ready = true; controls(); if (active && !loaded) load(); });
+onAdminEvent("admin-ready", () => { ready = canAdmin("instagram.view"); controls(); if (active && !loaded) load(); });
 document.addEventListener("admin-tab", event => {
-  active = event.detail === "instagram";
+  active = event.detail === "instagram" && canAdmin("instagram.view");
   if (active && ready && !loaded) load();
   else if (!active) { requestVersion++; loading = false; controls(); }
 });

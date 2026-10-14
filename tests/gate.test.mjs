@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { createGateHandler } from '../netlify/functions/gate.mjs';
 import { createStaffHandler } from '../netlify/functions/staff.mjs';
-import { adminLogin } from '../netlify/lib/security.mjs';
+import { adminLogin, signedAdminCookie } from '../netlify/lib/security.mjs';
+
+import { ADMIN_ACCOUNTS_KEY, normalizedPermissions, passwordRecord } from '../netlify/lib/admin-auth.mjs';
 
 const oldPassword = process.env.ADMIN_PASSWORD;
 process.env.ADMIN_PASSWORD = 'gate-unit-admin-only-password';
@@ -55,7 +57,7 @@ function memory() {
 }
 
 function fixture({ cap = 500 } = {}) {
-  const storage = memory();
+  const storage = memory(), adminStorage = memory();
   const state = {
     now: new Date(), failRead: false, failEvents: false, reads: [],
     events: [{ id: 'event-one', title: 'Birinci etkinlik', date: '2026-10-07', time: '18:00', location: 'Fakülte' },
@@ -88,8 +90,8 @@ function fixture({ cap = 500 } = {}) {
     const limit = Number(url.searchParams.get('limit') || cap);
     return rows.slice(offset, offset + Math.min(cap, limit));
   };
-  const handler = createGateHandler({ read, events, store: () => storage, now: () => new Date(state.now) });
-  const staffHandler = createStaffHandler({ events, store: () => storage, now: () => new Date(state.now), uuid: randomUUID });
+  const handler = createGateHandler({ read, events, store: () => storage, now: () => new Date(state.now), adminGetStore: () => adminStorage });
+  const staffHandler = createStaffHandler({ events, store: () => storage, now: () => new Date(state.now), uuid: randomUUID, adminGetStore: () => adminStorage });
   const request = async (action = 'participants', { method = 'GET', eventId = 'event-one', input,
     auth = true, cookie, headers = {}, rawBody } = {}) => {
     const url = new URL(origin + '/api/gate');
@@ -114,7 +116,17 @@ function fixture({ cap = 500 } = {}) {
     assert.equal(logged.status, 200);
     return logged.headers.get('set-cookie').split(';')[0];
   };
-  return { storage, state, request, scan, manual, staffCookie };
+  const delegatedCookie = async permissions => {
+    const account = { id: 'delegated-admin', username: 'other-admin', name: 'Diğer yönetici', role: 'admin', active: true,
+      version: randomUUID(), permissions: normalizedPermissions(permissions), ...passwordRecord('synthetic-other-admin-password') };
+    await adminStorage.setJSON(ADMIN_ACCOUNTS_KEY, { revision: 'test-revision', accounts: [account] });
+    return signedAdminCookie(new Request(origin), account, state.now).split(';')[0];
+  };
+  const staff = (method, cookie) => staffHandler(new Request(origin + '/api/staff?action=accounts&id=some-account', { method,
+    headers: { cookie, Origin: origin, 'Content-Type': 'application/json' },
+    ...(method === 'POST' ? { body: JSON.stringify({ username: 'door-worker', password: 'synthetic-door-password', name: 'Görevli', eventIds: ['event-one'] }) } : {}) }));
+  const session = cookie => staffHandler(new Request(origin + '/api/staff?action=session', { headers: { cookie } }));
+  return { storage, adminStorage, state, request, scan, manual, staffCookie, delegatedCookie, staff, session };
 }
 
 test('gate data and mutations require an operator; staff event scope is enforced on every route', async () => {
@@ -317,4 +329,38 @@ test('foreign-origin mutations, malformed bodies and event/user query injections
   assert.equal((await manual('person,query')).status, 400);
   assert.equal(storage.records.size, 0);
   assert.equal(state.reads.length, 0);
+});
+
+
+test('delegated attendance viewers read participants but cannot admit people or manage gate accounts', async () => {
+  const { delegatedCookie, request, scan, manual, staff, session, storage, state } = fixture();
+  const cookie = await delegatedCookie(['attendance.view']);
+  assert.equal((await request('events', { eventId: null, cookie })).status, 200);
+  assert.equal((await request('participants', { cookie })).status, 200);
+  const operator = (await (await session(cookie)).json()).operator;
+  assert.equal(operator.role, 'admin'); assert.equal(operator.canManage, false);
+  state.reads.length = 0; storage.calls.length = 0;
+  assert.equal((await scan(claimedCode, { cookie })).status, 403);
+  assert.equal((await manual(alice, { cookie })).status, 403);
+  for (const method of ['GET', 'POST', 'DELETE']) assert.equal((await staff(method, cookie)).status, 403);
+  assert.equal(state.reads.length, 0); assert.equal(storage.calls.length, 0);
+});
+
+test('delegated attendance managers can scan, but live permission removal stops reads and writes', async () => {
+  const { delegatedCookie, request, scan, staff, session, storage, adminStorage, state } = fixture();
+  const cookie = await delegatedCookie(['attendance.manage']);
+  assert.equal((await (await session(cookie)).json()).operator.canManage, true);
+  assert.equal((await scan(claimedCode, { cookie })).status, 200);
+  assert.equal((await staff('POST', cookie)).status, 403);
+  const saved = await adminStorage.get(ADMIN_ACCOUNTS_KEY);
+  saved.accounts[0].permissions = [];
+  await adminStorage.setJSON(ADMIN_ACCOUNTS_KEY, saved);
+  state.reads.length = 0; storage.calls.length = 0;
+  assert.equal((await request('events', { eventId: null, cookie })).status, 403);
+  assert.equal((await request('participants', { cookie })).status, 403);
+  assert.equal((await scan(unclaimedCode, { cookie })).status, 403);
+  assert.equal(state.reads.length, 0); assert.equal(storage.calls.length, 0);
+  saved.accounts[0].active = false;
+  await adminStorage.setJSON(ADMIN_ACCOUNTS_KEY, saved);
+  assert.equal((await session(cookie)).status, 401);
 });

@@ -1,4 +1,4 @@
-import { $, escape, api, onAdminEvent } from "./common.js";
+import { $, escape, api, onAdminEvent, canAdmin, isOwner } from "./common.js";
 import QRCode from "qrcode";
 import { ticketCard, printTickets } from "./ticket-print.js";
 import { validateStoredDesign, releaseTicketArtwork } from "./ticket-template.js";
@@ -47,7 +47,7 @@ function cancelOptionUploads(eventId, field, rowId) {
 }
 
 function uploadOptionImage(field, rowId) {
-  if (!ready || saving || loading || archived() || !OPTION_TYPES.has(field.type)) return;
+  if (!ready || !canAdmin("registrations.manage") || saving || loading || archived() || !OPTION_TYPES.has(field.type)) return;
   if (!window.cloudinary) { feedback("Görsel yükleme servisine ulaşılamadı. Lütfen tekrar deneyin.", true); return; }
   const draft = getDraft(), state = optionState(field);
   if (!draft || !state.ids.includes(rowId)) return;
@@ -120,15 +120,22 @@ function getDraft() { return drafts.get(selectedId); }
 function hasUnsaved() { const draft = getDraft(); return !!draft && (pendingOptions() || JSON.stringify(stableForm(draft.form)) !== draft.saved); }
 function updateControls() {
   const draft = getDraft();
-  $("registrationConfigFields").disabled = !draft || saving || loading || archived();
+  const manage = canAdmin("registrations.manage"), tickets = canAdmin("tickets.view") || canAdmin("tickets.manage");
+  $("registrationConfigHeading").closest("section").hidden = !manage;
+  $("registrationReadOnlyNotice").hidden = !ready || manage;
+  $("registrationDeleteHelp").hidden = !isOwner();
+  $("registrationConfigFields").disabled = !manage || !draft || saving || loading || archived();
   $("registrationEvent").disabled = saving;
   $("registrationEventScope").disabled = saving;
-  $("registrationSave").disabled = !draft || saving || loading || archived() || pendingOptions();
-  $("registrationAddField").disabled = !draft || saving || loading || archived() || draft.form.fields.length >= 25;
-  $("registrationDiscard").hidden = !hasUnsaved();
+  $("registrationSave").disabled = !manage || !draft || saving || loading || archived() || pendingOptions();
+  $("registrationAddField").disabled = !manage || !draft || saving || loading || archived() || draft.form.fields.length >= 25;
+  $("registrationDiscard").hidden = !manage || !hasUnsaved();
   $("registrationDiscard").disabled = saving || loading;
   $("registrationReceiptRequired").disabled = !draft?.form.receipt.enabled || saving || loading;
-  $("registrationExport").disabled = !selectedId || loading;
+  $("registrationExport").hidden = !canAdmin("registrations.export");
+  $("registrationExport").disabled = !canAdmin("registrations.export") || !selectedId || loading;
+  $("registrationRecordFilter").closest("label").hidden = !tickets;
+  if (!tickets && ["without-ticket", "with-ticket"].includes($("registrationRecordFilter").value)) $("registrationRecordFilter").value = "all";
   $("registrationReload").disabled = !selectedId || loading || saving;
   $("registrationDraftNotice").hidden = !hasUnsaved();
   $("registrationRetry").hidden = !selectedId || !$("registrationEntries").dataset.error;
@@ -164,7 +171,7 @@ function renderForm() {
   $("registrationReceiptRequired").checked = !!draft.form.receipt?.required;
   renderFields();
   const current = eventInfo || events.find((event) => event.id === selectedId);
-  $("registrationEventNote").textContent = archived() ? "Arşivlenmiş etkinlik: cevapları, dekontları ve verilmiş biletleri inceleyebilirsiniz. Form düzenleme ve yeni bilet verme kapalıdır." : current?.published === false ? "Etkinlik taslakta. Formu hazırlayabilirsiniz; katılımcılara açılması için etkinliği de yayımlayın." : "Form açıkken katılımcılar etkinliğin kendi bağlantısından kayıt olabilir. Geçmiş günlerin formları yeni kayıt almaz.";
+  $("registrationEventNote").textContent = archived() ? "Arşivlenmiş etkinlik: yetkili olduğunuz kayıtları ve dosyaları inceleyebilirsiniz. Form düzenleme ve yeni bilet verme kapalıdır." : current?.published === false ? "Etkinlik sitede yayımlanmıyor. Kayıt formunu erişime açtığınızda doğrudan form bağlantısı çalışır; etkinliği yayımlamanız gerekmez." : "Form erişimi etkinliğin yayından kaldırılmasından bağımsızdır. Geçmiş günlerin formları yeni kayıt almaz.";
   updateControls();
 }
 function classCompare(a, b) { return a.localeCompare(b, "tr", { numeric: true }); }
@@ -172,7 +179,7 @@ function savedLimit() { return getDraft()?.savedForm.maxRegistrations ?? null; }
 function isAtLimit() { const limit = savedLimit(); return limit != null && summary != null && Number(summary.total) >= limit; }
 function renderStats() {
   const limit = savedLimit();
-  $("registrationSummary").innerHTML = summary ? [["Toplam kayıt", Number(summary.total) || 0], ["Kayıt üst sınırı", limit ?? "Sınırsız"], ["Olası tekrar kayıt", Number(summary.duplicateEntries) || 0], ["Bilet verilmiş", entries.filter(entry => entry.ticket?.status === "issued").length]].map(([label, value]) => `<div class="registration-stat"><span>${label}</span><strong>${escape(value)}</strong></div>`).join("") : "";
+  $("registrationSummary").innerHTML = summary ? [["Toplam kayıt", Number(summary.total) || 0], ["Kayıt üst sınırı", limit ?? "Sınırsız"], ["Olası tekrar kayıt", Number(summary.duplicateEntries) || 0], ...(canAdmin("tickets.view") || canAdmin("tickets.manage") ? [["Bilet verilmiş", entries.filter(entry => entry.ticket?.status === "issued").length]] : [])].map(([label, value]) => `<div class="registration-stat"><span>${label}</span><strong>${escape(value)}</strong></div>`).join("") : "";
   $("registrationCapacityInfo").dataset.full = String(isAtLimit());
   $("registrationCapacityInfo").textContent = !summary ? "" : isAtLimit() ? "Kontenjan doldu. Form yeni kayıt alımına otomatik kapalı." : limit != null ? `Toplam ${Number(summary.total) || 0} kayıt var; kayıt üst sınırı ${limit}.` : "Bu formda kayıt üst sınırı yok.";
   $("registrationClassBreakdown").innerHTML = (summary?.byClass || []).slice().sort((a, b) => classCompare(a.classYear, b.classYear)).map((group) => `<span class="registration-class-chip">${escape(group.classYear || "Belirtilmedi")}: <strong>${Number(group.count) || 0}</strong></span>`).join("");
@@ -188,20 +195,23 @@ function formatDate(value) {
 function answerRows(entry) {
   const fields = entry.fields || getDraft()?.form.fields || [];
   const labels = new Map(fields.map((field) => [field.id, field.label]));
-  const photos = entry.photos || {};
-  return Object.entries(entry.answers || {}).filter(([id]) => !Object.hasOwn(photos, id)).map(([id, value]) => `<dt>${escape(labels.get(id) || id)}</dt><dd>${escape(Array.isArray(value) ? value.join(", ") : value || "—")}</dd>`).join("") + Object.entries(photos).map(([fieldId, photo]) => `<dt>${escape(labels.get(fieldId) || fieldId)}</dt><dd><button type="button" data-registration-photo="${escape(entry.id)}" data-photo-field="${escape(fieldId)}">Fotoğrafı görüntüle</button><span class="registration-photo-filename">${escape(photo.name || "Fotoğraf")}</span></dd>`).join("");
+  const storedPhotos = entry.photos || {}, photos = canAdmin("registrations.photos") ? storedPhotos : {};
+  return Object.entries(entry.answers || {}).filter(([id]) => !Object.hasOwn(storedPhotos, id)).map(([id, value]) => `<dt>${escape(labels.get(id) || id)}</dt><dd>${escape(Array.isArray(value) ? value.join(", ") : value || "—")}</dd>`).join("") + Object.entries(photos).map(([fieldId, photo]) => `<dt>${escape(labels.get(fieldId) || fieldId)}</dt><dd><button type="button" data-registration-photo="${escape(entry.id)}" data-photo-field="${escape(fieldId)}">Fotoğrafı görüntüle</button><span class="registration-photo-filename">${escape(photo.name || "Fotoğraf")}</span></dd>`).join("");
 }
 function entryMarkup(entry) {
   const id = escape(entry.id), busy = busyEntries.has(entry.id) ? "disabled" : "";
   const ticket = entry.ticket, issued = ticket?.status === "issued";
   const ticketLabel = issued ? "Bileti görüntüle" : ticket ? "Bileti tamamla / yeniden dene" : "Bilet ver";
   const ticketDisabled = busy || (archived() && !issued ? "disabled" : "");
-  const duplicate = entry.possibleDuplicate ? `<p class="registration-duplicate">Olası tekrar: aynı telefonla ${Number(entry.duplicateCount) || 2} kayıt var. Cevapları karşılaştırıp gereksiz kaydı silebilirsiniz.</p>` : "";
-  const confirm = deleteConfirmations.has(entry.id) ? `<span class="registration-delete-prompt">Bu kayıt ve dekontu silinsin mi?${ticket ? " Verilmiş QR bileti de iptal edilir; önceki katılım geçmişi korunur." : ""}<button type="button" class="registration-delete-confirm" data-registration-delete-confirm="${id}" ${busy}>Sil</button><button type="button" data-registration-delete-cancel="${id}" ${busy}>Vazgeç</button></span>` : `<button type="button" class="registration-delete" data-registration-delete="${id}" ${busy}>Kaydı sil</button>`;
-  return `<article class="registration-entry" data-registration-entry="${id}"><div class="registration-entry-head"><div><h4>${escape(entry.name || "İsimsiz kayıt")}</h4><div class="registration-entry-meta"><span>${escape(entry.classYear || "Sınıf belirtilmedi")}</span><span>${escape(entry.phone || "Telefon belirtilmedi")}</span><span>${escape(formatDate(entry.createdAt))}</span></div></div><span class="registration-ticket-state">${issued ? "Bilet verilmiş" : ticket ? "Bilet hazırlanıyor" : "Bilet verilmemiş"}</span></div>${duplicate}<details><summary>Cevapları göster</summary><dl class="registration-answers">${answerRows(entry)}</dl><p class="registration-muted">Kayıt referansı: ${id}</p></details><div class="registration-actions"><button type="button" class="registration-primary" data-registration-ticket="${id}" ${ticketDisabled}>${ticketLabel}</button>${entry.receipt ? `<button type="button" data-registration-receipt="${id}" ${busy}>Dekontu görüntüle</button>` : '<span class="registration-muted">Dekont yüklenmedi</span>'}${confirm}</div><p class="registration-feedback" data-entry-feedback="${id}" data-error="${!!entryFeedback.get(entry.id)?.error}" role="status">${escape(entryFeedback.get(entry.id)?.message || "")}</p></article>`;
+  const tickets = canAdmin("tickets.view") || canAdmin("tickets.manage");
+  const ticketAction = canAdmin(issued ? "tickets.view" : "tickets.manage") ? `<button type="button" class="registration-primary" data-registration-ticket="${id}" ${ticketDisabled}>${ticketLabel}</button>` : "";
+  const duplicate = entry.possibleDuplicate ? `<p class="registration-duplicate">Olası tekrar: aynı telefonla ${Number(entry.duplicateCount) || 2} kayıt var.${isOwner() ? " Cevapları karşılaştırıp gereksiz kaydı silebilirsiniz." : ""}</p>` : "";
+  const confirm = !isOwner() ? "" : deleteConfirmations.has(entry.id) ? `<span class="registration-delete-prompt">Bu kayıt ve dekontu silinsin mi?${ticket ? " Verilmiş QR bileti de iptal edilir; önceki katılım geçmişi korunur." : ""}<button type="button" class="registration-delete-confirm" data-registration-delete-confirm="${id}" ${busy}>Sil</button><button type="button" data-registration-delete-cancel="${id}" ${busy}>Vazgeç</button></span>` : `<button type="button" class="registration-delete" data-registration-delete="${id}" ${busy}>Kaydı sil</button>`;
+  const receipt = canAdmin("registrations.receipts") ? entry.receipt ? `<button type="button" data-registration-receipt="${id}" ${busy}>Dekontu görüntüle</button>` : '<span class="registration-muted">Dekont yüklenmedi</span>' : "";
+  return `<article class="registration-entry" data-registration-entry="${id}"><div class="registration-entry-head"><div><h4>${escape(entry.name || "İsimsiz kayıt")}</h4><div class="registration-entry-meta"><span>${escape(entry.classYear || "Sınıf belirtilmedi")}</span><span>${escape(entry.phone || "Telefon belirtilmedi")}</span><span>${escape(formatDate(entry.createdAt))}</span></div></div>${tickets ? `<span class="registration-ticket-state">${issued ? "Bilet verilmiş" : ticket ? "Bilet hazırlanıyor" : "Bilet verilmemiş"}</span>` : ""}</div>${duplicate}<details><summary>Cevapları göster</summary><dl class="registration-answers">${answerRows(entry)}</dl><p class="registration-muted">Kayıt referansı: ${id}</p></details><div class="registration-actions">${ticketAction}${receipt}${confirm}</div><p class="registration-feedback" data-entry-feedback="${id}" data-error="${!!entryFeedback.get(entry.id)?.error}" role="status">${escape(entryFeedback.get(entry.id)?.message || "")}</p></article>`;
 }
 function pendingDeletionMarkup() {
-  if (!pendingTicketDeletions.length) return "";
+  if (!isOwner() || !pendingTicketDeletions.length) return "";
   return `<section class="registration-cleanup" aria-label="Tamamlanmamış bilet iptalleri"><h4>Bilet iptali tamamlanmayı bekliyor</h4><p>Kayıt silindi; bağlantı hatası nedeniyle QR iptali henüz doğrulanamadı. Aşağıdaki düğmeyle aynı işlemi tamamlayın.</p>${pendingTicketDeletions.map(item => `<div><span>${escape(item.name || "Silinen kayıt")}</span><button type="button" data-registration-cleanup="${escape(item.id)}" ${busyEntries.has(item.id) ? "disabled" : ""}>Bilet iptalini tamamla</button><p class="registration-feedback" role="status">${escape(entryFeedback.get(item.id)?.message || "")}</p></div>`).join("")}</section>`;
 }
 function renderEntries() {
@@ -224,7 +234,7 @@ async function loadSelected({ preserveFeedback = false } = {}) {
   delete $("registrationEntries").dataset.error;
   $("registrationFilterCount").textContent = "";
   renderStats(); renderForm();
-  if (!id || !ready) { loading = false; updateControls(); return; }
+  if (!id || !ready || !canAdmin("registrations.view")) { loading = false; updateControls(); return; }
   if (!preserveFeedback) feedback(hasUnsaved() ? "Bu etkinliğin kaydedilmemiş değişiklikleri korunuyor." : "Form ve kayıtlar yükleniyor…");
   try {
     const first = await api(endpoint("admin", id, { page: "1" }));
@@ -254,7 +264,7 @@ async function loadSelected({ preserveFeedback = false } = {}) {
     pendingTicketDeletions = Array.isArray(first.pendingTicketDeletions) ? first.pendingTicketDeletions : [];
     loading = false;
     renderForm(); renderStats(); renderEntries();
-    if (!preserveFeedback) feedback(hasUnsaved() ? "Bu etkinliğin kaydedilmemiş değişiklikleri korunuyor." : `${first.event?.title || "Etkinlik"} için formu düzenleyebilir, kayıtları inceleyebilirsiniz.`);
+    if (!preserveFeedback) feedback(hasUnsaved() ? "Bu etkinliğin kaydedilmemiş değişiklikleri korunuyor." : canAdmin("registrations.manage") ? `${first.event?.title || "Etkinlik"} için formu düzenleyebilir, kayıtları inceleyebilirsiniz.` : `${first.event?.title || "Etkinlik"} kayıtlarını ve yetkili olduğunuz dosyaları inceleyebilirsiniz. Düzenleme yetkiniz yok.`);
     return true;
   } catch (error) {
     if (version !== loadVersion || id !== selectedId) return;
@@ -277,7 +287,7 @@ function populateEvents() {
   renderComparisonOptions();
 }
 async function loadSummary() {
-  if (!ready) return;
+  if (!ready || !canAdmin("registrations.view")) return;
   const version = ++summaryVersion;
   $("registrationComparisonFeedback").textContent = "Karşılaştırma verileri yükleniyor…";
   try {
@@ -335,7 +345,7 @@ function receiptClose() {
 async function showReceipt(id, opener, fieldId = "") {
   const entry = entries.find((entry) => entry.id === id);
   const metadata = fieldId ? entry?.photos?.[fieldId] : entry?.receipt;
-  if (!ready || !metadata) return;
+  if (!ready || !canAdmin(fieldId ? "registrations.photos" : "registrations.receipts") || !metadata) return;
   receiptClose();
   const eventId = selectedId, version = ++receiptVersion;
   const controller = new AbortController(); receiptAbort = controller;
@@ -386,7 +396,7 @@ function ticketClose() {
 }
 async function showTicket(id, opener) {
   const entry = entries.find(item => item.id === id), eventId = selectedId;
-  if (!entry || busyEntries.has(id) || (archived() && entry.ticket?.status !== "issued")) return;
+  if (!ready || !canAdmin("registrations.view") || !entry || !canAdmin(entry.ticket?.status === "issued" ? "tickets.view" : "tickets.manage") || busyEntries.has(id) || (archived() && entry.ticket?.status !== "issued")) return;
   ticketClose();
   const version = ticketVersion;
   ticketOpener = opener;
@@ -433,14 +443,19 @@ async function showTicket(id, opener) {
   }
 }
 
+// Establish the session boundary before replaying sticky ready/catalog events.
+// A panel bundle loaded after authentication must not clear its own ready replay.
+onAdminEvent("admin-session", clearRegistrationSession);
 onAdminEvent("events-loaded", (event) => {
+  if (!canAdmin("registrations.view")) return;
   events = Array.isArray(event.detail) ? event.detail : [];
   const oldId = selectedId;
   populateEvents();
   if (ready && (oldId !== selectedId || !getDraft())) loadSelected();
 });
-onAdminEvent("admin-ready", () => { ready = true; loadSelected(); loadSummary(); });
+onAdminEvent("admin-ready", () => { ready = canAdmin("registrations.view"); updateControls(); if (ready) { loadSelected(); loadSummary(); } });
 document.addEventListener("registration-event", (event) => {
+  if (!ready || !canAdmin("registrations.view")) return;
   if (saving) { feedback("Form kaydediliyor. Etkinliği değiştirmeden önce işlemin tamamlanmasını bekleyin.", true); return; }
   if (!event.detail?.id || !catalog().some((current) => current.id === event.detail.id)) return;
   if (catalog().find(current => current.id === event.detail.id)?.archived) $("registrationEventScope").value = "all";
@@ -453,7 +468,7 @@ $("registrationEvent").addEventListener("change", () => { selectedId = $("regist
 $("registrationEventScope").addEventListener("change", () => { populateEvents(); loadSelected(); });
 $("registrationConfigForm").addEventListener("input", (event) => {
   const draft = getDraft();
-  if (!draft || !ready || saving || loading || archived()) return;
+  if (!draft || !ready || !canAdmin("registrations.manage") || saving || loading || archived()) return;
   const target = event.target;
   if (target.id === "registrationDescription") draft.form.description = target.value;
   else if (target.id === "registrationMaxRegistrations") draft.form.maxRegistrations = target.value === "" ? null : Number(target.value);
@@ -487,7 +502,7 @@ $("registrationConfigForm").addEventListener("input", (event) => {
 });
 $("registrationFields").addEventListener("click", (event) => {
   const button = event.target.closest("button"), draft = getDraft();
-  if (!button || button.disabled || !draft || !ready || saving || loading || archived()) return;
+  if (!button || button.disabled || !draft || !ready || !canAdmin("registrations.manage") || saving || loading || archived()) return;
   const index = draft.form.fields.findIndex((field) => field.id === button.closest("[data-registration-field]")?.dataset.registrationField);
   if (index < 0) return;
   const field = draft.form.fields[index], state = optionState(field);
@@ -530,21 +545,21 @@ $("registrationFields").addEventListener("click", (event) => {
 });
 $("registrationAddField").addEventListener("click", () => {
   const draft = getDraft();
-  if (!draft || saving || loading || draft.form.fields.length >= 25) return;
+  if (!ready || !canAdmin("registrations.manage") || archived() || !draft || saving || loading || draft.form.fields.length >= 25) return;
   draft.form.fields.push({ id: `question_${crypto.randomUUID().replaceAll("-", "")}`, type: "text", label: "Yeni soru", required: false });
   renderFields(); changed();
   $("registrationFields").lastElementChild.querySelector("input[data-field-prop=label]").focus();
 });
 $("registrationDiscard").addEventListener("click", () => {
   const draft = getDraft();
-  if (!draft || saving || loading) return;
+  if (!ready || !canAdmin("registrations.manage") || !draft || saving || loading) return;
   cancelOptionUploads(selectedId);
   draft.form = structuredClone(draft.savedForm);
   renderForm(); feedback("Bu etkinliğin son kaydedilen formuna dönüldü.");
 });
 $("registrationConfigForm").addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!ready || saving || loading || archived() || !getDraft() || pendingOptions()) return;
+  if (!ready || !canAdmin("registrations.manage") || saving || loading || archived() || !getDraft() || pendingOptions()) return;
   const id = selectedId, draft = getDraft(), form = stableForm(draft.form), generation = authGeneration;
   if (form.maxRegistrations != null && (!Number.isInteger(form.maxRegistrations) || form.maxRegistrations < 1 || form.maxRegistrations > 10000)) { feedback("Kayıt üst sınırı 1 ile 10000 arasında tam sayı olmalı. Sınırsız kayıt için alanı boş bırakın.", true); return; }
   for (const field of form.fields) {
@@ -566,7 +581,7 @@ $("registrationConfigForm").addEventListener("submit", async (event) => {
     const current = events.find((event) => event.id === id);
     if (current) { current.registrationMode = "native"; current.registrationEnabled = stored.enabled && !isAtLimit(); }
     document.dispatchEvent(new CustomEvent("registration-config-saved", { detail: { eventId: id, enabled: stored.enabled } }));
-    renderForm(); renderStats(); feedback(stored.enabled ? isAtLimit() ? "Form kaydedildi. Kontenjan dolduğu için yeni kayıt alımı otomatik kapalı." : "Form kaydedildi. Yayımlanmış güncel etkinliğin kayıt bağlantısından erişilebilir." : "Form kaydedildi; yeni kayıt alımı kapalı. Önceki kayıtlar ve dekontlar korunuyor.");
+    renderForm(); renderStats(); feedback(stored.enabled ? isAtLimit() ? "Form kaydedildi. Kontenjan dolduğu için yeni kayıt alımı otomatik kapalı." : "Form kaydedildi. Doğrudan form bağlantısı açık; etkinliğin sitede yayımlanması gerekmez." : "Form kaydedildi; yeni kayıt alımı kapalı. Önceki kayıtlar ve dekontlar korunuyor.");
     loadSummary();
   } catch (error) { if (ready && generation === authGeneration && version === saveVersion) feedback(error.message, true); }
   finally { if (version === saveVersion) { saving = false; updateControls(); } }
@@ -588,10 +603,11 @@ $("registrationComparison").addEventListener("click", event => {
 });
 $("registrationEntries").addEventListener("click", async (event) => {
   const button = event.target.closest("button");
-  if (!button) return;
+  if (!button || !ready || !canAdmin("registrations.view")) return;
   if (button.dataset.registrationReceipt) { showReceipt(button.dataset.registrationReceipt, button); return; }
   if (button.dataset.registrationPhoto && button.dataset.photoField) { showReceipt(button.dataset.registrationPhoto, button, button.dataset.photoField); return; }
   if (button.dataset.registrationTicket) { showTicket(button.dataset.registrationTicket, button); return; }
+  if (!isOwner()) return;
   if (button.dataset.registrationCleanup) {
     const id = button.dataset.registrationCleanup, eventId = selectedId;
     if (busyEntries.has(id)) return;
@@ -651,7 +667,7 @@ $("registrationEntries").addEventListener("click", async (event) => {
 });
 $("registrationExport").addEventListener("click", async () => {
   const button = $("registrationExport"), id = selectedId, version = loadVersion;
-  if (!id) return;
+  if (!ready || !canAdmin("registrations.export") || !id) return;
   button.disabled = true; feedback("Kayıt listesi hazırlanıyor…");
   try {
     const response = await fetchPrivate(endpoint("export", id));
@@ -712,7 +728,7 @@ $("registrationTicketPrint").addEventListener("click", async () => {
   catch (error) { if (!controller.signal.aborted) feedback(error.message || "Bilet yazdırılamadı. Bileti yeniden açıp deneyin.", true); }
   finally { if (ticketPrintAbort === controller) ticketPrintAbort = null; }
 });
-document.addEventListener("admin-logout", () => {
+function clearRegistrationSession() {
   ready = false; authGeneration++; loadVersion++; summaryVersion++; saveVersion++; saving = false; loading = false;
   cancelOptionUploads();
   ticketPrintAbort?.abort(); ticketPrintAbort = null;
@@ -723,7 +739,8 @@ document.addEventListener("admin-logout", () => {
   $("registrationEntries").replaceChildren();
   $("registrationComparison").replaceChildren();
   renderStats(); renderForm();
-});
+}
+document.addEventListener("admin-logout", clearRegistrationSession);
 window.addEventListener("beforeunload", (event) => {
   if (!optionUploads.size && ![...drafts.values()].some((draft) => JSON.stringify(stableForm(draft.form)) !== draft.saved)) return;
   event.preventDefault(); event.returnValue = "";

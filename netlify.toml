@@ -18,6 +18,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/admin-auth"
+  to = "/.netlify/functions/admin-auth"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin-users"
+  to = "/.netlify/functions/admin-users"
+  status = 200
+
+[[redirects]]
   from = "/api/site-content"
   to = "/.netlify/functions/site-content"
   status = 200

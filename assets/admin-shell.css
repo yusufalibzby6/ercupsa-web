@@ -36,6 +36,7 @@
   .admin-login-form > p:first-of-type { color: var(--admin-muted); font-size: 14px; line-height: 1.7; margin: 10px 0 30px; }
   .admin-login-form label { font-size: 13px; font-weight: 700; margin-bottom: 9px; }
   .admin-login-form input { width: 100%; padding: 14px 16px; border: 1px solid var(--admin-border); border-radius: 12px; background: #fafbfc; }
+  .admin-login-form #username { margin-bottom: 18px; }
   .admin-login-form .admin-primary { margin-top: 18px; min-height: 48px; display: flex; align-items: center; justify-content: space-between; }
   #loginError { color: #a52b35; font-size: 13px; margin-top: 14px; line-height: 1.6; overflow-wrap: anywhere; }
   #loginError:empty { margin: 0; }

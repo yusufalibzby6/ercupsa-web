@@ -1,4 +1,4 @@
-import { guarded, requireAdmin, response, body, fail, identifier } from "../lib/security.mjs";
+import { guarded, requirePermission, response, body, fail, identifier } from "../lib/security.mjs";
 import { db, authAdmin } from "../lib/database.mjs";
 import { readEvents } from "./events.mjs";
 import { operationsStore, checkinKey } from "../lib/checkins.mjs";
@@ -75,9 +75,9 @@ async function accountHistory(userId, read, events, storage) {
 }
 
 export function createAccountsHandler({ read = db, auth = authAdmin, events = readEvents,
-  moderation = accountsStore, store = operationsStore, now = () => new Date() } = {}) {
+  moderation = accountsStore, store = operationsStore, now = () => new Date(), adminStore } = {}) {
   return guarded(async req => {
-    requireAdmin(req);
+    await requirePermission(req, req.method === "GET" ? "accounts.view" : "accounts.manage", { getStore: adminStore });
     const url = new URL(req.url), action = url.searchParams.get("action") || "list";
     if (req.method === "POST" && action === "visibility") {
       const input = await body(req), userId = accountId(input.userId);

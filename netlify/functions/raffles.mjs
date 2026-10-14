@@ -1,5 +1,5 @@
 import { getStore } from '@netlify/blobs';
-import { guarded, requireAdmin, response, body, identifier, fail, HttpError } from '../lib/security.mjs';
+import { guarded, requirePermission, response, body, identifier, fail, HttpError } from '../lib/security.mjs';
 import { db } from '../lib/database.mjs';
 import { readEvents } from './events.mjs';
 import { readCheckins } from '../lib/checkins.mjs';
@@ -8,7 +8,7 @@ import { paged, participantsFor, poolVersion, drawChances, drawInput, weightedWi
 
 export function createHandler({ read = db, events = readEvents, checkins = readCheckins,
   registrations = readRegistrationParticipants,
-  store = () => getStore({ name: 'ercupsa-raffles', consistency: 'strong' }) } = {}) {
+  store = () => getStore({ name: 'ercupsa-raffles', consistency: 'strong' }), adminStore } = {}) {
   const withSource = draw => draw ? { ...draw, source: draw.source ?? 'qr' } : null;
   async function history(storage, eventId) { return (await drawHistory(storage, eventId)).map(withSource); }
   async function pool(eventId, { source = 'qr', checkedInOnly = false, checkinBonus = false } = {}) {
@@ -56,7 +56,7 @@ export function createHandler({ read = db, events = readEvents, checkins = readC
     return { event, participants, ...modes, poolVersion: poolVersion(eventId, participants, modes) };
   }
   return guarded(async req => {
-    requireAdmin(req);
+    await requirePermission(req, req.method === 'GET' ? 'raffles.view' : 'raffles.manage', { getStore: adminStore });
     try {
       const url = new URL(req.url), storage = store();
       if (req.method === 'GET') {

@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { getStore as getBlobStore } from "@netlify/blobs";
-import { body, fail, guarded, requireAdmin, response, text } from "../lib/security.mjs";
+import { body, fail, guarded, requirePermission, response, text } from "../lib/security.mjs";
 import { mutateJson } from "../lib/blob-state.mjs";
 import { instagramPosts, readInstagramContent } from "../lib/site-content.mjs";
 
-export function createSiteContentHandler({ getStore = getBlobStore, now = () => new Date(), revision = randomUUID } = {}) {
+export function createSiteContentHandler({ getStore = getBlobStore, now = () => new Date(), revision = randomUUID, adminStore } = {}) {
   return guarded(async req => {
     if (!["GET", "POST"].includes(req.method)) fail(405, "Desteklenmeyen işlem.");
-    if (req.method === "POST") requireAdmin(req);
+    if (req.method === "POST") await requirePermission(req, "instagram.manage", { getStore: adminStore });
     const store = getStore("ercupsa-site-content");
     if (req.method === "GET") {
       const saved = await store.get("instagram", { type: "json", consistency: "strong" });

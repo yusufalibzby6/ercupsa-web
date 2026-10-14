@@ -1,4 +1,4 @@
-import { $, escape, onAdminEvent } from './common.js';
+import { $, escape, onAdminEvent, canAdmin, isOwner } from './common.js';
 
 let events = [], participants = [], entries = [], accounts = [], selectedId = '';
 let ready = false, active = false, loading = false, staffLoading = false, staffBusy = false;
@@ -14,11 +14,12 @@ function message(id, text, error = false) { $(id).textContent = text; $(id).data
 function controls() {
   $('attendanceRefresh').disabled = !ready || !selectedId || loading;
   $('attendanceEvent').disabled = loading;
-  $('staffFields').disabled = !ready || staffBusy || staffLoading;
-  $('staffCreate').disabled = !ready || staffBusy || staffLoading || !events.length;
-  $('staffReload').disabled = !ready || staffBusy || staffLoading;
-  for (const button of $('staffAccounts').querySelectorAll('button')) button.disabled = staffBusy;
-  $('attendanceScanner').hidden = !selectedId;
+  $('staffFields').disabled = !isOwner() || !ready || staffBusy || staffLoading;
+  $('staffCreate').disabled = !isOwner() || !ready || staffBusy || staffLoading || !events.length;
+  $('staffReload').disabled = !isOwner() || !ready || staffBusy || staffLoading;
+  for (const button of $('staffAccounts').querySelectorAll('button')) button.disabled = staffBusy || !isOwner();
+  $('staffOwnerSection').hidden = !isOwner();
+  $('attendanceScanner').hidden = !selectedId || !canAdmin('attendance.manage');
   if (selectedId) $('attendanceScanner').href = `giris.html?${new URLSearchParams({ event: selectedId })}`;
 }
 function populateEvents() {
@@ -53,12 +54,12 @@ function renderAttendance() {
   $('attendanceMore').hidden = matches.length <= visibleLimit;
 }
 async function loadAttendance({ quiet = false } = {}) {
-  if (!ready || !selectedId || loading) return;
+  if (!ready || !canAdmin('attendance.view') || !active || !selectedId || loading) return;
   const eventId = selectedId, version = ++listVersion;
   loading = true; controls(); if (!quiet) message('attendanceStatus', 'Katılım bilgileri yükleniyor…');
   const results = await Promise.allSettled([
     request(`/api/gate?${new URLSearchParams({ eventId })}`),
-    request(`/api/registrations?${new URLSearchParams({ action: 'admin', event_id: eventId })}`),
+    canAdmin('registrations.view') ? request(`/api/registrations?${new URLSearchParams({ action: 'admin', event_id: eventId })}`) : Promise.resolve(null),
   ]);
   if (version !== listVersion || !ready || selectedId !== eventId) return;
   const errors = [];
@@ -70,7 +71,8 @@ async function loadAttendance({ quiet = false } = {}) {
       renderAttendance();
     } else errors.push('Bilet ve giriş sayıları doğrulanamadı.');
   } else errors.push(results[0].reason.message);
-  if (results[1].status === 'fulfilled' && Number.isInteger(results[1].value.summary?.total)) $('attendanceRegistered').textContent = results[1].value.summary.total;
+  if (!canAdmin('registrations.view')) { $('attendanceRegistered').textContent = '—'; $('attendanceRegistered').title = 'Kayıt formu görüntüleme yetkisi yok.'; }
+  else if (results[1].status === 'fulfilled' && Number.isInteger(results[1].value.summary?.total)) $('attendanceRegistered').textContent = results[1].value.summary.total;
   else errors.push(results[1].status === 'rejected' ? `Form kayıtları: ${results[1].reason.message}` : 'Form kayıt sayısı doğrulanamadı.');
   message('attendanceStatus', errors.length ? `${errors.join(' ')} Gösterilen bilgiler güncel olmayabilir; yenileyin.` : `Son güncelleme ${new Date().toLocaleTimeString('tr-TR')} · Bu sekme açıkken 15 saniyede bir yenilenir.`, Boolean(errors.length));
   loading = false; controls();
@@ -80,7 +82,7 @@ function renderAccounts() {
   controls();
 }
 async function loadAccounts() {
-  if (!ready || staffLoading || staffBusy) return;
+  if (!ready || !isOwner() || !active || staffLoading || staffBusy) return;
   const version = ++staffVersion; staffLoading = true; controls(); message('staffStatus', 'Görevli hesapları yükleniyor…');
   try {
     const data = await request('/api/staff?action=accounts');
@@ -95,9 +97,9 @@ onAdminEvent('events-loaded', event => {
   populateEvents(); renderAccounts();
   if (ready && active) loadAttendance();
 });
-onAdminEvent('admin-ready', () => { ready = true; controls(); if (active) { loadAttendance(); loadAccounts(); } });
+onAdminEvent('admin-ready', () => { ready = canAdmin('attendance.view'); controls(); if (active) { loadAttendance(); loadAccounts(); } });
 document.addEventListener('admin-tab', event => {
-  active = event.detail === 'attendance';
+  active = event.detail === 'attendance' && canAdmin('attendance.view');
   if (active && ready) { loadAttendance(); loadAccounts(); }
 });
 document.addEventListener('admin-logout', () => {
@@ -113,7 +115,7 @@ $('attendanceFilter').addEventListener('change', () => { visibleLimit = 100; ren
 $('attendanceMore').addEventListener('click', () => { visibleLimit += 100; renderAttendance(); });
 $('staffReload').addEventListener('click', loadAccounts);
 $('staffForm').addEventListener('submit', async event => {
-  event.preventDefault(); if (!ready || staffBusy || staffLoading) return;
+  event.preventDefault(); if (!ready || !isOwner() || staffBusy || staffLoading) return;
   const eventIds = [...$('staffEventScopes').querySelectorAll('input:checked')].map(input => input.value);
   if (!eventIds.length) { message('staffStatus', 'Görevliye en az bir etkinlik seçin.', true); return; }
   const version = staffVersion;
@@ -129,7 +131,7 @@ $('staffForm').addEventListener('submit', async event => {
   finally { staffBusy = false; controls(); }
 });
 $('staffAccounts').addEventListener('click', async event => {
-  const button = event.target.closest('button'); if (!button || staffBusy) return;
+  const button = event.target.closest('button'); if (!button || !ready || !isOwner() || staffBusy) return;
   if (button.hasAttribute('data-staff-cancel')) { deleteId = ''; renderAccounts(); return; }
   if (button.dataset.staffDelete) { deleteId = button.dataset.staffDelete; renderAccounts(); $('staffAccounts').querySelector('[data-staff-confirm]')?.focus(); return; }
   const id = button.dataset.staffConfirm; if (!id || id !== deleteId || !accounts.some(account => account.id === id)) return;

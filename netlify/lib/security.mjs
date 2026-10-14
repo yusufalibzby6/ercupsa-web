@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual, randomUUID } from "node:crypto";
 export class HttpError extends Error {
   constructor(status, message) {
     super(message);
@@ -55,29 +55,86 @@ export async function body(req) {
     fail(400, "Geçersiz JSON.");
   }
 }
-function signature(s) {
+export const ADMIN_PERMISSIONS = Object.freeze([
+  "events.view", "events.manage", "events.publish",
+  "registrations.view", "registrations.manage", "registrations.receipts", "registrations.photos", "registrations.export",
+  "tickets.view", "tickets.manage", "raffles.view", "raffles.manage",
+  "attendance.view", "attendance.manage", "accounts.view", "accounts.manage", "instagram.view", "instagram.manage",
+]);
+export const ADMIN_SESSION_MS = 8 * 60 * 60 * 1000;
+export function ownerUsername() {
+  const value = (process.env.ADMIN_USERNAME || "basadmin").trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9._-]{2,49}$/.test(value) || value === "sayman")
+    fail(503, "Baş yönetici hesabı henüz yapılandırılmadı.");
+  return value;
+}
+function signature(value) {
   return createHmac("sha256", process.env.ADMIN_PASSWORD || "")
-    .update(s)
-    .digest("base64url");
+    .update("ercupsa:admin-session:v2:" + value).digest("base64url");
+}
+export function ownerSession() {
+  return { id: "owner", username: ownerUsername(), name: "Baş yönetici", role: "owner", permissions: [...ADMIN_PERMISSIONS] };
+}
+export function signedAdminCookie(req, principal, now = new Date()) {
+  if (!process.env.ADMIN_PASSWORD) fail(503, "Yönetici girişi henüz yapılandırılmadı.");
+  const issued = now.getTime(), expires = String(issued + ADMIN_SESSION_MS);
+  const payload = Buffer.from(JSON.stringify({ v: 2, id: principal.id, username: principal.username,
+    role: principal.role, ...(principal.version ? { version: principal.version } : {}),
+    issued, sessionId: randomUUID() })).toString("base64url");
+  const value = expires + ".v2." + payload;
+  return `ercupsa_admin=${value}.${signature(value)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${new URL(req.url).protocol === "https:" ? "; Secure" : ""}`;
+}
+export function decodeAdminCookie(req, now = new Date()) {
+  if (!process.env.ADMIN_PASSWORD) return null;
+  const token = (req.headers.get("cookie") || "").split(";").map(s => s.trim())
+    .find(s => s.startsWith("ercupsa_admin="))?.slice(14);
+  if (!token || token.length > 2000) return null;
+  const parts = token.split(".");
+  if (parts.length !== 4 || parts[1] !== "v2" || !/^\d{13}$/.test(parts[0]) ||
+      !/^[A-Za-z0-9_-]{1,1600}$/.test(parts[2]) || !/^[A-Za-z0-9_-]{43}$/.test(parts[3])) return null;
+  const expected = signature(parts.slice(0, 3).join("."));
+  if (!timingSafeEqual(Buffer.from(parts[3]), Buffer.from(expected))) return null;
+  let payload;
+  try { payload = JSON.parse(Buffer.from(parts[2], "base64url").toString("utf8")); } catch { return null; }
+  if (!payload || payload.v !== 2 || !["owner", "admin", "treasurer"].includes(payload.role) ||
+      typeof payload.id !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(payload.id) ||
+      typeof payload.username !== "string" || !/^[a-z0-9][a-z0-9._-]{2,49}$/.test(payload.username) ||
+      typeof payload.sessionId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(payload.sessionId) ||
+      !Number.isSafeInteger(payload.issued) || Number(parts[0]) !== payload.issued + ADMIN_SESSION_MS ||
+      Number(parts[0]) <= now.getTime() || payload.issued > now.getTime() + 60000) return null;
+  if (payload.role === "owner") {
+    if (payload.id !== "owner" || payload.username !== ownerUsername() || payload.version != null) return null;
+  } else if (typeof payload.version !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(payload.version)) return null;
+  return { ...payload, expires: Number(parts[0]) };
 }
 export function admin(req) {
-  if (!process.env.ADMIN_PASSWORD) return false;
-  const token = (req.headers.get("cookie") || "")
-    .split(";")
-    .map((s) => s.trim())
-    .find((s) => s.startsWith("ercupsa_admin="))
-    ?.slice(14);
-  if (!token) return false;
-  const [expires, sign] = token.split(".");
-  const expected = signature(expires || "");
-  return (
-    Number(expires) > Date.now() &&
-    sign?.length === expected.length &&
-    timingSafeEqual(Buffer.from(sign), Buffer.from(expected))
-  );
+  return decodeAdminCookie(req)?.role === "owner";
 }
 export function requireAdmin(req) {
-  if (!admin(req)) fail(401, "Yönetici girişi gerekli.");
+  const token = decodeAdminCookie(req);
+  if (!token) fail(401, "Yönetici girişi gerekli.");
+  if (token.role !== "owner") fail(403, "Bu işlem yalnızca baş yöneticiye açıktır.");
+  return ownerSession();
+}
+export async function getAdminSession(req, options = {}) {
+  return (await import("./admin-auth.mjs")).getAdminSession(req, options);
+}
+export const hasPermission = (session, permission) => session?.role === "owner" || session?.permissions?.includes(permission) === true;
+export async function requirePermission(req, permission, options = {}) {
+  const session = await getAdminSession(req, options);
+  if (!session) fail(401, "Yönetici girişi gerekli.");
+  if (session.role !== "owner" && !session.permissions.includes(permission))
+    fail(403, "Bu işlem için yetkiniz yok.");
+  return session;
+}
+export async function requireOwner(req, options = {}) {
+  const session = await getAdminSession(req, options);
+  if (!session) fail(401, "Yönetici girişi gerekli.");
+  if (session.role !== "owner") fail(403, "Bu işlem yalnızca baş yöneticiye açıktır.");
+  return session;
+}
+export function adminLogoutCookie(req) {
+  return `ercupsa_admin=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${new URL(req.url).protocol === "https:" ? "; Secure" : ""}`;
 }
 export function sameOrigin(req) {
   const origin = req.headers.get("origin");
@@ -93,8 +150,7 @@ export function adminLogin(req) {
     !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))
   )
     fail(401, "Giriş bilgileri geçersiz.");
-  const expires = String(Date.now() + 8 * 60 * 60 * 1000);
-  return `ercupsa_admin=${expires}.${signature(expires)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${new URL(req.url).protocol === "https:" ? "; Secure" : ""}`;
+  return signedAdminCookie(req, ownerSession());
 }
 export function response(data, status = 200, headers = {}) {
   return Response.json(data, {

@@ -4,12 +4,39 @@ export const $ = (id) => document.getElementById(id);
 const adminState = globalThis[Symbol.for("ercupsa.admin.state")] ||= {
   events: null,
   ready: false,
+  session: null,
 };
+const permissions = new Set([
+  "events.view", "events.manage", "events.publish", "registrations.view", "registrations.manage", "registrations.receipts", "registrations.photos", "registrations.export",
+  "tickets.view", "tickets.manage", "raffles.view", "raffles.manage", "attendance.view", "attendance.manage", "accounts.view", "accounts.manage", "instagram.view", "instagram.manage",
+]);
+export function getAdminSession() { return adminState.session ? structuredClone(adminState.session) : null; }
+export function setAdminSession(session) {
+  // Only the authenticated session endpoint supplies this value. A missing or
+  // malformed response must never confer owner privileges.
+  const valid = session && typeof session.id === "string" && session.id && typeof session.username === "string" && session.username &&
+    typeof session.name === "string" && ["owner", "admin", "treasurer"].includes(session.role) && Array.isArray(session.permissions);
+  adminState.session = valid ? { id: session.id, username: session.username, name: session.name, role: session.role,
+    permissions: [...new Set(session.permissions.filter(permission => permissions.has(permission)))] } : null;
+  adminState.ready = false;
+  document.dispatchEvent(new CustomEvent("admin-session", { detail: getAdminSession() }));
+  return getAdminSession();
+}
+export function isOwner() { return adminState.session?.role === "owner"; }
+export function canAdmin(permission) { return !!adminState.session && (isOwner() || adminState.session.permissions.includes(permission)); }
+if (typeof document !== "undefined" && !adminState.logoutListener) {
+  adminState.logoutListener = true;
+  document.addEventListener("admin-logout", () => {
+    adminState.session = null; adminState.ready = false; adminState.events = null;
+    document.dispatchEvent(new CustomEvent("admin-session", { detail: null }));
+  });
+}
 export function announceAdminEvents(events) {
   adminState.events = events;
   document.dispatchEvent(new CustomEvent("events-loaded", { detail: events }));
 }
 export function announceAdminReady() {
+  if (!adminState.session) return;
   adminState.ready = true;
   document.dispatchEvent(new Event("admin-ready"));
 }
@@ -18,6 +45,7 @@ export function onAdminEvent(name, listener) {
   if (name === "events-loaded" && adminState.events !== null)
     listener(new CustomEvent(name, { detail: adminState.events }));
   if (name === "admin-ready" && adminState.ready) listener(new Event(name));
+  if (name === "admin-session") listener(new CustomEvent(name, { detail: getAdminSession() }));
 }
 export const escape = (s) =>
   String(s ?? "").replace(

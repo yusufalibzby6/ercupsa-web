@@ -1,11 +1,12 @@
-import { $, escape, safeImage, status, announceAdminEvents, announceAdminReady } from "./common.js?v=raffle-2";
+import { $, escape, safeImage, status, announceAdminEvents, announceAdminReady, setAdminSession, getAdminSession, canAdmin, isOwner } from "./common.js?v=admin-roles-1";
 let events = [],
   photos = [],
   poster = "",
   selectedId = "";
-let authenticated = false, editorOpen = false, saving = false, restored = false, loggingIn = false, authGeneration = 0, loadVersion = 0;
+let authenticated = false, editorOpen = false, saving = false, restored = false, loggingIn = false, loggingOut = false, authGeneration = 0, loadVersion = 0;
 let mutation = null, operationVersion = 0, trashVersion = 0, trashLoading = false, trashEntries = [];
 let savedValue = null;
+let restoringDrafts = false;
 const drafts = new Map(), revisions = new Map(), uploads = new Set();
 const DRAFT_KEY = "ercupsa_event_drafts_v1";
 const fields = [
@@ -42,29 +43,32 @@ function readDrafts() {
     const raw = sessionStorage.getItem(DRAFT_KEY);
     if (!raw || raw.length > 2000000) return null;
     const stored = JSON.parse(raw);
+    if (stored.accountId ? stored.accountId !== getAdminSession()?.id : !isOwner()) throw new Error("Different account drafts");
     if (stored.version !== 1 || !Array.isArray(stored.drafts) || stored.drafts.length > 50) throw new Error("Invalid drafts");
     for (const draft of stored.drafts) {
       const id = draft?.key === "new" ? "" : draft?.key?.startsWith("event:") ? draft.key.slice(6) : null;
       if (id === null || (id && !/^[a-zA-Z0-9_-]{1,100}$/.test(id)) || !validValue(draft.value, id) || !validValue(draft.base, id)) continue;
       if (!same(draft.value, draft.base)) drafts.set(draft.key, { value: eventValue(draft.value, id), base: eventValue(draft.base, id) });
     }
-    return typeof stored.active === "string" && (stored.active === "new" || drafts.has(stored.active) || events.some(event => keyFor(event.id) === stored.active)) ? stored : null;
+    // Validate the key now; its event is resolved after the authenticated catalog
+    // loads. Invalid media is discarded while a valid saved event can still open.
+    return typeof stored.active === "string" && (stored.active === "new" || /^event:[A-Za-z0-9_-]{1,100}$/.test(stored.active)) ? stored : null;
   } catch {
     try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
     return null;
   }
 }
 function persistDrafts() {
-  if (!authenticated) return;
+  if (!authenticated || !canAdmin("events.manage") || restoringDrafts) return;
   try {
     if (!drafts.size && !editorOpen) sessionStorage.removeItem(DRAFT_KEY);
-    else sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ version: 1, drafts: [...drafts].map(([key, draft]) => ({ key, ...draft })), active: editorOpen ? editorKey() : null }));
+    else sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ version: 1, accountId: getAdminSession()?.id, drafts: [...drafts].map(([key, draft]) => ({ key, ...draft })), active: editorOpen ? editorKey() : null }));
   } catch {
     if (drafts.size) notify("Taslak bu sekmede korunuyor; sayfayı yenilemeden önce kaydedin. Tarayıcı taslak saklamaya izin vermedi.");
   }
 }
 function remember() {
-  if (!authenticated || !editorOpen || !savedValue) return;
+  if (!authenticated || !canAdmin("events.manage") || !editorOpen || !savedValue) return;
   const value = eventValue(current(), selectedId), key = editorKey();
   if (same(value, savedValue)) drafts.delete(key);
   else drafts.set(key, { value, base: structuredClone(savedValue) });
@@ -84,12 +88,15 @@ function draftNotice() {
   $("eventDiscard").textContent = selectedId ? "Kaydedilmiş etkinliğe dön" : "Yeni taslağı sil";
   const busy = saving || !!mutation;
   $("eventDiscard").disabled = busy;
-  $("saveBtn").disabled = busy || pending || !!missing;
-  [...fields, "published", "posterBtn", "photosBtn", "newBtn", "cancelBtn", "previewBtn"].forEach(id => { $(id).disabled = busy; });
-  $("photoThumbs").querySelectorAll("button").forEach(button => { button.disabled = busy; });
-  $("eventsList").querySelectorAll('button[data-action="edit"], button[data-action="publish"], button[data-action="delete"]').forEach(button => { button.disabled = busy; });
-  $("eventTrashList").querySelectorAll("button").forEach(button => { button.disabled = busy; });
-  $("eventTrashReload").disabled = busy || trashLoading;
+  $("saveBtn").disabled = !canAdmin("events.manage") || busy || pending || !!missing;
+  [...fields, "posterBtn", "photosBtn", "newBtn", "cancelBtn", "previewBtn"].forEach(id => { $(id).disabled = !canAdmin("events.manage") || busy; });
+  $("published").disabled = !canAdmin("events.publish") || busy;
+  $("newBtn").hidden = !canAdmin("events.manage");
+  $("eventTrashToggle").hidden = !isOwner();
+  $("photoThumbs").querySelectorAll("button").forEach(button => { button.disabled = !canAdmin("events.manage") || busy; });
+  $("eventsList").querySelectorAll('button[data-action="edit"], button[data-action="publish"], button[data-action="delete"]').forEach(button => { button.disabled = busy || (button.dataset.action === "delete" ? !isOwner() : !canAdmin(`events.${button.dataset.action === "publish" ? "publish" : "manage"}`)); });
+  $("eventTrashList").querySelectorAll("button").forEach(button => { button.disabled = !isOwner() || busy; });
+  $("eventTrashReload").disabled = !isOwner() || busy || trashLoading;
 }
 function forget(key) {
   drafts.delete(key);
@@ -103,9 +110,12 @@ function clearPrivateDrafts(event) {
   operationVersion++; trashVersion++;
   saving = false; mutation = null; trashLoading = false; trashEntries = [];
   events = []; $("eventsList").replaceChildren();
+  status(""); notify("");
+  $("adminSessionName").textContent = "Yönetici"; $("adminSessionRole").textContent = "Yönetim oturumu";
   $("eventTrashList").replaceChildren(); $("eventTrashMessage").textContent = "";
   $("eventTrashPanel").hidden = true; $("eventTrashToggle").setAttribute("aria-expanded", "false");
   drafts.clear(); revisions.clear(); uploads.clear();
+  restoringDrafts = false;
   try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
   reset();
   $("formWrap").classList.add("hidden");
@@ -119,7 +129,7 @@ async function api(path, opts = {}) {
   const response = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", ...opts.headers }, signal: AbortSignal.timeout(15000) });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    if ([401, 403].includes(response.status) && generation === authGeneration) {
+    if (response.status === 401 && generation === authGeneration) {
       document.dispatchEvent(new CustomEvent("admin-logout", { detail: { reason: !authenticated && !loggingIn ? "initial-session-probe" : "session-expired" } }));
       $("loginError").textContent = data.error || "Yönetici oturumunuz sona erdi. Tekrar giriş yapın.";
     }
@@ -137,6 +147,7 @@ function image(url, cls = "w-24 h-24 object-cover rounded-xl") {
   return src ? `<img src="${src}" alt="Etkinlik görseli" class="${cls}">` : "";
 }
 async function load() {
+  if (!authenticated || !["events.view", "registrations.view", "tickets.view", "raffles.view", "attendance.view"].some(canAdmin)) return false;
   remember();
   const version = ++loadVersion;
   const d = await api("/api/events?admin=true");
@@ -158,7 +169,7 @@ async function load() {
   return true;
 }
 function hasRegistrationLink(event) {
-  if (!event.published) return false;
+  if (event.registrationMode !== "native" && !event.published) return false;
   const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Istanbul" }).format(new Date());
   if (event.date < today) return false;
   if (event.registrationMode === "native") return event.registrationEnabled === true;
@@ -169,25 +180,26 @@ function hasRegistrationLink(event) {
   }
 }
 function render() {
+  if (!authenticated || !canAdmin("events.view")) { $("eventsList").replaceChildren(); return; }
   const q = $("eventSearch").value.toLocaleLowerCase("tr");
   $("eventsList").innerHTML =
     events
       .filter((e) => e.title.toLocaleLowerCase("tr").includes(q))
-      .map(
-        (e) =>
-          `<article class="card p-5 rounded-3xl flex flex-wrap justify-between gap-4"><div class="flex gap-4">${image(e.poster)}<div><p class="text-sm">${escape(e.category)} · ${escape(e.date)} · ${e.published ? "Yayında" : "Taslak"}</p><h3 class="font-bold text-xl">${escape(e.title)}</h3><p>${escape(e.location)} ${escape(e.time)}</p><p>${e.images.length} fotoğraf</p></div></div><div class="flex flex-wrap gap-2 items-center"><button data-action="publish" data-id="${escape(e.id)}" class="border rounded-xl p-2">${e.published ? "Yayından kaldır" : "Yayınla"}</button><button data-action="edit" data-id="${escape(e.id)}" class="border rounded-xl p-2">Düzenle</button><button data-action="registration" data-id="${escape(e.id)}" class="border rounded-xl p-2">Kayıt formu</button>${hasRegistrationLink(e) ? `<button data-action="copy-registration" data-id="${escape(e.id)}" class="border rounded-xl p-2">Kayıt linkini kopyala</button>` : ""}${e.published ? `<button data-action="share" data-id="${escape(e.id)}" class="border rounded-xl p-2">Etkinliği paylaş</button>` : ""}<button data-action="ticket" data-id="${escape(e.id)}" class="border rounded-xl p-2">Bilet oluştur</button><button data-action="delete" data-id="${escape(e.id)}" class="text-red-700 p-2">Sil</button></div></article>`,
-      )
+      .map(e => {
+        const button = (action, label, permission, owner = false) => (!owner && canAdmin(permission) || owner && isOwner()) ? `<button data-action="${action}" data-id="${escape(e.id)}" class="border rounded-xl p-2${action === "delete" ? " text-red-700" : ""}">${label}</button>` : "";
+        return `<article class="card p-5 rounded-3xl flex flex-wrap justify-between gap-4"><div class="flex gap-4">${image(e.poster)}<div><p class="text-sm">${escape(e.category)} · ${escape(e.date)} · ${e.published ? "Yayında" : "Taslak"}</p><h3 class="font-bold text-xl">${escape(e.title)}</h3><p>${escape(e.location)} ${escape(e.time)}</p><p>${e.images.length} fotoğraf</p></div></div><div class="flex flex-wrap gap-2 items-center">${button("publish", e.published ? "Yayından kaldır" : "Yayınla", "events.publish")}${button("edit", "Düzenle", "events.manage")}${button("registration", "Kayıt formu", "registrations.view")}${hasRegistrationLink(e) ? button("copy-registration", "Kayıt linkini kopyala", "events.view") : ""}${e.published ? button("share", "Etkinliği paylaş", "events.view") : ""}${button("ticket", canAdmin("tickets.manage") ? "Bilet oluştur" : "Biletleri görüntüle", "tickets.view")}${button("delete", "Sil", "", true)}</div></article>`;
+      })
       .join("") || "<p>Etkinlik bulunamadı.</p>";
 }
 function renderTrash() {
   $("eventTrashList").innerHTML = trashEntries.map(item => {
     const event = item.event || {}, partial = item.source === "registrations";
-    return `<article class="event-trash-item"><div><h4>${escape(event.title || "İsimsiz etkinlik")}</h4><p>${escape(event.date || "Tarih bulunamadı")} ${escape(event.time || "")} · ${escape(event.location || "Konum bulunamadı")}</p><p>${partial ? "Eski silinmiş kayıt: başlık, tarih ve konum kayıt arşivinden alınabilir. Afiş, açıklama ve galeri saklanmamış olabilir; geri aldıktan sonra tamamlayın." : "Etkinliğin afişi, açıklaması, fotoğrafları ve form ayarları saklanıyor."}</p><small>Etkinlik kimliği: ${escape(item.id)}</small></div><button type="button" data-restore-id="${escape(item.id)}">Taslak olarak geri al</button></article>`;
+    return `<article class="event-trash-item"><div><h4>${escape(event.title || "İsimsiz etkinlik")}</h4><p>${escape(event.date || "Tarih bulunamadı")} ${escape(event.time || "")} · ${escape(event.location || "Konum bulunamadı")}</p><p>${partial ? "Eski silinmiş kayıt: başlık, tarih ve konum kayıt arşivinden alınabilir. Afiş, açıklama ve galeri saklanmamış olabilir; geri aldıktan sonra tamamlayın." : "Etkinliğin afişi, açıklaması, fotoğrafları ve form ayarları saklanıyor."}</p><small>Etkinlik kimliği: ${escape(item.id)}</small></div><div class="event-trash-actions"><button type="button" data-restore-id="${escape(item.id)}">Taslak olarak geri al</button><button type="button" data-purge-id="${escape(item.id)}" class="event-trash-purge">Kalıcı olarak sil</button></div></article>`;
   }).join("");
   draftNotice();
 }
 async function loadTrash() {
-  if (!authenticated) return;
+  if (!authenticated || !isOwner()) return;
   const generation = authGeneration, version = ++trashVersion;
   trashLoading = true;
   $("eventTrashMessage").textContent = "Silinen etkinlikler yükleniyor…";
@@ -226,7 +238,7 @@ async function refreshConflict(error, operation) {
   if (activeOperation(operation)) notify(error.message);
 }
 $("eventTrashToggle").onclick = () => {
-  if (!authenticated) return;
+  if (!authenticated || !isOwner()) return;
   const opening = $("eventTrashPanel").hidden;
   $("eventTrashPanel").hidden = !opening;
   $("eventTrashToggle").setAttribute("aria-expanded", String(opening));
@@ -234,21 +246,28 @@ $("eventTrashToggle").onclick = () => {
 };
 $("eventTrashReload").onclick = () => { if (!saving && !mutation) loadTrash(); };
 $("eventTrashList").addEventListener("click", async event => {
-  const button = event.target.closest("button[data-restore-id]");
-  if (!button) return;
-  const item = trashEntries.find(item => item.id === button.dataset.restoreId);
-  if (!item || !confirm(`“${item.event.title || "İsimsiz etkinlik"}” aynı bağlantıyla taslak olarak geri alınsın mı? Kayıtları ve biletleri korunur.`)) return;
+  const button = event.target.closest("button[data-restore-id], button[data-purge-id]");
+  if (!button || !isOwner()) return;
+  const permanent = !!button.dataset.purgeId;
+  const item = trashEntries.find(item => item.id === (button.dataset.restoreId || button.dataset.purgeId));
+  if (!item) return;
+  let confirmation;
+  if (permanent) {
+    confirmation = prompt(`“${item.event.title || "İsimsiz etkinlik"}” çöp kutusundan kalıcı olarak silinecek ve geri alınamayacak. Kayıtlar ile biletler arşivde korunur. Onaylamak için etkinliğin adını aynen yazın:`);
+    if (confirmation !== (item.event.title || "").trim()) { if (confirmation !== null) $("eventTrashMessage").textContent = "Etkinlik adı uyuşmadığı için kalıcı silme yapılmadı."; return; }
+  } else if (!confirm(`“${item.event.title || "İsimsiz etkinlik"}” aynı bağlantıyla taslak olarak geri alınsın mı? Kayıtları ve biletleri korunur.`)) return;
   const operation = beginMutation(item.id);
   if (!operation) return;
-  $("eventTrashMessage").textContent = "Etkinlik geri alınıyor…";
+  $("eventTrashMessage").textContent = permanent ? "Etkinlik kalıcı olarak siliniyor…" : "Etkinlik geri alınıyor…";
   try {
-    await api("/api/events?action=restore", { method: "POST", body: JSON.stringify({ id: item.id, expectedRevision: item.revision }) });
+    await api(`/api/events?action=${permanent ? "purge" : "restore"}`, { method: "POST", body: JSON.stringify({ id: item.id, expectedRevision: item.revision, ...(permanent ? { confirmation } : {}) }) });
     if (!activeOperation(operation)) return;
     await load();
     if (!activeOperation(operation)) return;
     await loadTrash();
     if (!activeOperation(operation)) return;
     mutation = null;
+    if (permanent) { notify("Etkinlik çöp kutusundan kalıcı olarak silindi. Kayıt ve bilet arşivi korunuyor."); return; }
     const recovered = events.find(event => event.id === item.id);
     if (recovered) edit(recovered);
     notify(item.source === "registrations" ? "Etkinlik aynı bağlantıyla taslak olarak geri alındı. Afiş ve açıklamayı kontrol edip tamamladıktan sonra yayınlayın." : "Etkinlik taslak olarak geri alındı. Bilgileri kontrol ettikten sonra yayınlayabilirsiniz.");
@@ -284,7 +303,7 @@ function fillEditor(value) {
   $("preview").hidden = true;
 }
 function edit(e) {
-  if (saving || mutation || !authenticated) return;
+  if (saving || mutation || !authenticated || !canAdmin("events.manage")) return;
   remember();
   const id = e?.id || "", draft = drafts.get(keyFor(id));
   const pendingUpload = [...uploads].find(upload => upload.key === keyFor(id));
@@ -325,6 +344,8 @@ $("eventsList").addEventListener("click", async (ev) => {
   if (!b) return;
   const e = events.find((e) => e.id === b.dataset.id);
   if (!e) return;
+  const needed = { edit: "events.manage", publish: "events.publish", registration: "registrations.view", ticket: "tickets.view", share: "events.view", "copy-registration": "events.view" }[b.dataset.action];
+  if (!authenticated || (b.dataset.action === "delete" ? !isOwner() : !needed || !canAdmin(needed))) return;
   if ((saving || mutation) && ["edit", "publish", "delete"].includes(b.dataset.action)) {
     notify("Etkinlik işlemi sürüyor. İşlem tamamlanınca devam edebilirsiniz.");
     return;
@@ -392,6 +413,7 @@ $("eventsList").addEventListener("click", async (ev) => {
   }
 });
 $("photoThumbs").addEventListener("click", (ev) => {
+  if (!canAdmin("events.manage")) return;
   const b = ev.target.closest("button[data-photo]");
   if (!b) return;
   const i = Number(b.dataset.photo),
@@ -449,7 +471,7 @@ $("previewBtn").onclick = () => {
   $("preview").hidden = false;
 };
 $("saveBtn").onclick = async () => {
-  if (saving || mutation || !authenticated || !editorOpen || (selectedId && !events.some(event => event.id === selectedId)) || [...uploads].some(upload => upload.key === editorKey())) return;
+  if (saving || mutation || !authenticated || !canAdmin("events.manage") || !editorOpen || (selectedId && !events.some(event => event.id === selectedId)) || [...uploads].some(upload => upload.key === editorKey())) return;
   remember();
   const key = editorKey();
   const operation = { id: selectedId, generation: authGeneration, version: ++operationVersion };
@@ -478,7 +500,7 @@ $("saveBtn").onclick = async () => {
   }
 };
 function upload(single) {
-  if (!authenticated || !editorOpen || saving || mutation || (selectedId && !events.some(event => event.id === selectedId))) return;
+  if (!authenticated || !canAdmin("events.manage") || !editorOpen || saving || mutation || (selectedId && !events.some(event => event.id === selectedId))) return;
   if (!window.cloudinary) {
     notify("Görsel yükleme servisine ulaşılamadı. Lütfen tekrar deneyin.");
     return;
@@ -508,7 +530,7 @@ function upload(single) {
       },
       (error, result) => {
         // A late upload belongs to the event where it started, never the newly selected event.
-        if (!authenticated || authGeneration !== origin.authGeneration || (revisions.get(origin.key) || 0) !== origin.revision || (origin.id && !events.some(event => event.id === origin.id))) { finish(); return; }
+        if (!authenticated || !canAdmin("events.manage") || authGeneration !== origin.authGeneration || (revisions.get(origin.key) || 0) !== origin.revision || (origin.id && !events.some(event => event.id === origin.id))) { finish(); return; }
         if (error) {
           finish();
           notify("Yükleme başarısız. Tamamlanan görseller taslağınızda korundu; kalanları tekrar yükleyebilirsiniz.");
@@ -546,59 +568,97 @@ function upload(single) {
 }
 $("posterBtn").onclick = () => upload(true);
 $("photosBtn").onclick = () => upload(false);
-async function show() {
+async function show(session) {
   const generation = authGeneration;
-  const loaded = await load();
-  if (!loaded || generation !== authGeneration) return;
+  if (!setAdminSession(session)) throw new Error("Yönetici oturumu doğrulanamadı. Tekrar giriş yapın.");
   authenticated = true;
   $("login").classList.add("hidden");
   $("app").classList.remove("hidden");
-  const stored = readDrafts();
-  if (stored?.active) {
-    const id = stored.active === "new" ? "" : stored.active.slice(6);
-    edit(id ? events.find(event => event.id === id) || drafts.get(keyFor(id))?.base : null);
-  } else if (drafts.size) {
-    status("Kaydedilmemiş etkinlik taslaklarınız korunuyor. İlgili etkinlikte Düzenle ile devam edebilirsiniz.");
-  }
-  persistDrafts();
+  $("adminSessionName").textContent = session.name || session.username;
+  $("adminSessionRole").textContent = session.role === "owner" ? "Baş admin" : session.role === "treasurer" ? "Sayman · salt okunur" : "Yetkili yönetici";
+  const stored = canAdmin("events.manage") ? readDrafts() : null;
+  if (!canAdmin("events.manage")) { try { sessionStorage.removeItem(DRAFT_KEY); } catch {} }
+  draftNotice();
   announceAdminReady();
+  const needsCatalog = ["events.view", "registrations.view", "tickets.view", "raffles.view", "attendance.view"].some(canAdmin);
+  if (!needsCatalog) { announceAdminEvents([]); return; }
+  restoringDrafts = true;
+  try {
+    const loaded = await load();
+    if (!loaded || generation !== authGeneration || !authenticated) return;
+    if (canAdmin("events.manage")) {
+      if (stored?.active) {
+        const id = stored.active === "new" ? "" : stored.active.slice(6);
+        const recovered = id ? events.find(event => event.id === id) || drafts.get(keyFor(id))?.base : null;
+        if (!id || recovered) edit(recovered);
+      } else if (drafts.size) status("Kaydedilmemiş etkinlik taslaklarınız korunuyor. İlgili etkinlikte Düzenle ile devam edebilirsiniz.");
+      persistDrafts();
+    }
+  } catch (error) {
+    if (generation === authGeneration && authenticated) status(error.message, true);
+  } finally {
+    if (generation === authGeneration && authenticated) { restoringDrafts = false; persistDrafts(); }
+  }
 }
 $("loginBtn").onclick = async () => {
-  if (loggingIn) return;
+  if (loggingIn || loggingOut) return;
+  const username = $("username").value.trim(), password = $("password").value;
+  if (!username || !password) { $("loginError").textContent = "Kullanıcı adınızı ve şifrenizi girin."; return; }
   loggingIn = true;
-  // Invalidate the initial cookie probe before submitting, so its late 401 cannot
-  // erase this password or cancel the new authenticated catalog request.
   const generation = ++authGeneration;
   loadVersion++;
   $("loginBtn").disabled = true;
+  $("username").disabled = true;
   $("password").disabled = true;
   $("loginError").textContent = "";
   try {
-    await api("/api/events?action=auth", {
-      method: "POST",
-      headers: { "x-admin-password": $("password").value },
-    });
+    const data = await api("/api/admin-auth?action=login", { method: "POST", body: JSON.stringify({ username, password }) });
     if (generation !== authGeneration) return;
+    if (!data.session) throw new Error("Yönetici oturumu doğrulanamadı. Tekrar giriş yapın.");
     $("password").value = "";
-    await show();
-  } catch (e) {
-    $("loginError").textContent = e.message;
+    await show(data.session);
+  } catch (error) {
+    if (generation === authGeneration) $("loginError").textContent = error.message;
   } finally {
     loggingIn = false;
     $("loginBtn").disabled = false;
+    $("username").disabled = false;
     $("password").disabled = false;
   }
 };
-$("password").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("loginBtn").click();
-});
-$("adminLogout").onclick = async () => {
+for (const id of ["username", "password"]) $(id).addEventListener("keydown", event => { if (event.key === "Enter") $("loginBtn").click(); });
+async function logout() {
+  if (loggingOut) return;
+  loggingOut = true;
+  // Clear all private UI immediately, even when the network is slow.
+  document.dispatchEvent(new Event("admin-logout"));
+  const generation = authGeneration;
+  $("loginBtn").disabled = true;
+  $("adminLogoutRetry").hidden = true;
+  $("loginError").textContent = "Oturum kapatılıyor…";
   try {
-    await api("/api/events?action=logout", { method: "POST" });
-    document.dispatchEvent(new Event("admin-logout"));
-    location.reload();
-  } catch (error) { status(error.message, true); }
-};
+    await api("/api/admin-auth?action=logout", { method: "POST" });
+    if (generation === authGeneration) $("loginError").textContent = "";
+  } catch (error) {
+    if (generation === authGeneration) {
+      $("loginError").textContent = `Panel verileri temizlendi. Oturumu kapatmak için tekrar deneyin: ${error.message}`;
+      $("adminLogoutRetry").hidden = false;
+    }
+  } finally { loggingOut = false; $("loginBtn").disabled = false; }
+}
+$("adminLogout").onclick = logout;
+$("adminLogoutRetry").onclick = logout;
+async function probeSession() {
+  const generation = authGeneration;
+  try {
+    const data = await api("/api/admin-auth?action=session");
+    if (generation !== authGeneration || loggingIn) return;
+    if (data.session) await show(data.session);
+    else document.dispatchEvent(new CustomEvent("admin-logout", { detail: { reason: "initial-session-probe" } }));
+  } catch (error) {
+    if (generation === authGeneration && !loggingIn) $("loginError").textContent = error.message;
+  }
+}
 try { sessionStorage.removeItem("ercupsa_admin_password"); } catch {}
 document.addEventListener("admin-logout", clearPrivateDrafts);
 window.addEventListener("beforeunload", event => {
@@ -608,4 +668,4 @@ window.addEventListener("beforeunload", event => {
   event.returnValue = "";
 });
 document.addEventListener("registration-config-saved", () => load().catch(error => status(error.message, true)));
-show().catch(() => {});
+probeSession();
