@@ -4,6 +4,7 @@ let events = [],
   poster = "",
   selectedId = "";
 let authenticated = false, editorOpen = false, saving = false, restored = false, loggingIn = false, authGeneration = 0, loadVersion = 0;
+let mutation = null, operationVersion = 0, trashVersion = 0, trashLoading = false, trashEntries = [];
 let savedValue = null;
 const drafts = new Map(), revisions = new Map(), uploads = new Set();
 const DRAFT_KEY = "ercupsa_event_drafts_v1";
@@ -21,7 +22,7 @@ const editorKey = () => keyFor(selectedId);
 function eventValue(event = {}, id = "") {
   return {
     ...Object.fromEntries(fields.map((field) => [field, typeof event[field] === "string" ? event[field] : ""])),
-    id, published: event.published === true,
+    id, published: event.published === true, revision: typeof event.revision === "string" ? event.revision : "",
     poster: event.poster || "", images: structuredClone(event.images || []),
   };
 }
@@ -30,6 +31,7 @@ function same(left, right) { return JSON.stringify(left) === JSON.stringify(righ
 function validValue(value, id) {
   if (!value || typeof value !== "object" || value.id !== id || typeof value.published !== "boolean") return false;
   if (fields.some(field => typeof value[field] !== "string" || value[field].length > 50000)) return false;
+  if (value.revision !== undefined && (typeof value.revision !== "string" || value.revision.length > 200)) return false;
   if (typeof value.poster !== "string" || value.poster.length > 2048 || (value.poster && !safeImage(value.poster))) return false;
   if (!Array.isArray(value.images) || value.images.length > 100) return false;
   return value.images.every(photo => photo && typeof photo.url === "string" && photo.url.length <= 2048 && safeImage(photo.url) &&
@@ -44,10 +46,9 @@ function readDrafts() {
     for (const draft of stored.drafts) {
       const id = draft?.key === "new" ? "" : draft?.key?.startsWith("event:") ? draft.key.slice(6) : null;
       if (id === null || (id && !/^[a-zA-Z0-9_-]{1,100}$/.test(id)) || !validValue(draft.value, id) || !validValue(draft.base, id)) continue;
-      if (id && !events.some(event => event.id === id)) continue;
       if (!same(draft.value, draft.base)) drafts.set(draft.key, { value: eventValue(draft.value, id), base: eventValue(draft.base, id) });
     }
-    return typeof stored.active === "string" && (stored.active === "new" || events.some(event => keyFor(event.id) === stored.active)) ? stored : null;
+    return typeof stored.active === "string" && (stored.active === "new" || drafts.has(stored.active) || events.some(event => keyFor(event.id) === stored.active)) ? stored : null;
   } catch {
     try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
     return null;
@@ -74,16 +75,21 @@ function draftNotice() {
   const dirty = editorOpen && drafts.has(editorKey());
   const pending = editorOpen && [...uploads].some(upload => upload.key === editorKey());
   const latest = selectedId && events.find(event => event.id === selectedId);
+  const missing = editorOpen && selectedId && !latest;
   const remoteChanged = dirty && latest && !same(savedValue, eventValue(latest, selectedId));
-  $("eventDraftNotice").hidden = !dirty && !pending;
-  $("eventDraftNotice").textContent = pending ? "Görsel yükleme sürüyor. Yükleme tamamlandığında etkinliği kaydedebilirsiniz." :
+  $("eventDraftNotice").hidden = !dirty && !pending && !missing;
+  $("eventDraftNotice").textContent = missing ? "Bu etkinlik sunucuda bulunmuyor veya silinmiş. Yerel taslağınız korunuyor; yeniden oluşturulmasını önlemek için kaydetme kapalı. Silinen etkinliklerden aynı kaydı geri alın." : pending ? "Görsel yükleme sürüyor. Yükleme tamamlandığında etkinliği kaydedebilirsiniz." :
     `${restored ? "Kaydedilmemiş taslağınız geri yüklendi. " : "Kaydedilmemiş değişiklikleriniz var. "}Etkinlik değiştirirken, kapatırken ve bu sekmeyi yenilerken korunur.${remoteChanged ? " Sunucudaki etkinlik bu sırada değişmiş; kaydetmeden önce güncel etkinliği kontrol edin." : ""}`;
   $("eventDiscard").hidden = !dirty;
   $("eventDiscard").textContent = selectedId ? "Kaydedilmiş etkinliğe dön" : "Yeni taslağı sil";
-  $("eventDiscard").disabled = saving;
-  $("saveBtn").disabled = saving || pending;
-  [...fields, "published", "posterBtn", "photosBtn", "newBtn", "cancelBtn"].forEach(id => { $(id).disabled = saving; });
-  $("photoThumbs").querySelectorAll("button").forEach(button => { button.disabled = saving; });
+  const busy = saving || !!mutation;
+  $("eventDiscard").disabled = busy;
+  $("saveBtn").disabled = busy || pending || !!missing;
+  [...fields, "published", "posterBtn", "photosBtn", "newBtn", "cancelBtn", "previewBtn"].forEach(id => { $(id).disabled = busy; });
+  $("photoThumbs").querySelectorAll("button").forEach(button => { button.disabled = busy; });
+  $("eventsList").querySelectorAll('button[data-action="edit"], button[data-action="publish"], button[data-action="delete"]').forEach(button => { button.disabled = busy; });
+  $("eventTrashList").querySelectorAll("button").forEach(button => { button.disabled = busy; });
+  $("eventTrashReload").disabled = busy || trashLoading;
 }
 function forget(key) {
   drafts.delete(key);
@@ -94,6 +100,11 @@ function clearPrivateDrafts(event) {
   authenticated = false;
   authGeneration++;
   loadVersion++;
+  operationVersion++; trashVersion++;
+  saving = false; mutation = null; trashLoading = false; trashEntries = [];
+  events = []; $("eventsList").replaceChildren();
+  $("eventTrashList").replaceChildren(); $("eventTrashMessage").textContent = "";
+  $("eventTrashPanel").hidden = true; $("eventTrashToggle").setAttribute("aria-expanded", "false");
   drafts.clear(); revisions.clear(); uploads.clear();
   try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
   reset();
@@ -112,7 +123,9 @@ async function api(path, opts = {}) {
       document.dispatchEvent(new CustomEvent("admin-logout", { detail: { reason: !authenticated && !loggingIn ? "initial-session-probe" : "session-expired" } }));
       $("loginError").textContent = data.error || "Yönetici oturumunuz sona erdi. Tekrar giriş yapın.";
     }
-    throw new Error(data.error || "İşlem tamamlanamadı.");
+    const error = new Error(data.error || "İşlem tamamlanamadı.");
+    error.status = response.status;
+    throw error;
   }
   return data;
 }
@@ -129,11 +142,10 @@ async function load() {
   const d = await api("/api/events?admin=true");
   if (version !== loadVersion) return false;
   events = d.events;
-  for (const key of drafts.keys()) if (key !== "new" && !events.some(event => keyFor(event.id) === key)) forget(key);
   if (editorOpen && selectedId && !events.some(event => event.id === selectedId)) {
-    reset(); $("formWrap").classList.add("hidden");
-    notify("Bu etkinlik artık listede bulunmuyor. Düzenleme kapatıldı.");
-  } else if (editorOpen && selectedId && !drafts.has(editorKey())) {
+    if (drafts.has(editorKey())) notify("Etkinlik artık listede bulunmuyor. Yerel değişiklikleriniz korundu; Silinen etkinlikler bölümünden geri alabilirsiniz.");
+    else { reset(); $("formWrap").classList.add("hidden"); notify("Bu etkinlik artık listede bulunmuyor. Silinen etkinlikler bölümünü kontrol edin."); }
+  } else if (editorOpen && selectedId && !drafts.has(editorKey()) && ![...uploads].some(upload => upload.key === editorKey())) {
     // A clean editor follows refreshed saved data; an unsaved draft is never overwritten.
     savedValue = eventValue(events.find(event => event.id === selectedId), selectedId);
     fillEditor(savedValue);
@@ -167,6 +179,86 @@ function render() {
       )
       .join("") || "<p>Etkinlik bulunamadı.</p>";
 }
+function renderTrash() {
+  $("eventTrashList").innerHTML = trashEntries.map(item => {
+    const event = item.event || {}, partial = item.source === "registrations";
+    return `<article class="event-trash-item"><div><h4>${escape(event.title || "İsimsiz etkinlik")}</h4><p>${escape(event.date || "Tarih bulunamadı")} ${escape(event.time || "")} · ${escape(event.location || "Konum bulunamadı")}</p><p>${partial ? "Eski silinmiş kayıt: başlık, tarih ve konum kayıt arşivinden alınabilir. Afiş, açıklama ve galeri saklanmamış olabilir; geri aldıktan sonra tamamlayın." : "Etkinliğin afişi, açıklaması, fotoğrafları ve form ayarları saklanıyor."}</p><small>Etkinlik kimliği: ${escape(item.id)}</small></div><button type="button" data-restore-id="${escape(item.id)}">Taslak olarak geri al</button></article>`;
+  }).join("");
+  draftNotice();
+}
+async function loadTrash() {
+  if (!authenticated) return;
+  const generation = authGeneration, version = ++trashVersion;
+  trashLoading = true;
+  $("eventTrashMessage").textContent = "Silinen etkinlikler yükleniyor…";
+  draftNotice();
+  try {
+    const data = await api("/api/events?action=trash");
+    if (generation !== authGeneration || version !== trashVersion || !authenticated) return;
+    const seen = new Set();
+    trashEntries = [...(Array.isArray(data.trash) ? data.trash : []), ...(Array.isArray(data.recoverable) ? data.recoverable : [])].filter(item => {
+      if (!item || typeof item.id !== "string" || !item.event || seen.has(item.id)) return false;
+      seen.add(item.id); return true;
+    });
+    renderTrash();
+    $("eventTrashMessage").textContent = trashEntries.length ? `${trashEntries.length} etkinlik geri alınabilir.` : "Geri alınabilecek silinmiş etkinlik bulunamadı. Eski yöntemle silinen bir etkinliğin saklanmış form kaydı da yoksa bu panelden kurtarılamaz.";
+  } catch (error) {
+    if (generation === authGeneration && version === trashVersion && authenticated) $("eventTrashMessage").textContent = error.message;
+  } finally {
+    if (generation === authGeneration && version === trashVersion) { trashLoading = false; draftNotice(); }
+  }
+}
+function beginMutation(id) {
+  if (!authenticated || saving || mutation) return null;
+  const operation = { id, generation: authGeneration, version: ++operationVersion };
+  mutation = operation; draftNotice(); return operation;
+}
+function activeOperation(operation) {
+  return authenticated && operation.generation === authGeneration && operation.version === operationVersion;
+}
+async function refreshConflict(error, operation) {
+  if (!activeOperation(operation)) return;
+  if ([404, 409].includes(error.status)) {
+    await load().catch(() => {});
+    if (!activeOperation(operation)) return;
+    if (!$("eventTrashPanel").hidden) await loadTrash();
+  }
+  if (activeOperation(operation)) notify(error.message);
+}
+$("eventTrashToggle").onclick = () => {
+  if (!authenticated) return;
+  const opening = $("eventTrashPanel").hidden;
+  $("eventTrashPanel").hidden = !opening;
+  $("eventTrashToggle").setAttribute("aria-expanded", String(opening));
+  if (opening) loadTrash();
+};
+$("eventTrashReload").onclick = () => { if (!saving && !mutation) loadTrash(); };
+$("eventTrashList").addEventListener("click", async event => {
+  const button = event.target.closest("button[data-restore-id]");
+  if (!button) return;
+  const item = trashEntries.find(item => item.id === button.dataset.restoreId);
+  if (!item || !confirm(`“${item.event.title || "İsimsiz etkinlik"}” aynı bağlantıyla taslak olarak geri alınsın mı? Kayıtları ve biletleri korunur.`)) return;
+  const operation = beginMutation(item.id);
+  if (!operation) return;
+  $("eventTrashMessage").textContent = "Etkinlik geri alınıyor…";
+  try {
+    await api("/api/events?action=restore", { method: "POST", body: JSON.stringify({ id: item.id, expectedRevision: item.revision }) });
+    if (!activeOperation(operation)) return;
+    await load();
+    if (!activeOperation(operation)) return;
+    await loadTrash();
+    if (!activeOperation(operation)) return;
+    mutation = null;
+    const recovered = events.find(event => event.id === item.id);
+    if (recovered) edit(recovered);
+    notify(item.source === "registrations" ? "Etkinlik aynı bağlantıyla taslak olarak geri alındı. Afiş ve açıklamayı kontrol edip tamamladıktan sonra yayınlayın." : "Etkinlik taslak olarak geri alındı. Bilgileri kontrol ettikten sonra yayınlayabilirsiniz.");
+  } catch (error) {
+    await refreshConflict(error, operation);
+    if (activeOperation(operation)) $("eventTrashMessage").textContent = error.message;
+  } finally {
+    if (activeOperation(operation)) { mutation = null; draftNotice(); }
+  }
+});
 function reset() {
   selectedId = "";
   fields.forEach((f) => ($(f).value = f === "category" ? "Etkinlik" : ""));
@@ -192,11 +284,12 @@ function fillEditor(value) {
   $("preview").hidden = true;
 }
 function edit(e) {
-  if (saving || !authenticated) return;
+  if (saving || mutation || !authenticated) return;
   remember();
   const id = e?.id || "", draft = drafts.get(keyFor(id));
-  savedValue = draft ? structuredClone(draft.base) : id ? eventValue(e, id) : emptyValue();
-  fillEditor(draft ? draft.value : savedValue);
+  const pendingUpload = [...uploads].find(upload => upload.key === keyFor(id));
+  savedValue = structuredClone(draft?.base || pendingUpload?.base || (id ? eventValue(e, id) : emptyValue()));
+  fillEditor(draft?.value || pendingUpload?.value || savedValue);
   editorOpen = true;
   restored = !!draft;
   $("formWrap").classList.remove("hidden");
@@ -221,6 +314,7 @@ function current() {
   return {
     ...e,
     id: selectedId || undefined,
+    revision: savedValue?.revision || "",
     published: $("published").checked,
     poster,
     images: photos,
@@ -231,11 +325,12 @@ $("eventsList").addEventListener("click", async (ev) => {
   if (!b) return;
   const e = events.find((e) => e.id === b.dataset.id);
   if (!e) return;
-  if (saving && ["edit", "publish", "delete"].includes(b.dataset.action)) {
-    notify("Etkinlik kaydediliyor. İşlem tamamlanınca devam edebilirsiniz.");
+  if ((saving || mutation) && ["edit", "publish", "delete"].includes(b.dataset.action)) {
+    notify("Etkinlik işlemi sürüyor. İşlem tamamlanınca devam edebilirsiniz.");
     return;
   }
   b.disabled = true;
+  let operation;
   try {
     if (b.dataset.action === "share") {
       const url = `https://ercupsa.com.tr/etkinlik/${encodeURIComponent(e.id)}`;
@@ -261,27 +356,39 @@ $("eventsList").addEventListener("click", async (ev) => {
     if (b.dataset.action === "ticket")
       document.dispatchEvent(new CustomEvent("ticket-event", { detail: e }));
     if (b.dataset.action === "publish") {
-      await api("/api/events", {
+      operation = beginMutation(e.id);
+      if (!operation) return;
+      await api("/api/events?action=publish", {
         method: "POST",
-        body: JSON.stringify({ event: { ...e, published: !e.published } }),
+        body: JSON.stringify({ id: e.id, published: !e.published, expectedRevision: e.revision }),
       });
+      if (!activeOperation(operation)) return;
       await load();
+      if (activeOperation(operation)) notify(e.published ? "Etkinlik yayından kaldırıldı." : "Etkinlik yayınlandı.");
     }
     if (
       b.dataset.action === "delete" &&
       confirm(
-        "Etkinlik silinecek. Bu işlem geri alınamaz. Bilet geçmişi korunur. Devam edilsin mi?",
+        `“${e.title}” etkinliği silinen etkinliklere taşınacak. Aynı bağlantıyla geri alabilirsiniz; form kayıtları ve bilet geçmişi korunur. Devam edilsin mi?`,
       )
     ) {
-      await api("/api/events?id=" + encodeURIComponent(e.id), {
+      operation = beginMutation(e.id);
+      if (!operation) return;
+      await api("/api/events?id=" + encodeURIComponent(e.id) + "&expectedRevision=" + encodeURIComponent(e.revision || ""), {
         method: "DELETE",
       });
+      if (!activeOperation(operation)) return;
       await load();
+      if (!activeOperation(operation)) return;
+      if (!$("eventTrashPanel").hidden) await loadTrash();
+      if (activeOperation(operation)) notify("Etkinlik silinen etkinliklere taşındı. Silinen etkinlikler bölümünden geri alabilirsiniz.");
     }
-  } catch (e) {
-    notify(e.message);
+  } catch (error) {
+    if (operation) await refreshConflict(error, operation);
+    else notify(error.message);
   } finally {
-    b.disabled = false;
+    if (operation && activeOperation(operation)) mutation = null;
+    if (!operation || activeOperation(operation)) { b.disabled = false; draftNotice(); }
   }
 });
 $("photoThumbs").addEventListener("click", (ev) => {
@@ -298,7 +405,7 @@ $("photoThumbs").addEventListener("click", (ev) => {
 $("eventSearch").addEventListener("input", render);
 $("newBtn").onclick = () => edit(null);
 $("cancelBtn").onclick = () => {
-  if (saving) return;
+  if (saving || mutation) return;
   remember();
   editorOpen = false;
   $("formWrap").classList.add("hidden");
@@ -319,10 +426,14 @@ if (!$("eventDiscard")) {
   $("previewBtn").after(discard);
 }
 $("eventDiscard").onclick = () => {
-  if (saving || !confirm("Bu etkinliğin kaydedilmemiş değişiklikleri silinsin mi?")) return;
+  if (saving || mutation || !confirm("Bu etkinliğin kaydedilmemiş değişiklikleri silinsin mi?")) return;
   const id = selectedId;
   forget(editorKey());
   const event = events.find(event => event.id === id);
+  if (id && !event) {
+    reset(); $("formWrap").classList.add("hidden"); persistDrafts();
+    notify("Silinmiş etkinliğin yerel taslağı kaldırıldı."); return;
+  }
   savedValue = id && event ? eventValue(event, id) : emptyValue();
   fillEditor(savedValue);
   restored = false;
@@ -338,33 +449,36 @@ $("previewBtn").onclick = () => {
   $("preview").hidden = false;
 };
 $("saveBtn").onclick = async () => {
-  if (saving || !authenticated || !editorOpen || [...uploads].some(upload => upload.key === editorKey())) return;
+  if (saving || mutation || !authenticated || !editorOpen || (selectedId && !events.some(event => event.id === selectedId)) || [...uploads].some(upload => upload.key === editorKey())) return;
   remember();
   const key = editorKey();
+  const operation = { id: selectedId, generation: authGeneration, version: ++operationVersion };
   saving = true;
   draftNotice();
   notify("Kaydediliyor…");
   try {
     const e = current();
+    const expectedRevision = selectedId ? savedValue?.revision || "" : undefined;
+    const { revision, ...event } = e;
     await api("/api/events", {
       method: "POST",
-      body: JSON.stringify({ event: e }),
+      body: JSON.stringify({ event, ...(selectedId ? { expectedRevision } : {}) }),
     });
+    if (!activeOperation(operation) || key !== editorKey()) return;
     forget(key);
     $("formWrap").classList.add("hidden");
     reset();
     persistDrafts();
     await load();
-    notify("Etkinlik kaydedildi.");
-  } catch (e) {
-    notify(e.message);
+    if (activeOperation(operation)) notify("Etkinlik kaydedildi.");
+  } catch (error) {
+    await refreshConflict(error, operation);
   } finally {
-    saving = false;
-    draftNotice();
+    if (activeOperation(operation)) { saving = false; draftNotice(); }
   }
 };
 function upload(single) {
-  if (!authenticated || !editorOpen || saving) return;
+  if (!authenticated || !editorOpen || saving || mutation || (selectedId && !events.some(event => event.id === selectedId))) return;
   if (!window.cloudinary) {
     notify("Görsel yükleme servisine ulaşılamadı. Lütfen tekrar deneyin.");
     return;
@@ -411,9 +525,9 @@ function upload(single) {
             height: Number.isInteger(result.info.height) ? result.info.height : 0,
           };
           const active = editorOpen && editorKey() === origin.key;
-          const cached = drafts.get(origin.key), latest = origin.id && events.find(event => event.id === origin.id);
-          const value = active ? eventValue(current(), selectedId) : structuredClone(cached?.value || (latest ? eventValue(latest, origin.id) : origin.value));
-          const base = active ? savedValue : cached?.base || (latest ? eventValue(latest, origin.id) : origin.base);
+          const cached = drafts.get(origin.key);
+          const value = active ? eventValue(current(), selectedId) : structuredClone(cached?.value || origin.value);
+          const base = active ? savedValue : cached?.base || origin.base;
           if (single) value.poster = p.url;
           else if (value.images.length < 100) value.images.push(p);
           origin.value = structuredClone(value);
@@ -442,7 +556,7 @@ async function show() {
   const stored = readDrafts();
   if (stored?.active) {
     const id = stored.active === "new" ? "" : stored.active.slice(6);
-    edit(id ? events.find(event => event.id === id) : null);
+    edit(id ? events.find(event => event.id === id) || drafts.get(keyFor(id))?.base : null);
   } else if (drafts.size) {
     status("Kaydedilmemiş etkinlik taslaklarınız korunuyor. İlgili etkinlikte Düzenle ile devam edebilirsiniz.");
   }

@@ -41,3 +41,15 @@ Yalnızca `https://www.instagram.com/p/.../` ve `https://www.instagram.com/reel/
 ## Etkinlik kayıt formları
 
 Site içi form hazırlama, sınıf ve telefon alanları, zorunlu sorular, özel dekontlar ve etkinlik karşılaştırması için [KAYIT-SISTEMI.md](KAYIT-SISTEMI.md) belgesini izleyin. Bu özellik mevcut Netlify kurulumuyla çalışır.
+
+## Silinen etkinlikleri geri alma
+
+**Etkinlikler → Silinen etkinlikler** bölümünden etkinliği **Taslak olarak geri al** düğmesiyle kurtarın. Etkinlik eski kimliğiyle geri döner; mevcut form bağlantıları, başvurular ve biletler aynı etkinliğe bağlı kalır. Bilgilerini kontrol ettikten sonra yayımlayın.
+
+Bu sürümden sonra silinen etkinliklerin afişi, açıklaması ve diğer bilgileri geri almak için korunur. Silme, etkinliği siteden ve normal panel listesinden kaldırır; kayıtlarını ve biletlerini silmez. Geri alma işlemi otomatik yayımlama yapmaz.
+
+Önceki sürümlerde kalıcı silinmiş etkinlikler için kayıt formunda korunan başlık, tarih, saat ve konumdan bir taslak kurtarılabilir. Afiş, kategori, açıklama ve galeri bu eski kopyada bulunmaz; geri aldıktan sonra düzenleyin. Kayıt formunda kullanılabilir bir etkinlik kopyası yoksa bu yöntemle kurtarma yapılamaz. Yeni bir etkinlik oluşturmak farklı bir kimlik üretir ve eski bağlantıları geri getirmez. GitHub veya Netlify dağıtımını eski sürüme döndürmek, Blobs'taki silinmiş içeriği geri getirmez.
+
+Panel, etkinliği açtığınız sürüm değişmişse eski düzenlemeyle üzerine yazmayı reddeder. Yayınlama düğmesi yalnızca yayın durumunu değiştirir. Yeni silme ve geri alma işlemleri zaman damgasıyla kayda geçer; bu kayıtlar önceki silme işlemini kimin yaptığını göstermez. Panel ortak yönetici parolası kullandığı için kişi bazında kimlik tespiti yapılmaz.
+
+Yetkisiz yönetici erişiminden şüpheleniyorsanız Netlify **Project configuration → Environment variables → ADMIN_PASSWORD** değerini güçlü, yeni bir parola ile değiştirin ve yeniden yayımlayın. Yeni parola sunucuda devreye girdiğinde önceki yönetici çerezleri de geçersiz olur. Parolayı yalnızca yetkili yöneticilerle paylaşın; sohbet veya GitHub dosyalarına yazmayın.

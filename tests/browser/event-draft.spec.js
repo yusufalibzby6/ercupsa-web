@@ -207,15 +207,20 @@ test("expired authentication and logout clear local event drafts without storing
   expect(await savedDrafts(page)).toBeNull();
 });
 
-test("deleted event drafts and invalid browser-stored media are not restored", async ({ page }) => {
+test("deleted event drafts are preserved without allowing save, while invalid browser-stored media is rejected", async ({ page }) => {
   const state = await fixture(page);
   await edit(page);
   await page.locator("#title").fill("Artık olmayan etkinliğin taslağı");
   state.events = state.events.filter(event => event.id !== "draft-first");
   await page.reload();
   await expect(page.locator("#app")).toBeVisible();
+  await expect(page.locator("#formWrap")).toBeVisible();
+  await expect(page.locator("#title")).toHaveValue("Artık olmayan etkinliğin taslağı");
+  await expect(page.locator("#eventDraftNotice")).toContainText("sunucuda bulunmuyor veya silinmiş");
+  await expect(page.locator("#saveBtn")).toBeDisabled();
+  expect((await savedDrafts(page)).drafts).toHaveLength(1);
+  await page.locator("#eventDiscard").click();
   await expect(page.locator("#formWrap")).toBeHidden();
-  expect(await savedDrafts(page)).toBeNull();
   await edit(page, "draft-second");
   await page.locator("#title").fill("Güvensiz görseli olan taslak");
   await page.evaluate(key => {

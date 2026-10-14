@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 const base = process.env.SITE_URL || "http://127.0.0.1:8888";
+if (!["localhost", "127.0.0.1", "[::1]"].includes(new URL(base).hostname))
+  throw Error("Bu test etkinlik oluşturup siler; yalnızca yerel geliştirme adresinde çalıştırılabilir.");
 if (!process.env.ADMIN_PASSWORD)
   throw Error("ADMIN_PASSWORD test ortamında gerekli.");
 let cookie = "";
@@ -40,22 +42,24 @@ const login = await request("/api/events?action=auth", {
 });
 cookie = login.headers.get("set-cookie").split(";")[0];
 assert.match(login.headers.get("set-cookie"), /HttpOnly/);
-const id = "smoke-" + crypto.randomUUID();
+let id = "", revision = "";
 let eventCreated = false, eventRemoved = false;
 try {
-  await request("/api/events", {
+  const created = await (await request("/api/events", {
     method: "POST",
     auth: true,
     data: {
       event: {
-        id,
         title: "Smoke test",
         date: "2026-10-02",
         published: false,
         images: [],
       },
     },
-  });
+  })).json();
+  id = created.event.id;
+  revision = created.event.revision;
+  assert.ok(id && revision);
   eventCreated = true;
   const designPath = "/api/ticket-design?event_id=" + id;
   await request(designPath, { status: 401 });
@@ -103,10 +107,11 @@ try {
     headers: { Origin: "https://other.test" },
     data: { event: { id, title: "invalid", date: "2026-10-02" } },
   });
-  await request("/api/events", {
+  const updated = await (await request("/api/events", {
     method: "POST",
     auth: true,
     data: {
+      expectedRevision: revision,
       event: {
         id,
         title: "Updated smoke",
@@ -115,20 +120,43 @@ try {
         images: [],
       },
     },
-  });
+  })).json();
+  revision = updated.event.revision;
   assert.ok(
     (await (await request("/api/events")).json()).events.some(
       (e) => e.id === id && e.title === "Updated smoke",
     ),
   );
-  await request("/api/events?id=" + id, { method: "DELETE", auth: true });
+  await request("/api/events?id=" + id + "&expectedRevision=" + encodeURIComponent(revision), { method: "DELETE", auth: true });
   eventRemoved = true;
   assert.equal((await (await request(designPath, { auth: true })).json()).design.dataUrl, stored.dataUrl);
+  await request("/api/events?action=trash", { status: 401 });
+  await request("/api/events?action=restore", { method: "POST", data: { id }, status: 401 });
+  const deleted = (await (await request("/api/events?action=trash", { auth: true })).json()).trash.find(event => event.id === id);
+  assert.equal(deleted.event.title, "Updated smoke");
+  const restored = await (await request("/api/events?action=restore", {
+    method: "POST", auth: true, data: { id, expectedRevision: deleted.revision },
+  })).json();
+  eventRemoved = false;
+  assert.equal(restored.event.id, id);
+  assert.equal(restored.event.title, "Updated smoke");
+  assert.equal(restored.event.published, false);
+  revision = restored.event.revision;
+  assert.ok(!(await (await request("/api/events")).json()).events.some(event => event.id === id));
+  assert.equal((await (await request(designPath, { auth: true })).json()).design.dataUrl, stored.dataUrl);
+  await request("/api/events", {
+    method: "POST", auth: true, status: 409,
+    data: { event: updated.event, expectedRevision: updated.event.revision },
+  });
+  await request("/api/events?id=" + id + "&expectedRevision=" + encodeURIComponent(revision), { method: "DELETE", auth: true });
+  eventRemoved = true;
 } finally {
-  await request("/api/ticket-design?event_id=" + id, { method: "DELETE", auth: true });
-  if (eventCreated && !eventRemoved)
-    await request("/api/events?id=" + id, { method: "DELETE", auth: true });
+  if (eventCreated) await request("/api/ticket-design?event_id=" + id, { method: "DELETE", auth: true });
+  if (eventCreated && !eventRemoved) {
+    const latest = (await (await request("/api/events?admin=true", { auth: true })).json()).events.find(event => event.id === id);
+    if (latest) await request("/api/events?id=" + id + "&expectedRevision=" + encodeURIComponent(latest.revision), { method: "DELETE", auth: true });
+  }
 }
 console.log(
-  "PASS: served pages/assets, admin cookie, event CRUD, draft privacy, URL/date validation, origin protection and persistent archived ticket artwork. Smoke event and artwork removed.",
+  "PASS: served pages/assets, admin cookie, revision-protected event CRUD, private same-ID trash/restore, stale-editor protection, draft privacy, URL/date validation, origin protection and persistent archived ticket artwork. Smoke event moved to trash and artwork removed.",
 );

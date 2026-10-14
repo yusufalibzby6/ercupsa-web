@@ -1,6 +1,8 @@
-import { getStore } from "@netlify/blobs";
+import { getStore as getBlobStore } from "@netlify/blobs";
 import { randomUUID, createHash } from "node:crypto";
-import { hydrateRegistrationFlags } from "../lib/registrations.mjs";
+import { hydrateRegistrationFlags, mapConcurrent, REGISTRATION_STORE, registrationStateKey } from "../lib/registrations.mjs";
+import { activeEvents, assertEventRevision, CONTENT_STORE, eventArray, eventRevision, EVENTS_KEY,
+  isDeletedEvent, operationHistory, projectEvent, registrationRecovery } from "../lib/event-state.mjs";
 import {
   guarded,
   response,
@@ -58,20 +60,11 @@ const seedEvents = [
   },
 ];
 
+const READ_JSON = { type: "json", consistency: "strong" };
 export async function readEvents() {
-  const events =
-    (await getStore("ercupsa-content").get("events.json", {
-      type: "json",
-      consistency: "strong",
-    })) || seedEvents;
-  return events.map((e) => ({
-    ...eventInput(e),
-    id: identifier(e.id),
-    createdAt: e.createdAt,
-    updatedAt: e.updatedAt,
-  }));
+  return activeEvents(eventArray(await getBlobStore(CONTENT_STORE).get(EVENTS_KEY, READ_JSON), seedEvents));
 }
-async function loginLimit(req) {
+async function loginLimit(req, getStore, now) {
   const key =
     "login/" +
     createHash("sha256")
@@ -83,11 +76,13 @@ async function loginLimit(req) {
       type: "json",
       consistency: "strong",
     });
-    const now = Date.now(),
+    const timestamp = now().getTime(),
       record =
-        snap?.data?.expires > now
+        snap?.data?.expires > timestamp
           ? snap.data
-          : { hits: 0, expires: now + 15 * 60 * 1000 };
+          : { hits: 0, expires: timestamp + 15 * 60 * 1000 };
+    if (snap && (typeof snap.etag !== "string" || !snap.etag))
+      fail(503, "Giriş doğrulanamadı. Lütfen tekrar deneyin.");
     if (record.hits >= 10)
       fail(429, "Çok fazla giriş denemesi. 15 dakika sonra tekrar deneyin.");
     record.hits++;
@@ -100,23 +95,41 @@ async function loginLimit(req) {
   }
   fail(429, "Lütfen biraz sonra tekrar deneyin.");
 }
-export default guarded(async (req) => {
+export function createEventsHandler({ getStore = getBlobStore, now = () => new Date(), uuid = randomUUID,
+  hydrate = hydrateRegistrationFlags } = {}) {
+return guarded(async (req) => {
   const url = new URL(req.url);
-  if (req.method === "POST" && url.searchParams.get("action") === "auth") {
-    await loginLimit(req);
+  const action = url.searchParams.get("action") || "";
+  if (req.method === "POST" && action === "auth") {
+    await loginLimit(req, getStore, now);
     return response({ ok: true }, 200, { "Set-Cookie": adminLogin(req) });
   }
-  if (req.method === "POST" && url.searchParams.get("action") === "logout")
+  if (req.method === "POST" && action === "logout")
     return response({ ok: true }, 200, {
       "Set-Cookie":
-        "ercupsa_admin=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
+        `ercupsa_admin=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${url.protocol === "https:" ? "; Secure" : ""}`,
     });
   if (req.method === "GET") {
-    if (url.searchParams.get("admin") === "true") requireAdmin(req);
-    const events = await hydrateRegistrationFlags(await readEvents(), getStore);
+    const adminList = url.searchParams.get("admin") === "true";
+    if (action === "trash" || adminList) requireAdmin(req);
+    if (action && action !== "trash") fail(400, "Geçersiz etkinlik işlemi.");
+    const saved = eventArray(await getStore(CONTENT_STORE).get(EVENTS_KEY, READ_JSON), seedEvents);
+    if (action === "trash") {
+      const trash = saved.filter(isDeletedEvent).map(record => ({ id: record.id, event: projectEvent(record.event, true),
+        revision: record.revision, deletedAt: record.deletedAt, source: "trash" }));
+      const known = new Set(saved.map(event => event.id));
+      const store = getStore(REGISTRATION_STORE), listed = await store.list({ prefix: "state/" });
+      const ids = [...new Set(listed.blobs.flatMap(({ key }) => {
+        const match = typeof key === "string" && key.match(/^state\/([A-Za-z0-9_-]{1,100})\.json$/);
+        return match && !known.has(match[1]) ? [match[1]] : [];
+      }))];
+      const recoverable = (await mapConcurrent(ids, async id => registrationRecovery(await store.get(registrationStateKey(id), READ_JSON), id))).filter(Boolean);
+      return response({ trash, recoverable });
+    }
+    const events = await hydrate(activeEvents(saved, adminList), getStore);
     return response({
       events:
-        url.searchParams.get("admin") === "true"
+        adminList
           ? events
           : events.filter((e) => e.published !== false),
     });
@@ -124,42 +137,71 @@ export default guarded(async (req) => {
   requireAdmin(req);
   if (!["POST", "DELETE"].includes(req.method))
     fail(405, "Desteklenmeyen işlem.");
-  const input = req.method === "POST" ? (await body(req)).event : null;
-  const normalized = input ? eventInput(input) : null;
-  const id = input?.id
+  if ((req.method === "DELETE" && action) || !["", "publish", "restore"].includes(action))
+    fail(400, "Geçersiz etkinlik işlemi.");
+  const input = req.method === "POST" ? await body(req) : null;
+  const save = req.method === "POST" && !action;
+  if (save && (!input.event || typeof input.event !== "object" || Array.isArray(input.event)))
+    fail(400, "Etkinlik gerekli.");
+  const normalized = save ? eventInput(input.event) : null;
+  const providedId = save && input.event.id != null;
+  const id = action
     ? identifier(input.id)
     : req.method === "DELETE"
       ? identifier(url.searchParams.get("id"))
-      : randomUUID();
-  const store = getStore("ercupsa-content");
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const snapshot = await store.getWithMetadata("events.json", {
-      type: "json",
-      consistency: "strong",
-    });
-    const events = snapshot?.data || structuredClone(seedEvents);
+      : providedId ? identifier(input.event.id) : identifier(uuid());
+  const expectedRevision = req.method === "DELETE" ? url.searchParams.get("expectedRevision") : input.expectedRevision;
+  if (action === "publish" && typeof input.published !== "boolean") fail(400, "Geçersiz yayın durumu.");
+  const store = getStore(CONTENT_STORE);
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const snapshot = await store.getWithMetadata(EVENTS_KEY, READ_JSON);
+    if (snapshot && (typeof snapshot.etag !== "string" || !snapshot.etag)) fail(503, "Etkinlik listesi doğrulanamadı.");
+    const events = eventArray(snapshot?.data, seedEvents);
     const index = events.findIndex((e) => e.id === id);
-    let event;
+    const current = index >= 0 ? events[index] : null;
+    const at = now().toISOString();
+    let event, type;
     if (req.method === "DELETE") {
-      if (index < 0) fail(404, "Etkinlik bulunamadı.");
-      events.splice(index, 1);
+      if (!current || isDeletedEvent(current)) fail(409, "Etkinlik silinmiş veya artık listede bulunmuyor. Listeyi yenileyin.");
+      assertEventRevision(expectedRevision, eventRevision(current));
+      events[index] = { id, deleted: true, event: projectEvent(current), deletedAt: at,
+        revision: identifier(uuid()), operations: operationHistory(current, "delete", at), lastOperation: { type: "delete", at } };
+    } else if (action === "restore") {
+      if (current && !isDeletedEvent(current)) fail(409, "Etkinlik zaten listede. Listeyi yenileyin.");
+      let retained;
+      if (current) {
+        assertEventRevision(expectedRevision, current.revision);
+        retained = current.event; type = "restore";
+      } else {
+        const recovery = registrationRecovery(await getStore(REGISTRATION_STORE).get(registrationStateKey(id), READ_JSON), id);
+        if (!recovery) fail(404, "Geri getirilebilecek etkinlik kaydı bulunamadı.");
+        assertEventRevision(expectedRevision, recovery.revision);
+        retained = recovery.event; type = "recover";
+      }
+      event = { ...projectEvent(retained), published: false, createdAt: retained.createdAt || at,
+        updatedAt: at, revision: identifier(uuid()), operations: operationHistory(current || retained, type, at), lastOperation: { type, at } };
+      if (index >= 0) events[index] = event; else events.unshift(event);
     } else {
-      event = {
-        ...normalized,
-        id,
-        createdAt:
-          index >= 0 ? events[index].createdAt : new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      if (action === "publish" || providedId) {
+        if (!current || isDeletedEvent(current)) fail(409, "Etkinlik silinmiş veya artık listede bulunmuyor. Listeyi yenileyin.");
+        assertEventRevision(expectedRevision, eventRevision(current));
+      } else if (current) fail(409, "Etkinlik kimliği zaten kullanılıyor. Yeniden deneyin.");
+      type = action === "publish" ? input.published ? "publish" : "unpublish" : current ? "update" : "create";
+      event = { ...(action === "publish" ? projectEvent(current) : normalized), id,
+        ...(action === "publish" ? { published: input.published } : {}),
+        createdAt: current?.createdAt || at, updatedAt: at, revision: identifier(uuid()),
+        operations: operationHistory(current, type, at), lastOperation: { type, at } };
       if (index >= 0) events[index] = event;
       else events.unshift(event);
     }
     const result = await store.setJSON(
-      "events.json",
+      EVENTS_KEY,
       events,
       snapshot ? { onlyIfMatch: snapshot.etag } : { onlyIfNew: true },
     );
-    if (result.modified) return response({ ok: true, event, events });
+    if (result.modified) return response({ ok: true, ...(event ? { event: projectEvent(event, true) } : {}), events: activeEvents(events, true) });
   }
   fail(409, "Başka bir düzenleme yapıldı. Lütfen yeniden deneyin.");
 });
+}
+export default createEventsHandler();

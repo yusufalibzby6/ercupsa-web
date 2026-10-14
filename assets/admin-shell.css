@@ -187,6 +187,18 @@
     .admin-workspace .registration-panel-heading, .admin-workspace .gate-panel-head { gap: 12px; }
     .admin-workspace .registration-stats strong, .admin-workspace .gate-stats strong { font-size: 24px; }
   }
+  .event-list-actions, .event-trash-heading { display: flex; align-items: center; gap: 12px; justify-content: space-between; flex-wrap: wrap; }
+  .event-list-actions #eventTrashToggle, .event-trash-panel button { padding: 10px 14px; border: 1px solid #dce1e8; border-radius: 12px; background: #fff; font-weight: 650; }
+  .event-trash-panel { margin-bottom: 28px; padding: 24px; background: #fff; border: 1px solid #dce1e8; border-radius: 22px; }
+  .event-trash-panel[hidden] { display: none; }
+  .event-trash-panel h3 { font-weight: 750; font-size: 19px; }
+  .event-trash-panel p { color: #687385; font-size: 13px; line-height: 1.65; margin-top: 7px; }
+  #eventTrashMessage { min-height: 1.6em; margin: 14px 0; }
+  #eventTrashList { display: grid; gap: 12px; }
+  .event-trash-item { display: flex; gap: 18px; justify-content: space-between; align-items: start; padding: 16px; border-radius: 14px; background: #f7f8fa; flex-wrap: wrap; }
+  .event-trash-item h4 { font-weight: 750; }
+  .event-trash-item small { display: block; color: #687385; overflow-wrap: anywhere; margin-top: 7px; }
+  .event-trash-item button { color: #a32428; flex-shrink: 0; }
   @media (prefers-reduced-motion: reduce) {
     .admin-nav-button, .admin-workspace button { transition: none; }
   }
