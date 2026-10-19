@@ -26,11 +26,13 @@ async function fixture(page, options = {}) {
     poolVersion, postErrors: [...(options.postErrors || [])], lookupErrors: [...(options.lookupErrors || [])],
     deleteErrors: [...(options.deleteErrors || [])], holdPool: null, poolHolds: {}, poolErrors: [],
     registrations: structuredClone(options.registrations || registrations), sourceQueries: [],
+    registrationCheckedInIds: options.registrationCheckedInIds || ['registration-a'],
     poolQueries: [], prizes: [], prizeErrors: [...(options.prizeErrors || [])], holdPrize: null, checkedInIds: ['a', 'c'], checkinPrevious: { a: 1, b: 0, c: 0 },
   };
   function selectedPool(eventId, checkedInOnly, checkinBonus, source = 'qr') {
-    if (source === 'registrations') return { source, participants: eventId === 'one' ? structuredClone(state.registrations) : [],
-      poolVersion: createHash('sha256').update(`${state.poolVersion}|registrations`).digest('hex'), checkedInOnly: false, checkinBonus: false };
+    if (source === 'registrations') return { source,
+      participants: eventId === 'one' ? state.registrations.filter(person => !checkedInOnly || state.registrationCheckedInIds.includes(person.id)).map(person => ({ ...person, ...(checkedInOnly ? { enteredAt: '2026-10-07T17:00:00Z' } : {}) })) : [],
+      poolVersion: createHash('sha256').update(`${state.poolVersion}|registrations${checkedInOnly ? '|checked-in' : ''}`).digest('hex'), checkedInOnly, checkinBonus: false };
     const people = eventId === 'one' ? state.participants.filter(p => !checkedInOnly || state.checkedInIds.includes(p.id)) : [];
     return {
       participants: people.map(person => checkinBonus ? { ...person, previous: state.checkinPrevious[person.id] || 0, weight: 1 + (state.checkinPrevious[person.id] || 0) } : { ...person }),
@@ -598,6 +600,114 @@ test('uncertain form draw restores its source and recovers the same saved result
   await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
   await expect(page.locator('[data-person=registration-b]')).not.toBeChecked();
   await expect(page.locator('#raffleSummary')).toContainText('1 kişi dahil · 1 toplam hak');
+});
+
+test('form entrance filter draws only checked personal tickets and keeps QR rules separate', async ({ page }) => {
+  const thirdRegistration = { id: 'registration-c', name: 'Fırat Demir', createdAt: '2026-10-07T10:00:00Z', previous: 0, weight: 1 };
+  const state = await fixture(page, {
+    registrations: [...registrations, thirdRegistration],
+    registrationCheckedInIds: ['registration-a', 'registration-c'],
+  });
+  await expect(page.locator('#raffleRegistrationFilters')).toBeHidden();
+  await page.locator('#raffleCheckedInOnly').check();
+  await page.locator('#raffleCheckinBonus').check();
+  await page.locator('#raffleSourceRegistrations').click();
+  await expect(page.locator('#raffleFormsAll')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(3);
+  const allPoolVersion = createHash('sha256').update(`${state.poolVersion}|registrations`).digest('hex');
+  await page.locator('#raffleFormsCheckedIn').click();
+  await expect(page.locator('#raffleFormsCheckedIn')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
+  await expect(page.locator('[data-person=registration-b]')).toHaveCount(0);
+  await expect(page.locator('#raffleSourceHelp')).toContainText('Hesap oluşturma veya bileti hesaba ekleme şartı yoktur');
+  await expect(page.locator('#raffleParticipants')).toContainText('Kapıda okutuldu');
+  await expect(page.locator('#raffleSummary')).toContainText('Kapıda bileti okutulanlar');
+  await expect(page.locator('#raffleEntrySetting')).toBeHidden();
+  await expect(page.locator('#raffleLoyaltyBonus')).not.toBeChecked();
+  await expect(page.locator('#raffleCheckinBonus')).not.toBeChecked();
+  expect(state.poolQueries.at(-1)).toEqual({ eventId: 'one', checkedInOnly: true, checkinBonus: false });
+  await page.locator('[data-person=registration-a]').uncheck();
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleFormsAll')).toBeDisabled();
+  await expect(page.locator('#raffleResults li')).toHaveCount(1, { timeout: 6500 });
+  expect(state.requests[0]).toMatchObject({ source: 'registrations', checkedInOnly: true, checkinBonus: false, loyaltyBonus: false, excluded: ['registration-a'] });
+  expect(state.requests[0].poolVersion).not.toBe(allPoolVersion);
+  expect(state.draws[0].participants.map(person => person.id)).toEqual(['registration-c']);
+  await expect(page.locator('#raffleResults')).toContainText('Fırat Demir');
+  await expect(page.locator('#raffleStageSource')).toHaveText('Form kayıtları · Kapıda bileti okutulanlar');
+  await expect(page.locator('#raffleHistory .raffle-mode')).toHaveText('Herkese eşit şans · Kapıda bileti okutulanlar');
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('[data-export-draw]').click();
+  const csv = await readFile(await (await downloadPromise).path(), 'utf8');
+  expect(csv).toContain('Form kayıtları · Kapıda bileti okutulanlar');
+  expect(csv).not.toContain('private-phone'); expect(csv).not.toContain('private-email');
+  await page.locator('#raffleSourceQr').click();
+  await expect(page.locator('#raffleCheckedInOnly')).toBeChecked();
+  await expect(page.locator('#raffleCheckinBonus')).toBeChecked();
+  await page.locator('#raffleSourceRegistrations').click();
+  await expect(page.locator('#raffleFormsCheckedIn')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
+  await page.locator('#raffleFormsAll').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(3);
+  await expect(page.locator('#raffleFormsAll')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#raffleSummary')).not.toContainText('Kapıda bileti okutulanlar');
+  // Historical eligibility remains attached to the saved outcome after changing the live filter.
+  await expect(page.locator('#raffleHistory .raffle-source-badge')).toHaveText('Form kayıtları · Kapıda bileti okutulanlar');
+});
+
+test('uncertain checked-form draw restores entrance eligibility and recovers without another POST', async ({ page }) => {
+  const state = await fixture(page, { postErrors: [{ status: 503, commit: true }] });
+  await page.locator('#raffleSourceRegistrations').click();
+  await page.locator('#raffleFormsCheckedIn').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(1);
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleStart')).toHaveText('Aynı çekiliş sonucunu yeniden sorgula');
+  const saved = await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)), pendingKey);
+  expect(saved).toMatchObject({ source: 'registrations', checkedInOnly: true, loyaltyBonus: false, checkinBonus: false });
+  expect(JSON.stringify(saved)).not.toContain('Defne');
+  await page.reload();
+  await page.locator('[data-tab=raffles]').click();
+  await expect(page.locator('#raffleFormsCheckedIn')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#raffleFormsAll')).toBeDisabled();
+  await expect(page.locator('#raffleStageSource')).toHaveText('Form kayıtları · Kapıda bileti okutulanlar');
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleResults li')).toHaveCount(1, { timeout: 6500 });
+  expect(state.requests).toHaveLength(1);
+  expect(state.lookups).toEqual([saved.requestId]);
+  await page.locator('#raffleRefresh').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(1);
+  await expect(page.locator('#raffleSummary')).toContainText('Kapıda bileti okutulanlar');
+  expect(state.poolQueries.at(-1)).toEqual({ eventId: 'one', checkedInOnly: true, checkinBonus: false });
+});
+
+test('checked-form recovery rejects an outcome from the unrestricted form pool', async ({ page }) => {
+  const state = await fixture(page, { postErrors: [{ status: 503, commit: true }] });
+  await page.locator('#raffleSourceRegistrations').click();
+  await page.locator('#raffleFormsCheckedIn').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(1);
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleStart')).toHaveText('Aynı çekiliş sonucunu yeniden sorgula');
+  state.draws[0].checkedInOnly = false;
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleStatus')).toContainText('Kaydedilmiş çekiliş sonucu doğrulanamadı', { timeout: 6500 });
+  await expect(page.locator('#raffleResults li')).toHaveCount(0);
+  await expect(page.locator('#raffleFormsAll')).toBeDisabled();
+  expect(state.requests).toHaveLength(1);
+  expect(await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)).checkedInOnly, pendingKey)).toBe(true);
+});
+
+test('an empty checked-form pool explains the entry requirement and all forms remain available', async ({ page }) => {
+  const state = await fixture(page, { registrationCheckedInIds: [] });
+  await page.locator('#raffleSourceRegistrations').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
+  await page.locator('#raffleFormsCheckedIn').click();
+  await expect(page.locator('#raffleParticipants')).toContainText('henüz kişisel bileti kapıda okutulmuş aktif form kaydı bulunmuyor');
+  await expect(page.locator('#raffleStart')).toBeDisabled();
+  await expect(page.locator('#raffleStatus')).toHaveAttribute('data-error', 'false');
+  await page.locator('#raffleFormsAll').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
+  await expect(page.locator('#raffleStart')).toBeEnabled();
+  expect(state.requests).toHaveLength(0);
 });
 
 test('a late QR pool cannot replace the immediately selected form pool', async ({ page }) => {

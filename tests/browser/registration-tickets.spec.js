@@ -191,6 +191,7 @@ test("issued registration offers guest link, addressed WhatsApp text and explici
   const whatsapp = new URL(await page.locator("#registrationTicketWhatsApp").getAttribute("href"));
   expect(whatsapp.pathname).toBe("/905551234567");
   expect(whatsapp.searchParams.get("text")).toContain(link);
+  expect(whatsapp.searchParams.get("text")).toContain("*Çekilişlere katılmak ve farklı ayrıcalıklardan yararlanmak için biletini hesabına ekle.*");
   for (const [id, extension] of [["registrationTicketImage", ".png"], ["registrationTicketPdf", ".pdf"]]) {
     const downloaded = page.waitForEvent("download");
     await page.locator(`#${id}`).click();

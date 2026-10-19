@@ -1,6 +1,7 @@
 import { getStore } from '@netlify/blobs';
 import { fail, identifier, HttpError } from './security.mjs';
 import { REGISTRATION_STORE, registrationStateKey, entryPrefix, mapConcurrent } from './registrations.mjs';
+import { paged } from './raffles.mjs';
 
 const READ_JSON = { type: 'json', consistency: 'strong' };
 const MAXIMUM_ENTRIES = 100000;
@@ -62,4 +63,61 @@ export async function readRegistrationParticipants(eventId, store = getStore({ n
   const migrated = await store.get(key, READ_JSON);
   if (migrated !== null && migrated !== undefined) return stateParticipants(migrated, eventId);
   return participants(entries, eventId);
+}
+
+// Door scans can precede an account claim, so eligibility is proved by the
+// actual scanned ticket and its durable form reservation, never by a matching
+// name, phone number or profile. Every public raffle row remains a form ID.
+export async function checkedInRegistrationParticipants(eventId, owners, entries, read, now = Date.now()) {
+  if (!Array.isArray(owners) || owners.length > MAXIMUM_ENTRIES ||
+    !Array.isArray(entries) || entries.length > MAXIMUM_ENTRIES) invalid();
+  const byReservation = new Map(), ownerIds = new Set();
+  const validIdentifier = value => {
+    try { return identifier(value); }
+    catch (error) { if (error instanceof HttpError) invalid(); throw error; }
+  };
+  for (const owner of owners) {
+    const person = participant({ ...owner, eventId }, eventId);
+    const batchId = validIdentifier(owner.batchId);
+    if (typeof owner.codeHash !== 'string' || !/^[a-f0-9]{64}$/.test(owner.codeHash)) invalid();
+    const key = `${batchId}/${owner.codeHash}`;
+    if (ownerIds.has(person.id) || byReservation.has(key)) invalid();
+    ownerIds.add(person.id); byReservation.set(key, person);
+  }
+  const scanned = new Map(), seenScans = new Set();
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry) ||
+      typeof entry.enteredAt !== 'string' || entry.enteredAt.length > 100 ||
+      !Number.isFinite(Date.parse(entry.enteredAt))) invalid();
+    const ticketId = validIdentifier(entry.ticketId);
+    if (seenScans.has(ticketId)) invalid();
+    seenScans.add(ticketId);
+    // A future timestamp cannot prove an entrance that has already happened.
+    if (Date.parse(entry.enteredAt) <= now) scanned.set(ticketId, entry.enteredAt);
+  }
+  const tickets = [], ticketIds = [...scanned.keys()];
+  for (let i = 0; i < ticketIds.length; i += 100) {
+    const ids = ticketIds.slice(i, i + 100).join(',');
+    try {
+      tickets.push(...await paged(`tickets?event_id=eq.${encodeURIComponent(eventId)}&id=in.(${ids})&select=id,event_id,batch_id,code_hash,revoked&order=id.asc`, read, { cursor: ['id'] }));
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 400) invalid();
+      throw error;
+    }
+  }
+  const included = new Map(), seenTickets = new Set();
+  for (const ticket of tickets) {
+    if (!ticket || typeof ticket !== 'object' || Array.isArray(ticket) ||
+      typeof ticket.revoked !== 'boolean' || typeof ticket.code_hash !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(ticket.code_hash)) invalid();
+    const ticketId = validIdentifier(ticket.id), batchId = validIdentifier(ticket.batch_id);
+    if (seenTickets.has(ticketId) || !scanned.has(ticketId)) invalid();
+    seenTickets.add(ticketId);
+    if (ticket.event_id !== eventId || ticket.revoked) continue;
+    const person = byReservation.get(`${batchId}/${ticket.code_hash}`);
+    if (!person) continue;
+    if (included.has(person.id)) invalid();
+    included.set(person.id, { ...person, enteredAt: scanned.get(ticketId) });
+  }
+  return [...included.values()].sort((a, b) => a.name.localeCompare(b.name, 'tr') || a.id.localeCompare(b.id));
 }

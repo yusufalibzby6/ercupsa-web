@@ -9,6 +9,6 @@ export function whatsAppTicketUrl(phone, { link, eventTitle = "Etkinlik" }) {
     if (!/^[1-9]\d{7,14}$/.test(digits)) digits = "";
   }
   const url = new URL(`https://wa.me/${digits}`);
-  url.searchParams.set("text", `${eventTitle} için kişisel biletin hazır. Bağlantıyı açıp giriş yapmadan görüntüleyebilir, fotoğraf veya PDF olarak indirebilirsin. Etkinlik girişinde QR kodunu göstermen yeterli.\n${link}`);
+  url.searchParams.set("text", `${eventTitle} için kişisel biletin hazır. Bağlantıyı açıp giriş yapmadan görüntüleyebilir, fotoğraf veya PDF olarak indirebilirsin. Etkinlik girişinde QR kodunu göstermen yeterli.\n\n*Çekilişlere katılmak ve farklı ayrıcalıklardan yararlanmak için biletini hesabına ekle.*\nBilet sayfasındaki “Biletimi hesabıma ekle” düğmesine dokunabilirsin.\n\n${link}`);
   return url.href;
 }

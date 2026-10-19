@@ -9,6 +9,8 @@ test("WhatsApp delivery normalizes Turkish/international numbers without attachi
     assert.equal(url.origin + url.pathname, "https://wa.me/905551234567");
     assert.ok(url.searchParams.get("text").endsWith(link));
     assert.ok(url.searchParams.get("text").includes("Bilim & sanat"));
+    assert.ok(url.searchParams.get("text").includes("*Çekilişlere katılmak ve farklı ayrıcalıklardan yararlanmak için biletini hesabına ekle.*"));
+    assert.ok(url.searchParams.get("text").includes("“Biletimi hesabıma ekle”"));
     assert.deepEqual([...url.searchParams.keys()], ["text"]);
   }
   assert.equal(new URL(whatsAppTicketUrl("+49 151 23456789", { link })).pathname, "/4915123456789");

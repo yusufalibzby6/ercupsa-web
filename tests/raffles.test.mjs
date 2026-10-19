@@ -665,10 +665,11 @@ test('source selection validates inputs, binds request hashes and retains legacy
   for (const source of ['', 'form', 'QR', null, false, {}, ['qr']]) {
     assert.throws(() => drawInput({ ...base, source }), error => error.code === 'RAFFLE_INVALID_SELECTION');
   }
-  for (const key of ['loyaltyBonus', 'checkedInOnly', 'checkinBonus']) {
+  for (const key of ['loyaltyBonus', 'checkinBonus']) {
     assert.throws(() => drawInput({ ...base, source: 'registrations', [key]: true }), error => error.code === 'RAFFLE_INVALID_SELECTION');
     assert.equal(drawInput({ ...base, source: 'registrations', [key]: false })[key], false);
   }
+  assert.equal(drawInput({ ...base, source: 'registrations', checkedInOnly: true }).checkedInOnly, true);
   const common = [{ id: 'same', name: 'Aynı', weight: 1, claimedAt: '2026-10-07', createdAt: '2026-10-07' }];
   assert.equal(poolVersion('current', common), poolVersion('current', common, { source: 'qr' }));
   assert.notEqual(poolVersion('current', common), poolVersion('current', common, { source: 'registrations' }));
@@ -677,10 +678,10 @@ test('source selection validates inputs, binds request hashes and retains legacy
 test('form source rejects QR-only options and malformed source without reading participant stores', async () => {
   const { state, store, request } = fixture();
   for (const source of ['', 'form', 'QR', 'null']) assert.equal((await request('GET', null, { source })).status, 400);
-  for (const key of ['checkedInOnly', 'checkinBonus']) {
+  for (const key of ['checkinBonus']) {
     assert.equal((await request('GET', null, { source: 'registrations', [key]: true })).status, 400);
   }
-  for (const key of ['loyaltyBonus', 'checkedInOnly', 'checkinBonus']) {
+  for (const key of ['loyaltyBonus', 'checkinBonus']) {
     const result = await request('POST', { ...formInput({ poolVersion: 'a'.repeat(64) }), [key]: true });
     assert.equal(result.status, 400); assert.equal(result.data.code, 'RAFFLE_INVALID_SELECTION');
   }

@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="assets/admin-raffles.css?v=form-raffles-1">
 <link rel="stylesheet" href="assets/admin-instagram.css?v=instagram-1">
 <link rel="stylesheet" href="assets/admin-accounts.css?v=accounts-1">
-<link rel="stylesheet" href="assets/gate.css?v=operations-1">
+<link rel="stylesheet" href="assets/gate.css?v=gate-owner-1">
 <link rel="stylesheet" href="assets/admin-shell.css?v=admin-roles-1">
 <link rel="stylesheet" href="assets/admin-users.css?v=admin-roles-1">
 <link rel="stylesheet" href="assets/admin-team.css?v=digital-team-1">
@@ -56,9 +56,10 @@
 <div class="raffle-heading"><h2 id="raffleHeading" class="text-2xl font-bold mb-4">Etkinlik çekilişleri</h2><button id="rafflePresentation" type="button">Seyirci ekranını aç</button></div>
 <p class="raffle-intro">Katılımcı kaynağını seçin, çekilişi hazırlayın ve kazananları birlikte keşfedin. Aynı kişi bir çekilişte yalnızca bir kez kazanabilir.</p>
 <div class="raffle-source-switch" role="group" aria-label="Çekiliş katılımcı kaynağı"><button id="raffleSourceQr" type="button" data-source="qr" aria-pressed="true"><i class="fa-solid fa-qrcode" aria-hidden="true"></i><span><strong>QR katılımcıları</strong><small>Biletini hesabına ekleyenler</small></span></button><button id="raffleSourceRegistrations" type="button" data-source="registrations" aria-pressed="false"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><span><strong>Form kayıtları</strong><small>Kayıt formunu dolduranlar</small></span></button></div><p id="raffleSourceHelp" class="raffle-source-help" aria-live="polite"></p>
+<div id="raffleRegistrationFilters" class="raffle-source-switch" role="group" aria-label="Form kaydı çekiliş kapsamı" hidden><button id="raffleFormsAll" type="button" data-checked-in="false" aria-pressed="true"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><span><strong>Tüm form kayıtları</strong><small>Formu dolduran herkes</small></span></button><button id="raffleFormsCheckedIn" type="button" data-checked-in="true" aria-pressed="false"><i class="fa-solid fa-door-open" aria-hidden="true"></i><span><strong>Kapıda bileti okutulanlar</strong><small>Form kaydı ve giriş kaydı olanlar</small></span></button></div>
 <div class="raffle-controls"><label>Etkinlik<select id="raffleEvent"></select></label><label>Kazanan sayısı<input id="raffleCount" type="number" value="1" min="1" max="200"></label><button id="raffleRefresh" type="button" class="border p-3 rounded-xl">Listeyi yenile</button></div>
 <div class="raffle-settings-grid"><div class="raffle-chance-setting"><label for="raffleLoyaltyBonus"><input id="raffleLoyaltyBonus" type="checkbox" role="switch" checked aria-describedby="raffleLoyaltyHelp"><span>Önceki katılımlar ek hak versin</span></label><p id="raffleLoyaltyHelp" aria-live="polite">Açık: Her kişi 1 hakla başlar; önceki her farklı etkinlik +1 hak verir.</p></div>
-<div class="raffle-chance-setting"><label for="raffleCheckedInOnly"><input id="raffleCheckedInOnly" type="checkbox" role="switch" aria-describedby="raffleEntryHelp"><span>Yalnızca etkinliğe giriş yapanlar katılsın</span></label><p id="raffleEntryHelp" aria-live="polite">Etkinliğin biletini hesabına ekleyen herkes katılır; giriş şartı aranmaz.</p></div>
+<div id="raffleEntrySetting" class="raffle-chance-setting"><label for="raffleCheckedInOnly"><input id="raffleCheckedInOnly" type="checkbox" role="switch" aria-describedby="raffleEntryHelp"><span>Yalnızca etkinliğe giriş yapanlar katılsın</span></label><p id="raffleEntryHelp" aria-live="polite">Etkinliğin biletini hesabına ekleyen herkes katılır; giriş şartı aranmaz.</p></div>
 <div class="raffle-chance-setting"><label for="raffleCheckinBonus"><input id="raffleCheckinBonus" type="checkbox" role="switch" aria-describedby="raffleCheckinBonusHelp"><span>Ek hakları gerçek girişlere göre hesapla</span></label><p id="raffleCheckinBonusHelp" aria-live="polite">Ek hak için önceki etkinliklerin hesaba eklenmiş biletleri sayılır. Ek hak kapalıyken herkes eşittir.</p></div>
 </div>
 <p id="raffleStatus" role="status" aria-live="polite"></p>
@@ -177,4 +178,4 @@
 <div class="registration-actions"><button id="registrationTicketImage" type="button" disabled>Fotoğraf indir</button><button id="registrationTicketPdf" type="button" disabled>PDF indir · tek bilet</button><button id="registrationTicketShare" type="button" disabled>PDF paylaş</button><button id="registrationTicketPrint" type="button" disabled>Bileti yazdır / PDF kaydet</button></div>
 <p class="registration-muted">Bağlantı, hesaba giriş gerektirmeden bileti ve indirme seçeneklerini açar. WhatsApp yönlendirmesi mesajı ve bağlantıyı hazırlar. PDF paylaş düğmesinde WhatsApp’ı ve alıcıyı siz seçersiniz. Bu bileti yalnızca sahibine iletin; kapıda aynı QR okutulur. Bilet göndermek otomatik olarak hesaba eklemez. Biletler bölümündeki A4’e 10’lu çıktı seçeneği de kullanılabilir.</p>
 </dialog>
-<script type="module" src="assets/admin.js?v=admin-roles-1"></script><script type="module" src="assets/admin-community.bundle.js?v=digital-team-1"></script></body></html>
+<script type="module" src="assets/admin.js?v=admin-roles-1"></script><script type="module" src="assets/admin-community.bundle.js?v=gate-owner-1"></script></body></html>

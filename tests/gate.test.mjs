@@ -44,6 +44,10 @@ function memory() {
       const record = structuredClone(records.get(key) || null);
       return hooks.metadata ? hooks.metadata(key, record) : record;
     },
+    async list({ prefix }) {
+      calls.push({ action: 'list', prefix });
+      return { blobs: [...records.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })) };
+    },
     async setJSON(key, data, options = {}) {
       calls.push({ action: 'setJSON', key, options });
       await hooks.beforeSet?.(key, data);
@@ -57,16 +61,16 @@ function memory() {
 }
 
 function fixture({ cap = 500 } = {}) {
-  const storage = memory(), adminStorage = memory();
+  const storage = memory(), adminStorage = memory(), registrationStorage = memory();
   const state = {
     now: new Date(), failRead: false, failEvents: false, reads: [],
     events: [{ id: 'event-one', title: 'Birinci etkinlik', date: '2026-10-07', time: '18:00', location: 'Fakülte' },
       { id: 'event-two', title: 'İkinci etkinlik', date: '2026-10-08', time: '19:00', location: 'Salon' }],
     tickets: [
-      { id: claimedId, event_id: 'event-one', code_hash: hash(claimedCode), claimed_by: alice, revoked: false },
-      { id: unclaimedId, event_id: 'event-one', code_hash: hash(unclaimedCode), claimed_by: null, revoked: false },
-      { id: wrongId, event_id: 'event-two', code_hash: hash(wrongCode), claimed_by: null, revoked: false },
-      { id: revokedId, event_id: 'event-one', code_hash: hash(revokedCode), claimed_by: null, revoked: true },
+      { id: claimedId, event_id: 'event-one', batch_id: 'claimed-batch', code_hash: hash(claimedCode), claimed_by: alice, revoked: false },
+      { id: unclaimedId, event_id: 'event-one', batch_id: 'unclaimed-batch', code_hash: hash(unclaimedCode), claimed_by: null, revoked: false },
+      { id: wrongId, event_id: 'event-two', batch_id: 'wrong-batch', code_hash: hash(wrongCode), claimed_by: null, revoked: false },
+      { id: revokedId, event_id: 'event-one', batch_id: 'revoked-batch', code_hash: hash(revokedCode), claimed_by: null, revoked: true },
     ],
     attendance: [{ user_id: alice, event_id: 'event-one', ticket_id: claimedId, created_at: '2026-10-07T10:00:00Z' }],
     profiles: [{ id: alice, name: 'Ada' }, { id: bob, name: 'Bora' }],
@@ -90,7 +94,7 @@ function fixture({ cap = 500 } = {}) {
     const limit = Number(url.searchParams.get('limit') || cap);
     return rows.slice(offset, offset + Math.min(cap, limit));
   };
-  const handler = createGateHandler({ read, events, store: () => storage, now: () => new Date(state.now), adminGetStore: () => adminStorage });
+  const handler = createGateHandler({ read, events, store: () => storage, now: () => new Date(state.now), adminGetStore: () => adminStorage, registrationStore: registrationStorage });
   const staffHandler = createStaffHandler({ events, store: () => storage, now: () => new Date(state.now), uuid: randomUUID, adminGetStore: () => adminStorage });
   const request = async (action = 'participants', { method = 'GET', eventId = 'event-one', input,
     auth = true, cookie, headers = {}, rawBody } = {}) => {
@@ -126,7 +130,11 @@ function fixture({ cap = 500 } = {}) {
     headers: { cookie, Origin: origin, 'Content-Type': 'application/json' },
     ...(method === 'POST' ? { body: JSON.stringify({ username: 'door-worker', password: 'synthetic-door-password', name: 'Görevli', eventIds: ['event-one'] }) } : {}) }));
   const session = cookie => staffHandler(new Request(origin + '/api/staff?action=session', { headers: { cookie } }));
-  return { storage, adminStorage, state, request, scan, manual, staffCookie, delegatedCookie, staff, session };
+  const formEntry = (overrides = {}) => ({ id: 'form-entry-one', eventId: 'event-one', name: 'Elif Form Sahibi', classYear: '3. Sınıf',
+    createdAt: '2026-10-07T12:00:00Z', phone: 'private-phone', answers: { confidential: 'private-answer' },
+    receipt: { key: 'private-receipt' }, ticket: { batchId: 'unclaimed-batch', code: unclaimedCode, status: 'issued' }, ...overrides });
+  const saveForm = (entries, deleted = []) => registrationStorage.setJSON('state/event-one.json', { version: 1, eventId: 'event-one', entries, deleted });
+  return { storage, adminStorage, registrationStorage, formEntry, saveForm, state, request, scan, manual, staffCookie, delegatedCookie, staff, session };
 }
 
 test('gate data and mutations require an operator; staff event scope is enforced on every route', async () => {
@@ -279,6 +287,78 @@ test('an unclaimed admission resolves to its account after a later ticket claim 
   const repeated = await manual(bob);
   assert.equal((await repeated.json()).status, 'already');
   assert.equal((await storage.get(entryKey('event-one'))).entries.length, 1);
+});
+
+test('personal form tickets show their registrant before account claim and preserve ownership when a different account claims them', async () => {
+  const { formEntry, saveForm, scan, state, request, storage, registrationStorage } = fixture({ cap: 1 });
+  await saveForm([formEntry()]);
+  const first = await (await scan(unclaimedCode)).json();
+  assert.equal(first.status, 'entered');
+  assert.deepEqual({ name: first.entry.name, userId: first.entry.userId, registrationId: first.entry.registrationId, classYear: first.entry.classYear },
+    { name: 'Elif Form Sahibi', userId: null, registrationId: 'form-entry-one', classYear: '3. Sınıf' });
+  state.tickets.find(ticket => ticket.id === unclaimedId).claimed_by = bob;
+  state.attendance.push({ user_id: bob, event_id: 'event-one', ticket_id: unclaimedId, created_at: '2026-10-07T19:00:00Z' });
+  const repeated = await (await scan(unclaimedCode)).json();
+  assert.equal(repeated.status, 'already');
+  assert.equal(repeated.entry.name, 'Elif Form Sahibi');
+  assert.equal(repeated.entry.accountName, 'Bora'); assert.equal(repeated.entry.userId, bob);
+  assert.equal(repeated.entry.enteredAt, first.entry.enteredAt);
+  const data = await (await request()).json();
+  const participant = data.participants.find(person => person.id === bob);
+  assert.equal(participant.name, 'Elif Form Sahibi'); assert.equal(participant.accountName, 'Bora');
+  assert.equal(data.entries[0].name, 'Elif Form Sahibi'); assert.equal(data.entries[0].accountName, 'Bora');
+  assert.equal(data.entries[0].classYear, '3. Sınıf');
+  assert.equal((await storage.get(entryKey('event-one'))).entries.length, 1);
+  assert.equal(registrationStorage.calls.filter(call => call.action === 'setJSON').length, 1);
+  const details = JSON.stringify({ first, repeated, data, stored: await storage.get(entryKey('event-one')) });
+  for (const secret of [unclaimedCode, hash(unclaimedCode), 'private-phone', 'private-answer', 'private-receipt']) assert.equal(details.includes(secret), false);
+});
+
+test('existing gate admissions are enriched from actual form ticket proof without changing physical entry records', async () => {
+  const { formEntry, saveForm, request, storage, state } = fixture();
+  await storage.setJSON(entryKey('event-one'), { entries: [{ ticketId: unclaimedId, userId: null, name: 'Bilet sahibi', enteredAt: state.now.toISOString(), method: 'qr' }] });
+  await saveForm([formEntry({ ticket: { batchId: 'unclaimed-batch', code: unclaimedCode, status: 'pending' } })]);
+  const before = structuredClone(await storage.get(entryKey('event-one')));
+  const data = await (await request()).json();
+  assert.equal(data.entries[0].name, 'Elif Form Sahibi');
+  assert.equal(data.entries[0].registrationId, 'form-entry-one');
+  assert.deepEqual(await storage.get(entryKey('event-one')), before);
+  assert.equal(storage.calls.filter(call => call.action === 'setJSON').length, 1);
+});
+
+test('form owners require both canonical batch and code hash proof; deleted registrations and unrelated form names never match', async () => {
+  for (const reservation of [
+    { batchId: 'another-batch', code: unclaimedCode, status: 'issued' },
+    { batchId: 'unclaimed-batch', code: claimedCode, status: 'issued' },
+    undefined,
+  ]) {
+    const { formEntry, saveForm, scan } = fixture();
+    await saveForm([formEntry({ name: 'Ada', ticket: reservation })]);
+    const result = await (await scan(unclaimedCode)).json();
+    assert.equal(result.entry.name, 'Bilet sahibi'); assert.equal(result.entry.registrationId, undefined);
+  }
+  const { formEntry, saveForm, scan, request } = fixture();
+  await saveForm([formEntry()]);
+  assert.equal((await (await scan(unclaimedCode)).json()).entry.name, 'Elif Form Sahibi');
+  await saveForm([], [{ id: 'form-entry-one' }]);
+  const repeated = await (await scan(unclaimedCode)).json();
+  assert.equal(repeated.status, 'already'); assert.equal(repeated.entry.registrationId, undefined);
+  assert.equal(repeated.entry.name, 'Bilet sahibi');
+  const entries = (await (await request()).json()).entries;
+  assert.equal(entries[0].registrationId, undefined); assert.equal(entries[0].name, 'Bilet sahibi');
+});
+
+test('event authorization precedes private registration reads and malformed owner state never admits a ticket', async () => {
+  const { saveForm, formEntry, registrationStorage, scan, staffCookie, storage, request } = fixture();
+  await saveForm([formEntry()]);
+  const cookie = await staffCookie(); registrationStorage.calls.length = 0;
+  assert.equal((await scan(wrongCode, { cookie, eventId: 'event-two' })).status, 403);
+  assert.equal((await request('participants', { cookie, eventId: 'event-two' })).status, 403);
+  assert.equal((await scan(unclaimedCode, { auth: false })).status, 401);
+  assert.equal(registrationStorage.calls.length, 0);
+  await saveForm([formEntry({ ticket: { batchId: 'unclaimed-batch', code: 'broken', status: 'issued' } })]);
+  assert.equal((await scan(unclaimedCode, { cookie })).status, 503);
+  assert.equal(storage.records.has(entryKey('event-one')), false);
 });
 
 test('lost admission write responses are recovered as duplicates and missing ETags fail closed', async () => {

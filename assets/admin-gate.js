@@ -46,11 +46,12 @@ function renderAttendance() {
   // An unclaimed paper ticket can be admitted too; keep it visible and counted.
   const rows = [...participants, ...entries.filter(entry => !claimedTickets.has(entry.ticketId)).map(entry => ({
     name: entry.name || 'Bilet sahibi', claimedAt: null, enteredAt: entry.enteredAt, ticketId: entry.ticketId,
+    classYear: entry.classYear, accountName: entry.accountName,
   }))];
   const matches = rows.filter(person => person.name.toLocaleLowerCase('tr').includes(query) &&
     (filter === 'all' || (filter === 'entered' ? Boolean(person.enteredAt) : !person.enteredAt)));
   $('attendanceListCount').textContent = `${matches.length} kişi${matches.length > visibleLimit ? ` · ilk ${visibleLimit} gösteriliyor` : ''}`;
-  $('attendancePeople').innerHTML = matches.slice(0, visibleLimit).map(person => `<tr><td>${escape(person.name)}</td><td>${person.claimedAt ? escape(time(person.claimedAt)) : 'Hesabına eklememiş'}</td><td>${person.enteredAt ? `<span>Giriş yaptı · ${escape(time(person.enteredAt))}</span>` : 'Henüz giriş yapmadı'}</td></tr>`).join('') || '<tr><td colspan="3" class="gate-muted">Bu filtrede katılımcı bulunamadı.</td></tr>';
+  $('attendancePeople').innerHTML = matches.slice(0, visibleLimit).map(person => `<tr><td><strong>${escape(person.name)}</strong>${person.classYear || person.accountName ? `<small class="block gate-muted">${escape([person.classYear, person.accountName ? `Hesap: ${person.accountName}` : ''].filter(Boolean).join(' · '))}</small>` : ''}</td><td>${person.claimedAt ? escape(time(person.claimedAt)) : 'Hesabına eklememiş'}</td><td>${person.enteredAt ? `<span>Giriş yaptı · ${escape(time(person.enteredAt))}</span>` : 'Henüz giriş yapmadı'}</td></tr>`).join('') || '<tr><td colspan="3" class="gate-muted">Bu filtrede katılımcı bulunamadı.</td></tr>';
   $('attendanceMore').hidden = matches.length <= visibleLimit;
 }
 async function loadAttendance({ quiet = false } = {}) {

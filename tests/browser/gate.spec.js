@@ -75,9 +75,10 @@ async function fixture(page, options = {}) {
     const error = state.scanErrors.shift();
     if (error) return route.fulfill({ status: error.status, json: { error: error.message } });
     const person = state.participants.find(person => person.id === (input.userId || 'a'));
-    const existing = state.entries.find(entry => entry.ticketId === person.ticketId);
-    const entry = existing || { ticketId: person.ticketId, userId: person.id, name: person.name, enteredAt: '2026-10-07T18:00:00Z', method: action === 'manual' ? 'manual' : 'qr' };
-    if (!existing) { state.entries.push(entry); person.enteredAt = entry.enteredAt; }
+    const ticketId = options.ticketOwner?.ticketId || person.ticketId;
+    const existing = state.entries.find(entry => entry.ticketId === ticketId);
+    const entry = existing || { ticketId, userId: person.id, name: person.name, ...options.ticketOwner, enteredAt: '2026-10-07T18:00:00Z', method: action === 'manual' ? 'manual' : 'qr' };
+    if (!existing) { state.entries.push(entry); if (!options.ticketOwner) person.enteredAt = entry.enteredAt; }
     return route.fulfill({ json: { status: existing ? 'already' : 'entered', entry, event: events[0] } });
   });
   return state;
@@ -117,6 +118,29 @@ test('wrong event and uncertain response explain failure without falsely claimin
   await expect(page.locator('#gateResult')).toHaveAttribute('data-state', 'error'); await expect(page.locator('#gateResultDetail')).toContainText('başka bir etkinliğe');
   await page.locator('#gateCodeSubmit').click(); await expect(page.locator('#gateResult')).toHaveAttribute('data-state', 'uncertain');
   await expect(page.locator('#gateResultDetail')).toContainText('aynı bileti yeniden okutun'); await expect(page.locator('#gateEntered')).toHaveText('0');
+});
+
+for (const claimed of [false, true]) test(`personal form ticket owner remains prominent on first and duplicate scans (${claimed ? 'different account name' : 'no site account'})`, async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const owner = 'Elif <img src=x onerror=alert(1)> Daş';
+  const state = await scanner(page, { ticketOwner: { ticketId: 'personal-ticket', userId: claimed ? 'a' : null,
+    name: owner, registrationId: 'registration-one', classYear: '3. Sınıf', ...(claimed ? { accountName: 'Ada Hesap Adı' } : {}) } });
+  await page.locator('#gateCode').fill(code); await page.locator('#gateCodeSubmit').click();
+  await expect(page.locator('#gateResultTitle')).toContainText('Giriş başarılı');
+  await expect(page.locator('#gateResultOwner')).toHaveText(owner);
+  await expect(page.locator('#gateResultDetail')).toContainText('3. Sınıf');
+  if (claimed) await expect(page.locator('#gateResultDetail')).toContainText('Hesap: Ada Hesap Adı');
+  await expect(page.locator('#gateResult img')).toHaveCount(0);
+  await expect(page.locator('#gateEntered')).toHaveText('1');
+  await page.locator('#gateCode').fill(code); await page.locator('#gateCodeSubmit').click();
+  await expect(page.locator('#gateResultTitle')).toContainText('daha önce kullanıldı');
+  await expect(page.locator('#gateResultOwner')).toHaveText(owner);
+  await expect(page.locator('#gateResultDetail')).toContainText('İkinci giriş kaydedilmedi');
+  expect(state.entries).toHaveLength(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.locator('#gateLogout').click();
+  await expect(page.locator('#gateResultOwner')).toBeHidden();
+  await expect(page.locator('#gateResultOwner')).toBeEmpty();
 });
 
 test('valid session with failed event fetch keeps a visible retry and admin logout clears both sessions', async ({ page }) => {
@@ -186,11 +210,13 @@ test('camera stop and event switching release every camera track', async ({ page
 
 test('admin overview stays lazy, compares registration/claim/entry and scopes staff creation and revocation', async ({ page }) => {
   const state = await fixture(page, { admin: true });
-  state.entries.push({ ticketId: 'paper-ticket', userId: null, name: 'Bilet sahibi', enteredAt: '2026-10-07T18:00:00Z', method: 'qr' });
+  state.entries.push({ ticketId: 'paper-ticket', userId: null, name: 'Formdaki Bilet Sahibi', classYear: '3. Sınıf', enteredAt: '2026-10-07T18:00:00Z', method: 'qr' });
   await page.goto('/admin.html'); await expect(page.locator('#app')).toBeVisible(); expect(state.gateGets).toHaveLength(0);
   await page.locator('[data-tab=attendance]').click(); await expect(page.locator('#attendanceRegistered')).toHaveText('7');
   await expect(page.locator('#attendanceClaimed')).toHaveText('2'); await expect(page.locator('#attendanceEntered')).toHaveText('1');
   await expect(page.locator('#attendancePeople img')).toHaveCount(0);
+  await expect(page.locator('#attendancePeople')).toContainText('Formdaki Bilet Sahibi');
+  await expect(page.locator('#attendancePeople')).toContainText('3. Sınıf');
   await expect(page.locator('#attendanceScanner')).toHaveAttribute('href', 'giris.html?event=one');
   await page.locator('#attendanceFilter').selectOption('entered'); await expect(page.locator('#attendancePeople tr')).toHaveCount(1); await expect(page.locator('#attendancePeople')).toContainText('Hesabına eklememiş');
   await page.locator('#staffName').fill('Elif'); await page.locator('#staffUsername').fill('invalid/name');

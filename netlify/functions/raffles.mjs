@@ -3,11 +3,13 @@ import { guarded, requirePermission, response, body, identifier, fail, HttpError
 import { db } from '../lib/database.mjs';
 import { readEvents } from './events.mjs';
 import { readCheckins } from '../lib/checkins.mjs';
-import { readRegistrationParticipants } from '../lib/raffle-registrations.mjs';
+import { readRegistrationParticipants, checkedInRegistrationParticipants } from '../lib/raffle-registrations.mjs';
+import { readRegistrationTicketOwners } from '../lib/registration-ticket-owners.mjs';
 import { paged, participantsFor, poolVersion, drawChances, drawInput, weightedWinners, savedDraw, drawHistory, saveDraw, deleteDraw, updatePrize, RaffleError, raffleFail } from '../lib/raffles.mjs';
 
 export function createHandler({ read = db, events = readEvents, checkins = readCheckins,
   registrations = readRegistrationParticipants,
+  ticketOwners = readRegistrationTicketOwners,
   store = () => getStore({ name: 'ercupsa-raffles', consistency: 'strong' }), adminStore } = {}) {
   const withSource = draw => draw ? { ...draw, source: draw.source ?? 'qr' } : null;
   async function history(storage, eventId) { return (await drawHistory(storage, eventId)).map(withSource); }
@@ -17,10 +19,13 @@ export function createHandler({ read = db, events = readEvents, checkins = readC
     const event = allEvents.find(e => e.id === eventId);
     if (!event) fail(404, 'Etkinlik bulunamadı.');
     if (source === 'registrations') {
-      if (checkedInOnly || checkinBonus) fail(400, 'Form kayıtları çekilişinde QR ve giriş seçenekleri kullanılamaz.');
-      const participants = await registrations(eventId);
+      if (checkinBonus) fail(400, 'Form kayıtları çekilişinde geçmiş etkinlik ek hakları kullanılamaz.');
+      const participants = checkedInOnly
+        ? await Promise.all([ticketOwners(eventId), checkins(eventId)])
+          .then(([owners, entries]) => checkedInRegistrationParticipants(eventId, owners, entries, read, now))
+        : await registrations(eventId);
       if (!Array.isArray(participants)) fail(503, 'Form kayıtları doğrulanamadı.');
-      const modes = { source, checkedInOnly: false, checkinBonus: false };
+      const modes = { source, checkedInOnly, checkinBonus: false };
       return { event, participants, ...modes, poolVersion: poolVersion(eventId, participants, modes) };
     }
     // attendance is written by claim_ticket when a QR ticket is added to an

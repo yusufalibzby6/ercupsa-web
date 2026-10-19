@@ -15,7 +15,10 @@ async function request(path, options = {}) {
   return data;
 }
 function message(id, text, error = false) { $(id).textContent = text; $(id).dataset.error = String(error); }
-function result(state, title, detail) { $('gateResult').dataset.state = state; $('gateResultTitle').textContent = title; $('gateResultDetail').textContent = detail; }
+function result(state, title, detail, ownerName = '') {
+  $('gateResult').dataset.state = state; $('gateResultTitle').textContent = title; $('gateResultDetail').textContent = detail;
+  $('gateResultOwner').textContent = ownerName; $('gateResultOwner').hidden = !ownerName;
+}
 function controls() {
   const disabled = !operator || !selectedId || busy;
   $('gateEvent').disabled = busy;
@@ -92,7 +95,7 @@ function renderPeople() {
   const query = $('gateSearch').value.trim().toLocaleLowerCase('tr');
   const matches = participants.filter(person => person.name.toLocaleLowerCase('tr').includes(query));
   $('gateSearchCount').textContent = participants.length ? `${matches.length} kişi gösteriliyor${matches.length > visibleLimit ? ` · ilk ${visibleLimit}` : ''}` : '';
-  $('gatePeople').innerHTML = matches.slice(0, visibleLimit).map(person => `<article class="gate-person"><div><strong>${escape(person.name)}</strong><small class="${person.enteredAt ? 'gate-entered' : ''}">${person.enteredAt ? `Giriş yaptı · ${escape(dateTime(person.enteredAt))}` : 'Biletini ekledi · Henüz giriş yapmadı'}</small></div>${person.enteredAt || !canManage() ? '' : `<button type="button" data-manual="${escape(person.id)}">Elle giriş</button>`}</article>`).join('') || '<p class="gate-muted">Katılımcı bulunamadı.</p>';
+  $('gatePeople').innerHTML = matches.slice(0, visibleLimit).map(person => `<article class="gate-person"><div><strong>${escape(person.name)}</strong>${person.classYear || person.accountName ? `<small>${escape([person.classYear, person.accountName ? `Hesap: ${person.accountName}` : ''].filter(Boolean).join(' · '))}</small>` : ''}<small class="${person.enteredAt ? 'gate-entered' : ''}">${person.enteredAt ? `Giriş yaptı · ${escape(dateTime(person.enteredAt))}` : 'Biletini ekledi · Henüz giriş yapmadı'}</small></div>${person.enteredAt || !canManage() ? '' : `<button type="button" data-manual="${escape(person.id)}">Elle giriş</button>`}</article>`).join('') || '<p class="gate-muted">Katılımcı bulunamadı.</p>';
   $('gateMore').hidden = matches.length <= visibleLimit; controls();
 }
 async function loadPeople({ quiet = false } = {}) {
@@ -123,7 +126,8 @@ async function scan(code, userId = null) {
     if (eventId !== selectedId || !operator) return;
     if (!['entered', 'already'].includes(data.status) || !data.entry) throw new Error('Giriş sonucu doğrulanamadı. Aynı bileti yeniden kontrol edin.');
     const name = data.entry.name || 'Bilet sahibi';
-    result(data.status, data.status === 'entered' ? 'Giriş başarılı ✓' : 'Bu bilet daha önce kullanıldı', `${name} · ${dateTime(data.entry.enteredAt)}${data.status === 'already' ? ' · İkinci giriş kaydedilmedi.' : ''}`);
+    const details = [data.entry.classYear, data.entry.accountName ? `Hesap: ${data.entry.accountName}` : '', dateTime(data.entry.enteredAt), data.status === 'already' ? 'İkinci giriş kaydedilmedi.' : ''].filter(Boolean).join(' · ');
+    result(data.status, data.status === 'entered' ? 'Giriş başarılı ✓' : 'Bu bilet daha önce kullanıldı', details, name);
     $('gateCode').value = '';
     $('gateCameraStart').textContent = 'Sonraki bileti okut';
     message('gateCameraStatus', 'Sonraki kişiyi okutmak için “Sonraki bileti okut” düğmesine basın.');

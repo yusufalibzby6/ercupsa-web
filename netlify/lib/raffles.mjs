@@ -99,7 +99,8 @@ export function participantsFor(event, events, attendance, profiles, now = Date.
 export function poolVersion(eventId, participants, options = {}) {
   const registrations = options.source === 'registrations';
   const snapshot = participants.map(p => ({ id: p.id, weight: p.weight, name: p.name,
-    ...(registrations ? { createdAt: p.createdAt } : { claimedAt: p.claimedAt }) }))
+    ...(registrations ? { createdAt: p.createdAt } : { claimedAt: p.claimedAt }),
+    ...(registrations && options.checkedInOnly ? { enteredAt: p.enteredAt } : {}) }))
     .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   // Default previews retain their exact legacy hashes. Entry-based modes bind
   // their rules even when a coincidentally identical set of people qualifies.
@@ -141,8 +142,8 @@ export function drawInput(input) {
       normalized[key] = input[key];
     }
     if (normalized.source === 'registrations' &&
-      ['loyaltyBonus', 'checkedInOnly', 'checkinBonus'].some(key => normalized[key] === true)) {
-      fail(400, 'Form kayıtları çekilişinde herkes eşit şansla katılır; QR ve giriş seçenekleri kullanılamaz.');
+      ['loyaltyBonus', 'checkinBonus'].some(key => normalized[key] === true)) {
+      fail(400, 'Form kayıtları çekilişinde herkes eşit şansla katılır; geçmiş etkinlik ek hakları kullanılamaz.');
     }
     // Preserve omitted fields for requests already saved before the toggle.
     // Omitting the version keeps the exact old hash for already-saved legacy
