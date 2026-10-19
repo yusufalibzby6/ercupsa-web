@@ -140,7 +140,7 @@ test("explicit issuance renders a custom QR ticket, copies and prints it, then r
   await preview.locator(".ticket-artwork").evaluate(image => image.decode());
   await preview.locator(".ticket-qr").evaluate(image => image.decode());
   await expect(preview).toHaveAttribute("data-code", code);
-  await expect(page.locator("#registrationTicketLink")).toHaveValue(new RegExp(`/biletler\\.html\\?ticket=${code}$`));
+  await expect(page.locator("#registrationTicketLink")).toHaveValue(new RegExp(`/bilet\\.html#${code}$`));
   await page.locator("#registrationTicketCopy").click();
   await expect(page.locator("#registrationTicketMessage")).toContainText("kopyalandı");
   expect(await page.evaluate(() => window.__copiedLinks)).toEqual([await page.locator("#registrationTicketLink").inputValue()]);
@@ -173,6 +173,53 @@ test("failed issuance preserves the form draft and retries the same registration
   await page.locator("#registrationTicketClose").click();
   await expect(page.locator('[data-registration-entry="new"]')).toContainText("Bilet verilmiş");
   await expect(page.locator("#registrationDescription")).toHaveValue("Korunacak form açıklaması");
+});
+
+test("issued registration offers guest link, addressed WhatsApp text and explicit PNG/PDF downloads", async ({ page }) => {
+  const state = await fixture(page);
+  await openAdmin(page);
+  const downloads = [];
+  page.on("download", download => downloads.push(download.suggestedFilename()));
+  await page.locator('[data-registration-ticket="existing"]').click();
+  await expect(page.locator("#registrationTicketPdf")).toBeEnabled();
+  // Preparing a ticket must never start a download or issue another ticket.
+  expect(downloads).toEqual([]);
+  expect(ticketRequests(state).map(request => request.method)).toEqual(["GET"]);
+  const link = await page.locator("#registrationTicketLink").inputValue();
+  expect(link).toMatch(new RegExp(`/bilet\\.html#${code}$`));
+  await expect(page.locator("#registrationTicketOpen")).toHaveAttribute("href", link);
+  const whatsapp = new URL(await page.locator("#registrationTicketWhatsApp").getAttribute("href"));
+  expect(whatsapp.pathname).toBe("/905551234567");
+  expect(whatsapp.searchParams.get("text")).toContain(link);
+  for (const [id, extension] of [["registrationTicketImage", ".png"], ["registrationTicketPdf", ".pdf"]]) {
+    const downloaded = page.waitForEvent("download");
+    await page.locator(`#${id}`).click();
+    expect((await downloaded).suggestedFilename()).toMatch(new RegExp(`\\${extension}$`));
+  }
+  await page.locator("#registrationTicketClose").click();
+  await expect(page.locator("#registrationTicketOpen")).not.toHaveAttribute("href");
+  await expect(page.locator("#registrationTicketWhatsApp")).not.toHaveAttribute("href");
+  await expect(page.locator("#registrationTicketPdf")).toBeDisabled();
+});
+
+test("PDF sharing passes a prepared file to the phone share sheet without sending a WhatsApp message", async ({ page }) => {
+  await fixture(page);
+  await page.addInitScript(() => {
+    window.__ticketShares = [];
+    Object.defineProperty(navigator, "canShare", { configurable: true, value: ({ files }) => files?.[0]?.type === "application/pdf" });
+    Object.defineProperty(navigator, "share", { configurable: true, value: async ({ files, title }) => {
+      window.__ticketShares.push({ title, name: files[0].name, type: files[0].type, size: files[0].size });
+    } });
+  });
+  await openAdmin(page);
+  await page.locator('[data-registration-ticket="existing"]').click();
+  await expect(page.locator("#registrationTicketShare")).toBeEnabled();
+  await page.locator("#registrationTicketShare").click();
+  await expect(page.locator("#registrationTicketMessage")).toContainText("paylaşım ekranına iletildi");
+  const shares = await page.evaluate(() => window.__ticketShares);
+  expect(shares).toHaveLength(1);
+  expect(shares[0]).toMatchObject({ title: "Bilim atölyesi", type: "application/pdf" });
+  expect(shares[0].size).toBeGreaterThan(1000);
 });
 
 test("duplicate warnings and with or without ticket filters preserve full event totals", async ({ page }) => {

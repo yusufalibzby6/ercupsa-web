@@ -12,7 +12,7 @@ execFileSync(
   ],
   { stdio: "inherit" },
 );
-for (const name of ["tickets", "admin-community", "gate"])
+for (const name of ["tickets", "admin-community", "gate", "ticket-export", "digital-ticket"])
   await build({
     entryPoints: [`assets/${name}.js`],
     bundle: true,

@@ -45,9 +45,15 @@ Aynı etkinlikte aynı telefonla gönderilmiş başvurular **Olası tekrar kayı
 
 ## Form kaydından QR bileti verme
 
-Katılımcının kaydında **Bilet ver** düğmesine basın. O kayda özel tek bir QR bileti hazırlanır. Etkinliğin özel bilet tasarımı varsa aynı tasarım kullanılır. **Bağlantıyı kopyala** ile katılımcıya iletebilir veya **Bileti yazdır / PDF kaydet** ile çıktı alabilirsiniz. Sonraki **Bileti görüntüle** işlemi aynı bileti açar; bağlantı kesildiğinde yeniden denemek ek bilet oluşturmaz. Bilet bağlantısını yalnızca sahibine iletin.
+Katılımcının kaydında **Bilet ver** düğmesine basın. O kayda özel tek bir QR bileti hazırlanır. Etkinliğin özel bilet tasarımı varsa aynı tasarım kullanılır. Sonraki **Bileti görüntüle** işlemi aynı bileti açar; bağlantı kesildiğinde yeniden denemek ek bilet oluşturmaz. Form gönderimi otomatik QR bileti veya bilet indirmesi başlatmaz.
 
-Bu işlem bilet oluşturur; katılımcının hesabına kendiliğinden eklemez. Katılımcı QR’ı okutur, giriş yapar veya hesap oluşturur, ardından **Katılımımı ekle** düğmesine basar. Hazır QR kodu varsa bu adım mobil sayfanın üstünde gösterilir. Kapıda görevli aynı bileti ayrıca okutur. Panelde **Hesaba eklendi** ve **Kapıda giriş yaptı** durumları ayrı gösterilir.
+**Bağlantıyı kopyala** veya **WhatsApp’a yönlendir** ile kişiye özel `bilet.html#ERC-…` bağlantısını gönderin. Katılımcı hesaba giriş yapmadan tam bilet görselini açar, **Fotoğraf olarak indir** ile 2232 × 1176 piksel PNG veya **PDF indir** ile tek biletlik A4 yatay PDF indirebilir. Özel tasarımın oranı ve sağdaki QR konumu korunur. Dosya yalnızca indirme düğmesine basınca iner; bağlantıyı tekrar açmak veya dosyayı tekrar indirmek yeni QR oluşturmaz. İptal edilmiş bilet bağlantıları açılmaz. Bilet bağlantısını yalnızca sahibine iletin.
+
+Panelde **Fotoğraf indir** ve **PDF indir · tek bilet** aynı dosyaları hazırlar. **PDF paylaş**, destekleyen telefonlarda PDF’yi sistem paylaşım ekranına verir; WhatsApp’ı ve alıcıyı siz seçersiniz. **WhatsApp’a yönlendir** ise kayıtlı telefon numarasının sohbetini mesaj ve bilet bağlantısıyla açar; PDF eki eklemez, mesajı siz gönderirsiniz. Telefon numarası yoksa WhatsApp’ın alıcı seçimi açılır. Dosya paylaşımı desteklenmeyen cihazlarda PDF’yi indirip elle ekleyebilirsiniz. Resmî WhatsApp API kurulumu gerekmez.
+
+**Biletler** bölümündeki her biletin kişisel bağlantısını kopyalayabilir, fotoğrafını veya tek A4 PDF’sini indirebilirsiniz. Mevcut **Çıktı oluştur** düğmesi korunur: her A4 sayfada en fazla **10 bilet**, aynı kesim çizgileriyle basılır.
+
+Bu işlem bilet oluşturur; katılımcının hesabına kendiliğinden eklemez. Katılımcı dijital biletteki **Biletimi hesabıma ekle** bağlantısına basar veya QR’ı okutur, giriş yapar veya hesap oluşturur, ardından **Katılımımı ekle** düğmesine basar. Hesaba ekleme, QR katılımcıları arasındaki çekilişler için kullanılır; biletin ekranda açılması veya indirilmesi çekilişe otomatik katılım sağlamaz. Hazır QR kodu varsa bu adım mobil sayfanın üstünde gösterilir. Kapıda görevli aynı bileti ayrıca okutur. Panelde **Hesaba eklendi** ve **Kapıda giriş yaptı** durumları ayrı gösterilir.
 
 Form kaydını silmek o kayıttan verilmiş QR biletini de iptal eder. Daha önceki hesap katılımı, kapı giriş geçmişi ve çekiliş sonuçları bu işlemle silinmez. İptal sırasında bağlantı hatası olursa **Bilet iptali tamamlanmayı bekliyor** satırı kalır; **Bilet iptalini tamamla** ile aynı işlem yeniden denenir.
 

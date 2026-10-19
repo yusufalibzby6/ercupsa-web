@@ -34,7 +34,7 @@ Yönetici hesapları özel Netlify Blobs deposunda saklanır. Yeni SQL veya zoru
 
 ## Panel bölümleri
 
-Baş yönetici panelinde **Etkinlikler**, **Kayıt formları**, **Biletler**, **Çekilişler**, **Giriş ve görevliler**, **Kullanıcılar**, **Instagram** ve **Yönetici hesapları** bölümleri bulunur. Diğer hesaplar yalnızca izin verilen bölümleri görür. Geniş ekranda soldaki menüden, telefonda üstteki menüden geçiş yapılır. Öneriler, deneyimler ve değerlendirmeler sekmeleri kaldırılmıştır.
+Baş yönetici panelinde **Etkinlikler**, **Kayıt formları**, **Biletler**, **Çekilişler**, **Giriş ve görevliler**, **Kullanıcılar**, **Instagram**, **Ekibimiz** ve **Yönetici hesapları** bölümleri bulunur. Diğer hesaplar yalnızca izin verilen bölümleri görür. Geniş ekranda soldaki menüden, telefonda üstteki menüden geçiş yapılır. Öneriler, deneyimler ve değerlendirmeler sekmeleri kaldırılmıştır.
 
 Hesaplar ve QR bilet kurulumu için [SUPABASE-KURULUM.md](SUPABASE-KURULUM.md), kapı girişleri için [ETKINLIK-GIRIS.md](ETKINLIK-GIRIS.md), çekiliş kuralları için [CEKILISLER.md](CEKILISLER.md) belgesini izleyin. Yönetici parolası tarayıcı depolamasında tutulmaz. `npm ci`, `npm run build` ve `npm test` kullanılabilir.
 
@@ -43,6 +43,14 @@ Hesaplar ve QR bilet kurulumu için [SUPABASE-KURULUM.md](SUPABASE-KURULUM.md), 
 **Kullanıcılar** sekmesinde siteye kayıt olan hesapların ad soyad ve e-posta bilgileri listelenir; ad veya e-posta ile arayıp sayfalar arasında ilerleyebilirsiniz. Henüz profil bilgilerini tamamlamamış hesaplar da görünür. Bir isme basınca açılan pencerede biletini hesabına eklediği etkinlikler ve kapıda doğrulanmış girişleri ayrı gösterilir. Bileti hesaba eklemek, etkinliğe gerçekten giriş yapmak anlamına gelmez. Kapı kayıtları okunamazsa giriş durumu doğrulanamadı olarak gösterilir.
 
 **Sitedeki adı gizle**, kişinin adının herkese açık katılım listelerinde gösterilmesini engeller. Hesabı, e-postası, biletleri, çekiliş hakları ve etkinlik geçmişi silinmez. Kullanıcı profilinde izin verse bile yönetici engeli devam eder. **Yönetici engelini kaldır** yalnızca bu engeli kaldırır; kişinin kendi görünürlük iznini değiştirmez. İzin vermemiş kullanıcıların adı gizli kalır. Bu ekran e-posta veya etkinlik geçmişini herkese açık hâle getirmez. Yönetici çıkışında liste ve açık pencerenin bilgileri temizlenir.
+
+## Ekip düzenleme
+
+**Ekibimiz** bölümü yalnızca baş yöneticiye açıktır; diğer hesaplara bu yetki verilemez. İsim ve görevleri düzenleyebilir, yeni kişi ekleyebilir, kart sırasını değiştirebilir veya kişi/fotoğraf kaldırabilirsiniz. **Geniş kart** danışman gibi öne çıkan bir kart içindir. İlk liste danışman ve mevcut 21 öğrencinin tamamını, Belinay Daş’ın Dileknaz Ergül’den sonraki yerini korur.
+
+**Fotoğraf yükle** ile doğrudan cihazdan JPG, PNG veya WebP seçin. Panel uzun kenarı en fazla 800 piksele küçültür, JPEG olarak 150 KB veya altına sıkıştırır. Yeni fotoğrafı önizlemeden sonra **Ekibi kaydet** ile yayımlayın. Fotoğraf ve ekip listesi Netlify Blobs’ta saklanır; bu alan için Cloudinary veya yeni ortam değişkeni gerekmez. Aynı anda iki pencerede yapılan değişikliklerde eski pencerenin yeni listeyi ezmesi engellenir. Kaydetme başarısız olursa değişiklikler açık pencerede korunur.
+
+Kişisel dijital bilet bağlantıları, tek biletlik fotoğraf/PDF indirme ve WhatsApp paylaşımı için [KAYIT-SISTEMI.md](KAYIT-SISTEMI.md#form-kaydından-qr-bileti-verme) bölümüne bakın. A4’e 10 bilet çıktısı korunur.
 
 ## Ana sayfanın Instagram paylaşımları
 

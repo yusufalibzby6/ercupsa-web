@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Dijital biletin | ERCUPSA</title>
+    <link rel="icon" href="ercupsa.PNG" />
+    <link rel="stylesheet" href="assets/digital-ticket.css?v=digital-ticket-1" />
+    <script type="module" src="assets/digital-ticket.bundle.js?v=digital-ticket-1"></script>
+  </head>
+  <body>
+    <header class="digital-header"><a href="index.html" aria-label="ERCUPSA ana sayfa"><img src="ercupsa.PNG" width="44" height="44" alt="" /><span>ERCUPSA</span></a><span>Dijital bilet</span></header>
+    <main class="digital-main">
+      <div class="digital-intro"><span class="digital-eyebrow">Etkinlikte görüşürüz</span><h1 id="ticketHeading">Biletin hazırlanıyor</h1><p>Girişte bu ekrandaki QR kodunu göstermen yeterli. Hesaba giriş yapman gerekmez.</p></div>
+      <section id="ticketLoading" class="digital-notice" role="status" aria-live="polite">Biletin kontrol ediliyor…</section>
+      <section id="ticketError" class="digital-notice digital-error" role="alert" hidden><h2>Bilet açılamadı</h2><p id="ticketErrorMessage"></p><button id="retryTicket" type="button">Yeniden dene</button><a href="iletisim.html">Organizatörle iletişime geç</a></section>
+      <section id="ticketContent" hidden aria-label="Kişiye özel dijital bilet">
+        <div class="digital-ticket-frame"><img id="ticketImage" width="2232" height="1176" alt="Etkinlik biletin ve girişte gösterilecek kişiye özel QR kodun" /></div>
+        <dl id="ticketDetails" class="digital-details"></dl>
+        <div class="digital-actions"><button id="downloadTicketImage" type="button"><span aria-hidden="true">↓</span> Fotoğraf olarak indir</button><button id="downloadTicketPdf" type="button"><span aria-hidden="true">↓</span> PDF indir</button></div>
+        <p id="ticketDownloadStatus" class="digital-download-status" role="status" aria-live="polite"></p>
+        <p class="digital-note">İnternetsiz göstermek için biletini önceden indirebilirsin. Bu bilet bağlantısı sana özeldir; başkalarıyla paylaşma.</p>
+        <aside class="digital-account"><div><h2>Katılımını hesabında sakla</h2><p>Biletini hesabına ekleyerek katılım geçmişini ve rozetlerini takip edebilirsin. Bu adım giriş için zorunlu değildir.</p></div><a id="claimTicket" href="biletler.html">Biletimi hesabıma ekle <span aria-hidden="true">→</span></a></aside>
+      </section>
+      <noscript><p class="digital-notice digital-error">Biletini görmek için tarayıcında JavaScript’i etkinleştirmen gerekir.</p></noscript>
+    </main>
+    <footer class="digital-footer">ERCUPSA · Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu</footer>
+  </body>
+</html>

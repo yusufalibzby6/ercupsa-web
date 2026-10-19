@@ -5,6 +5,7 @@ import "./admin-gate.js";
 import "./admin-instagram.js";
 import "./admin-accounts.js";
 import "./admin-users.js";
+import "./admin-team.js";
 import { $, escape, api, status, onAdminEvent, canAdmin, isOwner } from "./common.js";
 import {
   ticketCard,
@@ -13,15 +14,16 @@ import {
   TICKETS_PER_PAGE,
 } from "./ticket-print.js";
 import { readTicketDesign, validateStoredDesign, releaseTicketArtwork } from "./ticket-template.js";
+import { ticketPublicUrl, createTicketFiles, downloadTicketFile } from "./ticket-export.js";
 let data = { batches: [] };
 let events = [], design = null, designEventId = "", designState = "idle";
 let ready = false, authGeneration = 0, catalogLoadVersion = 0;
 let designBusy = false, batchBusy = false, fileReading = false, candidate = null, candidateFile = null;
 let designLoadVersion = 0, fileReadVersion = 0, batchLoadVersion = 0, cardsVersion = 0;
 let designPromise = null, openedBatch = null;
-const tabs = ["events", "registrations", "tickets", "raffles", "attendance", "accounts", "instagram", "adminUsers"];
+const tabs = ["events", "registrations", "tickets", "raffles", "attendance", "accounts", "instagram", "team", "adminUsers"];
 let currentTab = "";
-const tabAllowed = name => name === "adminUsers" ? isOwner() : canAdmin(`${name}.view`);
+const tabAllowed = name => ["adminUsers", "team"].includes(name) ? isOwner() : canAdmin(`${name}.view`);
 function tab(name) {
   if (!tabs.includes(name) || !tabAllowed(name)) return;
   currentTab = name;
@@ -276,10 +278,11 @@ function render() {
 }
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("button");
-  if (!b || !ready) return;
+  if (!b || !ready || !canAdmin("tickets.view")) return;
   const generation = authGeneration;
   try {
     if (b.dataset.batch) await showBatch(b.dataset.batch);
+    if (b.dataset.digitalCode) await exportBatchTicket(b);
     if (b.dataset.revoke && canAdmin("tickets.manage") && confirm("Bu bilet iptal edilsin mi?")) {
       await api("/api/community?action=revoke", {
         method: "POST",
@@ -292,6 +295,48 @@ document.addEventListener("click", async (e) => {
     if (ready && generation === authGeneration) status(e.message, true);
   }
 });
+async function exportBatchTicket(button) {
+  const batch = openedBatch;
+  const generation = authGeneration;
+  const version = cardsVersion;
+  const eventId = $("ticketEvent").value;
+  const code = button.dataset.digitalCode;
+  const action = button.dataset.digitalAction;
+  const sameContext = () => ready && canAdmin("tickets.view") && generation === authGeneration && version === cardsVersion && openedBatch === batch && batch?.event_id === eventId && eventId === $("ticketEvent").value;
+  const current = () => sameContext() && designState === "ready" && !designBusy && !candidate && !fileReading;
+  if (button.disabled || !current() || !batch.codes.includes(code) || !["copy", "image", "pdf"].includes(action)) return;
+  const controls = button.closest(".ticket-controls");
+  const buttons = [...controls.querySelectorAll("button[data-digital-code]")];
+  const result = controls.querySelector("[data-digital-status]");
+  buttons.forEach(item => { item.disabled = true; });
+  delete result.dataset.error;
+  result.textContent = action === "copy" ? "Bağlantı kopyalanıyor…" : "Bilet dosyası hazırlanıyor…";
+  try {
+    const digest = await hash(code);
+    const ticket = batch.tickets.find(item => item.code_hash === digest);
+    if (!current()) return;
+    if (!ticket || ticket.revoked) throw new Error("Bu biletin durumu doğrulanamadı veya bilet iptal edilmiş.");
+    if (action === "copy") {
+      if (!navigator.clipboard?.writeText) throw new Error("Bu tarayıcı bağlantıyı kopyalayamıyor. “Bileti aç” bağlantısını paylaşabilirsiniz.");
+      await navigator.clipboard.writeText(ticketPublicUrl(code));
+    } else {
+      const files = await createTicketFiles({ code, eventTitle: batch.event_title, design, event: events.find(item => item.id === eventId) });
+      if (!current()) return;
+      downloadTicketFile(action === "pdf" ? files.pdf : files.image);
+    }
+    if (current()) result.textContent = action === "copy" ? "Kişiye özel bilet bağlantısı kopyalandı." : "Bilet indirildi.";
+  } catch (error) {
+    if (current()) {
+      result.textContent = error.message || "Bilet hazırlanamadı. Lütfen tekrar deneyin.";
+      result.dataset.error = "true";
+    }
+  } finally {
+    if (sameContext()) {
+      buttons.forEach(item => { item.disabled = false; });
+      if (!current()) result.textContent = "Tasarım değişti. Bileti yeniden hazırlayabilirsiniz.";
+    }
+  }
+}
 $("batchForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const b = e.target.querySelector("button");
@@ -385,9 +430,12 @@ async function renderOpenedBatch() {
     const entryState = !ticket || d.checkins_available !== true
       ? "Giriş durumu doğrulanamadı"
       : ticket.entered_at ? "Kapıda giriş yaptı" : "Henüz giriş yapmadı";
+    const digitalControls = ticket && !ticket.revoked
+      ? `<div class="flex flex-wrap gap-2 mt-2"><a class="border rounded-lg px-3 py-2" href="${escape(ticketPublicUrl(code))}" target="_blank" rel="noopener noreferrer">Bileti aç</a><button class="border rounded-lg px-3 py-2" data-digital-code="${escape(code)}" data-digital-action="copy">Bağlantıyı kopyala</button><button class="border rounded-lg px-3 py-2" data-digital-code="${escape(code)}" data-digital-action="image">Fotoğraf indir</button><button class="border rounded-lg px-3 py-2" data-digital-code="${escape(code)}" data-digital-action="pdf">PDF indir (A4)</button></div><p class="text-sm mt-2" data-digital-status role="status" aria-live="polite"></p>`
+      : "";
     return {
       card: ticketCard({ code, qr, eventTitle: d.event_title, ticket, design: artwork }),
-      control: `<div class="ticket-controls no-print"><span>${ticket?.revoked ? "İptal" : claimState} · ${entryState}</span>${canAdmin("tickets.manage") && ticket && !ticket.revoked && !ticket.claimed_at ? `<button class="text-red-700" data-revoke="${escape(ticket.id)}">İptal et</button>` : ""}</div>`,
+      control: `<div class="ticket-controls no-print flex-col items-start"><span>${ticket?.revoked ? "İptal" : claimState} · ${entryState}</span>${digitalControls}${canAdmin("tickets.manage") && ticket && !ticket.revoked && !ticket.claimed_at ? `<button class="text-red-700" data-revoke="${escape(ticket.id)}">İptal et</button>` : ""}</div>`,
     };
   }));
   if (!ready || version !== cardsVersion || openedBatch !== d || d.event_id !== $("ticketEvent").value) return;

@@ -51,7 +51,7 @@ test("retired panels are absent and admin starts with ticket metadata instead of
   await expect(page.locator('[data-tab="suggestions"], [data-tab="experiences"], [data-tab="feedback"]')).toHaveCount(0);
   await expect(page.locator("#suggestionsTab, #experiencesTab, #feedbackTab")).toHaveCount(0);
   await expect(page.locator('[data-tab="members"], #membersTab, #memberForm, #memberList')).toHaveCount(0);
-  await expect(page.locator(".admin-navigation [data-tab]")).toHaveCount(8);
+  await expect(page.locator(".admin-navigation [data-tab]")).toHaveCount(9);
   await expect(page.locator('[data-tab="accounts"]')).toHaveText("Kullanıcılar");
   expect(state.feedbackRequests).toBe(0);
   expect(state.accountRequests).toBe(0);

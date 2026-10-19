@@ -2,6 +2,8 @@ import { $, escape, api, onAdminEvent, canAdmin, isOwner } from "./common.js";
 import QRCode from "qrcode";
 import { ticketCard, printTickets } from "./ticket-print.js";
 import { validateStoredDesign, releaseTicketArtwork } from "./ticket-template.js";
+import { createTicketFiles, downloadTicketFile, ticketPublicUrl, ticketClaimUrl } from "./ticket-export.js";
+import { whatsAppTicketUrl } from "./ticket-delivery.js";
 
 const CORE_IDS = new Set(["full_name", "class_year", "phone"]);
 const CLASS_OPTIONS = ["Hazırlık", "1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf", "5. Sınıf", "Mezun", "Diğer"];
@@ -393,6 +395,11 @@ function ticketClose() {
   $("registrationTicketCode").textContent = "";
   $("registrationTicketCopy").disabled = true;
   $("registrationTicketPrint").disabled = true;
+  for (const id of ["registrationTicketImage", "registrationTicketPdf", "registrationTicketShare"]) $(id).disabled = true;
+  for (const id of ["registrationTicketOpen", "registrationTicketWhatsApp"]) {
+    $(id).hidden = true;
+    $(id).removeAttribute("href");
+  }
 }
 async function showTicket(id, opener) {
   const entry = entries.find(item => item.id === id), eventId = selectedId;
@@ -417,16 +424,21 @@ async function showTicket(id, opener) {
     }
     document.dispatchEvent(new CustomEvent("registration-ticket-issued", { detail: { eventId } }));
     if (!ready || version !== ticketVersion || eventId !== selectedId) return;
-    const link = new URL("/biletler.html", location.origin);
-    link.searchParams.set("ticket", ticket.code);
-    $("registrationTicketLink").value = link.href;
+    const link = ticketPublicUrl(ticket.code, { origin: location.origin });
+    $("registrationTicketLink").value = link;
     $("registrationTicketCode").textContent = ticket.code;
-    activeTicket = { ticket, event: result.event, link: link.href, card: null, design: null };
+    activeTicket = { ticket, event: result.event, link, card: null, design: null, files: null };
     $("registrationTicketCopy").disabled = ticket.revoked;
-    $("registrationTicketMessage").textContent = ticket.revoked ? "Bu bilet iptal edilmiş; etkinlik girişinde kullanılamaz." : ticket.claimedAt ? "Bilet katılımcının hesabına eklenmiş. Kapıda giriş yapmak ayrı bir işlemdir." : "Bilet hazır. Bağlantıyı bu katılımcıya iletebilir veya QR biletini yazdırabilirsiniz.";
+    $("registrationTicketMessage").textContent = ticket.revoked ? "Bu bilet iptal edilmiş; etkinlik girişinde kullanılamaz." : ticket.claimedAt ? "Bilet katılımcının hesabına eklenmiş. Kapıda giriş yapmak ayrı bir işlemdir." : "Bilet hazır. Katılımcı bu bağlantıdan giriş yapmadan biletini görüntüleyebilir.";
+    if (!ticket.revoked) {
+      $("registrationTicketOpen").href = link;
+      $("registrationTicketWhatsApp").href = whatsAppTicketUrl(entry.phone, { link, eventTitle: result.event.title });
+      $("registrationTicketOpen").hidden = false;
+      $("registrationTicketWhatsApp").hidden = false;
+    }
     const [stored, qr] = await Promise.all([
       api(`/api/ticket-design?event_id=${encodeURIComponent(eventId)}`),
-      QRCode.toDataURL(link.href, { width: 300, margin: 4 }),
+      QRCode.toDataURL(ticketClaimUrl(ticket.code, { origin: location.origin }), { width: 300, margin: 4 }),
     ]);
     const design = validateStoredDesign(stored.design);
     if (version !== ticketVersion || eventId !== selectedId) { releaseTicketArtwork(design); return; }
@@ -434,6 +446,19 @@ async function showTicket(id, opener) {
     activeTicket.card = ticketCard({ code: ticket.code, qr, eventTitle: result.event.title, ticket: { revoked: ticket.revoked, claimed_at: ticket.claimedAt }, design });
     $("registrationTicketPreview").innerHTML = activeTicket.card;
     $("registrationTicketPrint").disabled = ticket.revoked;
+    if (!ticket.revoked) {
+      const current = activeTicket;
+      try {
+        const files = await createTicketFiles({ code: ticket.code, eventTitle: result.event.title, event: result.event, design, origin: location.origin });
+        if (!ready || version !== ticketVersion || activeTicket !== current) return;
+        current.files = files;
+        $("registrationTicketImage").disabled = false;
+        $("registrationTicketPdf").disabled = false;
+        $("registrationTicketShare").disabled = false;
+      } catch {
+        if (activeTicket === current) $("registrationTicketMessage").textContent = "Bilet bağlantısı hazır. Dosyalar bu cihazda hazırlanamadı; bileti yeniden açıp deneyebilir veya bağlantıyı gönderebilirsiniz.";
+      }
+    }
   } catch (error) {
     if (version === ticketVersion) $("registrationTicketMessage").textContent = error.message;
     entryFeedback.set(id, { message: error.message, error: true });
@@ -727,6 +752,28 @@ $("registrationTicketPrint").addEventListener("click", async () => {
   try { await printing; }
   catch (error) { if (!controller.signal.aborted) feedback(error.message || "Bilet yazdırılamadı. Bileti yeniden açıp deneyin.", true); }
   finally { if (ticketPrintAbort === controller) ticketPrintAbort = null; }
+});
+for (const [id, format] of [["registrationTicketImage", "image"], ["registrationTicketPdf", "pdf"]]) {
+  $(id).addEventListener("click", () => {
+    const current = activeTicket;
+    if (!ready || !canAdmin("tickets.view") || !current?.files || current.ticket.revoked) return;
+    downloadTicketFile(current.files[format]);
+  });
+}
+$("registrationTicketShare").addEventListener("click", async () => {
+  const current = activeTicket;
+  if (!ready || !canAdmin("tickets.view") || !current?.files || current.ticket.revoked) return;
+  const files = [current.files.pdf];
+  if (!navigator.share || !navigator.canShare?.({ files })) {
+    $("registrationTicketMessage").textContent = "Bu cihaz dosya paylaşımını desteklemiyor. PDF’yi indirip WhatsApp’a ekleyebilir veya WhatsApp’a yönlendir düğmesiyle bilet bağlantısını gönderebilirsiniz.";
+    return;
+  }
+  try {
+    await navigator.share({ files, title: current.event.title });
+    if (activeTicket === current) $("registrationTicketMessage").textContent = "Bilet paylaşım ekranına iletildi.";
+  } catch (error) {
+    if (activeTicket === current && error.name !== "AbortError") $("registrationTicketMessage").textContent = "Paylaşım açılamadı. PDF’yi indirip WhatsApp’a ekleyebilirsiniz.";
+  }
 });
 function clearRegistrationSession() {
   ready = false; authGeneration++; loadVersion++; summaryVersion++; saveVersion++; saving = false; loading = false;

@@ -42,10 +42,10 @@ test("admin tickets display claims and gate entries independently, including unc
   await expect(controls.nth(1)).toContainText("Henüz hesaba eklenmedi · Kapıda giriş yaptı");
   await expect(controls.nth(2)).toContainText("Hesaba eklendi · Kapıda giriş yaptı");
   await expect(controls.nth(3)).toContainText("İptal · Henüz giriş yapmadı");
-  await expect(controls.nth(0).locator("button")).toHaveCount(0);
-  await expect(controls.nth(1).locator("button")).toHaveText("İptal et");
-  await expect(controls.nth(2).locator("button")).toHaveCount(0);
-  await expect(controls.nth(3).locator("button")).toHaveCount(0);
+  await expect(controls.nth(0).locator("button[data-revoke]")).toHaveCount(0);
+  await expect(controls.nth(1).locator("button[data-revoke]")).toHaveText("İptal et");
+  await expect(controls.nth(2).locator("button[data-revoke]")).toHaveCount(0);
+  await expect(controls.nth(3).locator("button[data-revoke]")).toHaveCount(0);
   await expect(page.locator("#ticketOutput")).toContainText("Hesaba eklenme ve kapıdan giriş ayrı durumlardır.");
   await expect(page.locator("#printTickets")).toBeEnabled();
 });
