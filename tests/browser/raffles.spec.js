@@ -19,10 +19,18 @@ const registrations = [
 const poolVersion = '1'.repeat(64);
 const pendingKey = 'ercupsa_raffle_pending_v1';
 
+function historicalDraw(id, winners, { eventId = 'one', source } = {}) {
+  return { id, eventId, eventTitle: events.find(event => event.id === eventId)?.title || 'Çekiliş',
+    ...(source ? { source } : {}), poolVersion, loyaltyBonus: source !== 'registrations',
+    checkedInOnly: false, checkinBonus: false, createdAt: '2026-10-07T18:00:00Z',
+    participants: structuredClone(winners), winners: structuredClone(winners) };
+}
+
 async function fixture(page, options = {}) {
   const state = {
     draws: structuredClone(options.draws || []), requests: [], lookups: [], deletes: [], gets: [],
     events: structuredClone(events), participants: structuredClone(options.participants || participants),
+    participantsByEvent: structuredClone(options.participantsByEvent || {}),
     poolVersion, postErrors: [...(options.postErrors || [])], lookupErrors: [...(options.lookupErrors || [])],
     deleteErrors: [...(options.deleteErrors || [])], holdPool: null, poolHolds: {}, poolErrors: [],
     registrations: structuredClone(options.registrations || registrations), sourceQueries: [],
@@ -33,7 +41,7 @@ async function fixture(page, options = {}) {
     if (source === 'registrations') return { source,
       participants: eventId === 'one' ? state.registrations.filter(person => !checkedInOnly || state.registrationCheckedInIds.includes(person.id)).map(person => ({ ...person, ...(checkedInOnly ? { enteredAt: '2026-10-07T17:00:00Z' } : {}) })) : [],
       poolVersion: createHash('sha256').update(`${state.poolVersion}|registrations${checkedInOnly ? '|checked-in' : ''}`).digest('hex'), checkedInOnly, checkinBonus: false };
-    const people = eventId === 'one' ? state.participants.filter(p => !checkedInOnly || state.checkedInIds.includes(p.id)) : [];
+    const people = (state.participantsByEvent[eventId] || (eventId === 'one' ? state.participants : [])).filter(p => !checkedInOnly || state.checkedInIds.includes(p.id));
     return {
       participants: people.map(person => checkinBonus ? { ...person, previous: state.checkinPrevious[person.id] || 0, weight: 1 + (state.checkinPrevious[person.id] || 0) } : { ...person }),
       poolVersion: checkedInOnly || checkinBonus ? createHash('sha256').update(`${state.poolVersion}|${checkedInOnly}|${checkinBonus}`).digest('hex') : state.poolVersion,
@@ -147,6 +155,134 @@ test('draw excludes people, reveals unique winners after five seconds and saves/
   expect(state.deletes).toHaveLength(1);
 });
 
+test('three product winners are automatically unchecked before the next round and stay excluded after reload', async ({ page }) => {
+  const fourth = { id: 'd', name: 'Deniz Aydın', previous: 0, weight: 1, claimedAt: '2026-10-07T13:00:00Z' };
+  const state = await fixture(page, { participants: [...participants, fourth] });
+  await page.locator('#raffleCount').fill('3');
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleResults li')).toHaveCount(3, { timeout: 6500 });
+  for (const id of ['a', 'b', 'c']) await expect(page.locator(`[data-person=${id}]`)).not.toBeChecked();
+  await expect(page.locator('[data-person=d]')).toBeChecked();
+  await expect(page.locator('#raffleSummary')).toContainText('1 kişi dahil');
+  await page.locator('#raffleCount').fill('1');
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleHistory article')).toHaveCount(2, { timeout: 6500 });
+  expect([...state.requests[1].excluded].sort()).toEqual(['a', 'b', 'c']);
+  expect(state.draws[0].winners.map(person => person.id)).toEqual(['d']);
+  await expect(page.locator('#raffleSummary')).toContainText('0 kişi dahil');
+  await expect(page.locator('#raffleStart')).toBeDisabled();
+  await page.reload();
+  await page.locator('[data-tab=raffles]').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(4);
+  await expect(page.locator('#raffleParticipants input:checked')).toHaveCount(0);
+  await expect(page.locator('#raffleStart')).toBeDisabled();
+  expect(state.requests).toHaveLength(2);
+});
+
+test('manual winner reinclusion and include-all survive refresh, while a fresh win is unchecked again', async ({ page }) => {
+  const state = await fixture(page, { draws: [historicalDraw('previous-a', [participants[0]])] });
+  await expect(page.locator('[data-person=a]')).not.toBeChecked();
+  await page.locator('[data-person=b]').uncheck();
+  await page.locator('[data-person=a]').check();
+  await page.locator('#raffleRefresh').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(3);
+  await expect(page.locator('[data-person=a]')).toBeChecked();
+  await expect(page.locator('[data-person=b]')).not.toBeChecked();
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleHistory article')).toHaveCount(2, { timeout: 6500 });
+  expect(state.requests[0].excluded).toEqual(['b']);
+  expect(state.draws[0].winners[0].id).toBe('a');
+  await expect(page.locator('[data-person=a]')).not.toBeChecked();
+  await expect(page.locator('[data-person=b]')).not.toBeChecked();
+  await expect(page.locator('[data-person=c]')).toBeChecked();
+  await page.locator('#raffleIncludeAll').click();
+  await page.locator('#raffleRefresh').click();
+  await expect(page.locator('#raffleParticipants input:checked')).toHaveCount(3);
+});
+
+test('deleting winning draws releases only automatic exclusions and another event keeps its own winners', async ({ page }) => {
+  const state = await fixture(page, {
+    draws: [historicalDraw('previous-a', [participants[0]]),
+      historicalDraw('previous-ac', [participants[0], participants[2]]),
+      historicalDraw('other-event-b', [participants[1]], { eventId: 'two' })],
+    participantsByEvent: { two: participants },
+  });
+  await expect(page.locator('[data-person=a]')).not.toBeChecked();
+  await expect(page.locator('[data-person=c]')).not.toBeChecked();
+  await expect(page.locator('[data-person=b]')).toBeChecked();
+  await page.locator('[data-person=b]').uncheck();
+  page.on('dialog', dialog => dialog.accept());
+  await page.locator('[data-delete-draw="previous-a"]').click();
+  await expect(page.locator('#raffleHistory article')).toHaveCount(1);
+  await expect(page.locator('[data-person=a]')).not.toBeChecked();
+  await expect(page.locator('[data-person=c]')).not.toBeChecked();
+  await page.locator('[data-delete-draw="previous-ac"]').click();
+  await expect(page.locator('#raffleHistory article')).toHaveCount(0);
+  await expect(page.locator('[data-person=a]')).toBeChecked();
+  await expect(page.locator('[data-person=c]')).toBeChecked();
+  await expect(page.locator('[data-person=b]')).not.toBeChecked();
+  await page.locator('#raffleEvent').selectOption('two');
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(3);
+  await expect(page.locator('[data-person=a]')).toBeChecked();
+  await expect(page.locator('[data-person=c]')).toBeChecked();
+  await expect(page.locator('[data-person=b]')).not.toBeChecked();
+  await page.locator('#raffleEvent').selectOption('one');
+  await expect(page.locator('#raffleParticipants input:checked')).toHaveCount(3);
+  expect(state.requests).toHaveLength(0);
+});
+
+test('QR and form winner IDs are source-scoped while form all and entrance filters share prior winners', async ({ page }) => {
+  const forms = [{ ...registrations[0], id: 'a' }, registrations[1],
+    { id: 'registration-c', name: 'Fırat Demir', createdAt: '2026-10-07T10:00:00Z', previous: 0, weight: 1 }];
+  await fixture(page, {
+    draws: [historicalDraw('qr-winner-a', [participants[0]]),
+      historicalDraw('form-winner-b', [forms[1]], { source: 'registrations' })],
+    registrations: forms, registrationCheckedInIds: ['a', 'registration-b'],
+  });
+  await expect(page.locator('[data-person=a]')).not.toBeChecked();
+  await page.locator('#raffleSourceRegistrations').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(3);
+  await expect(page.locator('[data-person=a]')).toBeChecked();
+  await expect(page.locator('[data-person=registration-b]')).not.toBeChecked();
+  await page.locator('#raffleFormsCheckedIn').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
+  await expect(page.locator('[data-person=a]')).toBeChecked();
+  await expect(page.locator('[data-person=registration-b]')).not.toBeChecked();
+  await page.locator('#raffleFormsAll').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(3);
+  await expect(page.locator('[data-person=registration-b]')).not.toBeChecked();
+  await page.locator('#raffleSourceQr').click();
+  await expect(page.locator('[data-person=a]')).not.toBeChecked();
+  await page.locator('[data-person=a]').check();
+  await page.locator('#raffleSourceRegistrations').click();
+  await page.locator('#raffleSourceQr').click();
+  await expect(page.locator('[data-person=a]')).not.toBeChecked();
+});
+
+test('uncertain recovery keeps frozen exclusions and unchecks verified winners only after the same saved outcome', async ({ page }) => {
+  const state = await fixture(page, { draws: [historicalDraw('previous-a', [participants[0]])],
+    postErrors: [{ status: 503, commit: true }] });
+  await expect(page.locator('[data-person=a]')).not.toBeChecked();
+  await page.locator('[data-person=b]').uncheck();
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleStart')).toHaveText('Aynı çekiliş sonucunu yeniden sorgula');
+  const frozen = await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)), pendingKey);
+  expect([...frozen.excluded].sort()).toEqual(['a', 'b']);
+  expect(state.draws[0].winners[0].id).toBe('c');
+  expect(state.requests).toHaveLength(1);
+  await page.reload();
+  await page.locator('[data-tab=raffles]').click();
+  expect(await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)), pendingKey)).toEqual(frozen);
+  await page.locator('#raffleStart').click();
+  await expect(page.locator('#raffleResults li')).toHaveCount(1, { timeout: 6500 });
+  expect(state.requests).toHaveLength(1);
+  expect(state.lookups).toEqual([frozen.requestId]);
+  await page.locator('#raffleRefresh').click();
+  await expect(page.locator('#raffleParticipants input')).toHaveCount(3);
+  await expect(page.locator('#raffleParticipants input:checked')).toHaveCount(0);
+  await expect(page.locator('#raffleStart')).toBeDisabled();
+});
+
 test('uncertain save queries the same result and reduced-motion avoids rotating names', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const state = await fixture(page, { postErrors: [{ status: 503, commit: true }] });
@@ -237,6 +373,8 @@ test('chance switch gives everyone one chance and records each draw mode without
   const csv = await readFile(await download.path(), 'utf8');
   expect(csv).toContain('Çekiliş kuralı');
   expect(csv).toContain('Herkese eşit şans');
+  // This case compares chance modes with the same full pool deliberately.
+  await page.locator('#raffleIncludeAll').click();
   await toggle.check();
   await expect(page.locator('#raffleSummary')).toContainText('3 kişi dahil · 7 toplam hak');
   await expect(page.locator('#raffleStageMode')).toHaveText('Herkese eşit şans');
@@ -599,7 +737,8 @@ test('uncertain form draw restores its source and recovers the same saved result
   await page.locator('#raffleRefresh').click();
   await expect(page.locator('#raffleParticipants input')).toHaveCount(2);
   await expect(page.locator('[data-person=registration-b]')).not.toBeChecked();
-  await expect(page.locator('#raffleSummary')).toContainText('1 kişi dahil · 1 toplam hak');
+  await expect(page.locator('[data-person=registration-a]')).not.toBeChecked();
+  await expect(page.locator('#raffleSummary')).toContainText('0 kişi dahil · 0 toplam hak');
 });
 
 test('form entrance filter draws only checked personal tickets and keeps QR rules separate', async ({ page }) => {

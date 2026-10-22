@@ -1,4 +1,5 @@
 import { $, escape, onAdminEvent, canAdmin } from './common.js';
+import { previousWinnerIds, raffleExcludedIds } from './raffle-selection.js';
 
 const PENDING_KEY = 'ercupsa_raffle_pending_v1';
 const SOURCE_KEY = 'ercupsa_raffle_source_v1';
@@ -13,6 +14,8 @@ let queuedCatalog = null, lastDraw = null, pending = recoverPending(), pendingSt
 let source = pending ? sourceOf(pending) : recoverSource();
 let qrSettings = { loyaltyBonus: true, checkedInOnly: false, checkinBonus: false };
 let formCheckedInOnly = source === 'registrations' && pending?.checkedInOnly === true;
+const manualExcluded = new Set(), includedWinners = new Set();
+let previousWinners = new Set(), restoredExclusions = pending ? new Set(pending.excluded) : null;
 if (pending) {
   excluded = new Set(pending.excluded);
   loadedEventId = pending.eventId;
@@ -31,6 +34,20 @@ function recoverSource() {
   catch { return 'qr'; }
 }
 function sourceOf(value) { return value?.source || 'qr'; }
+function resetSelection() {
+  excluded.clear(); manualExcluded.clear(); includedWinners.clear(); previousWinners.clear(); restoredExclusions = null;
+}
+function syncSelection({ completeHistory = false } = {}) {
+  previousWinners = previousWinnerIds(draws, loadedEventId, source);
+  if (completeHistory && restoredExclusions) {
+    // A recovered request stores only frozen IDs. Once full history is known,
+    // separate earlier winners from the administrator's other exclusions.
+    for (const id of restoredExclusions) if (!previousWinners.has(id)) manualExcluded.add(id);
+    restoredExclusions = null;
+  }
+  excluded = raffleExcludedIds(participants, previousWinners, manualExcluded, includedWinners);
+  if (restoredExclusions) for (const person of participants) if (restoredExclusions.has(person.id)) excluded.add(person.id);
+}
 function sourceLabel(value = source, checkedInOnly = false) {
   return value === 'registrations' ? 'Form kayıtları' + (checkedInOnly ? ' · Kapıda bileti okutulanlar' : '') : 'QR katılımcıları';
 }
@@ -160,8 +177,8 @@ function renderMode() {
       : 'Bu etkinliğin kayıt formunu dolduranlar listelenir. Hesap oluşturma veya QR ekleme şartı yoktur; her aktif form kaydı 1 hak kazanır.'
     : 'Bu etkinliğin bilet QR kodunu hesabına ekleyenler listelenir. Form kayıtları bu listeye karıştırılmaz.';
   if ($('raffleParticipantsHelp')) $('raffleParticipantsHelp').textContent = forms
-    ? 'İşareti kaldırarak bu kaydı yalnızca çekilişten çıkarabilirsiniz. Etkinlik kaydı korunur.'
-    : 'İşareti kaldırarak kişiyi yalnızca çekilişten çıkarabilirsiniz. Hesabı ve bileti korunur.';
+    ? 'Bu etkinlikte daha önce kazanan kayıtların işareti otomatik kaldırılır; isterseniz yeniden dahil edebilirsiniz. İşareti kaldırmak etkinlik kaydını silmez.'
+    : 'Bu etkinlikte daha önce kazananların işareti otomatik kaldırılır; isterseniz yeniden dahil edebilirsiniz. İşareti kaldırmak hesabı veya bileti silmez.';
   document.querySelectorAll('.raffle-chance-setting').forEach(setting => setting.classList.toggle('is-unavailable', forms));
   if (forms) {
     $('raffleLoyaltyHelp').textContent = 'Form çekilişinde herkesin 1 hakkı vardır. Önceki QR katılımları ek hak vermez.';
@@ -196,7 +213,7 @@ function renderParticipants() {
   countInput.max = String(Math.min(200, included.length || 1));
   const filtered = participants.filter(person => person.name.toLocaleLowerCase('tr').includes(search));
   list.innerHTML = filtered.map(person =>
-    `<label class="raffle-person ${excluded.has(person.id) ? 'is-excluded' : ''}"><input type="checkbox" data-person="${escape(person.id)}" ${excluded.has(person.id) ? '' : 'checked'}><span><strong>${escape(person.name)}</strong><small>${source === 'registrations' ? 'Form kaydı · 1 hak' : `${person.previous} önceki ${entryBonus() ? 'gerçek giriş' : 'etkinlik'} · ${effectiveWeight(person)} hak`}</small><small>${escape(claimDate(source === 'registrations' ? person.createdAt : person.claimedAt))}</small>${source === 'registrations' && entryToggle.checked ? `<small>Kapıda okutuldu${person.enteredAt ? ` · ${escape(claimDate(person.enteredAt))}` : ''}</small>` : ''}</span><span class="raffle-weight">×${effectiveWeight(person)}</span></label>`
+    `<label class="raffle-person ${excluded.has(person.id) ? 'is-excluded' : ''}"><input type="checkbox" data-person="${escape(person.id)}" ${excluded.has(person.id) ? '' : 'checked'}><span><strong>${escape(person.name)}</strong>${previousWinners.has(person.id) ? '<small>Bu etkinlikte daha önce kazandı</small>' : ''}<small>${source === 'registrations' ? 'Form kaydı · 1 hak' : `${person.previous} önceki ${entryBonus() ? 'gerçek giriş' : 'etkinlik'} · ${effectiveWeight(person)} hak`}</small><small>${escape(claimDate(source === 'registrations' ? person.createdAt : person.claimedAt))}</small>${source === 'registrations' && entryToggle.checked ? `<small>Kapıda okutuldu${person.enteredAt ? ` · ${escape(claimDate(person.enteredAt))}` : ''}</small>` : ''}</span><span class="raffle-weight">×${effectiveWeight(person)}</span></label>`
   ).join('') || (participants.length ? '<p class="raffle-empty">Aramanızla eşleşen katılımcı bulunamadı.</p>' : `<p class="raffle-empty">${source === 'registrations' ? entryToggle.checked ? 'Bu etkinlikte henüz kişisel bileti kapıda okutulmuş aktif form kaydı bulunmuyor.' : 'Bu etkinlikte henüz aktif form kaydı bulunmuyor.' : entryToggle.checked ? 'Biletini hesabına ekleyip etkinliğe giriş yapan kişiler burada görünür.' : 'Bu etkinliğin biletini hesabına ekleyenler burada görünür.'}</p>`);
   controls();
   if (focused) [...list.querySelectorAll('input')].find(input => input.dataset.person === focused)?.focus({ preventScroll: true });
@@ -226,7 +243,7 @@ async function load({ keepResults = false } = {}) {
   const sameEvent = eventId === loadedEventId && selectedSource === loadedSource;
   loadedEventId = eventId; loadedSource = selectedSource; loaded = false; poolVersion = null;
   participants = []; draws = [];
-  if (!sameEvent) { excluded.clear(); $('raffleSearch').value = ''; }
+  if (!sameEvent) { resetSelection(); $('raffleSearch').value = ''; }
   if (!keepResults) {
     lastDraw = null; $('raffleResults').innerHTML = '';
     $('raffleStageName').textContent = 'Sıradaki şanslı kim?';
@@ -243,7 +260,7 @@ async function load({ keepResults = false } = {}) {
         sourceOf(data) !== selectedSource ||
         data.checkedInOnly !== modes.checkedInOnly || data.checkinBonus !== modes.checkinBonus) throw new Error('Katılımcı listesi doğrulanamadı. Listeyi yeniden yükleyin.');
     participants = data.participants.map(personView); draws = data.draws.map(drawView); poolVersion = data.poolVersion; loaded = true;
-    excluded = new Set([...excluded].filter(id => participants.some(person => person.id === id)));
+    syncSelection({ completeHistory: true });
     renderParticipants(); renderHistory(); feedback('Katılımcı seçimini ve kazanan sayısını ayarlayıp çekilişi başlatabilirsiniz.');
   } catch (error) {
     if (!ready || current !== version || eventId !== eventSelect.value || selectedSource !== source) return;
@@ -300,19 +317,24 @@ sourceButtons.forEach(button => button.addEventListener('click', () => {
   entryToggle.checked = source === 'qr' ? qrSettings.checkedInOnly : formCheckedInOnly;
   entryBonusToggle.checked = source === 'qr' && qrSettings.checkinBonus;
   try { sessionStorage.setItem(SOURCE_KEY, source); } catch { /* Selection still works for this page. */ }
-  excluded.clear(); $('raffleSearch').value = '';
+  resetSelection(); $('raffleSearch').value = '';
   renderMode(); load();
 }));
 formFilterButtons.forEach(button => button.addEventListener('click', () => {
   const checked = button.dataset.checkedIn === 'true';
   if (!ready || !active || busy || pending || source !== 'registrations' || checked === entryToggle.checked) return;
   formCheckedInOnly = entryToggle.checked = checked;
-  excluded.clear(); $('raffleSearch').value = '';
+  resetSelection(); $('raffleSearch').value = '';
   renderMode(); load();
 }));
 $('raffleRefresh').addEventListener('click', () => load());
 $('raffleSearch').addEventListener('input', renderParticipants);
-$('raffleIncludeAll').addEventListener('click', () => { if (!ready || !canAdmin('raffles.manage')) return; excluded.clear(); renderParticipants(); });
+$('raffleIncludeAll').addEventListener('click', () => {
+  if (!ready || !canAdmin('raffles.manage') || busy || pending) return;
+  manualExcluded.clear(); restoredExclusions = null;
+  for (const id of previousWinners) includedWinners.add(id);
+  syncSelection(); renderParticipants();
+});
 loyaltyToggle.addEventListener('change', () => {
   if (!ready || !canAdmin('raffles.manage') || busy || pending) return;
   renderMode(); renderParticipants();
@@ -325,7 +347,13 @@ for (const toggle of [entryToggle, entryBonusToggle]) toggle.addEventListener('c
 $('raffleParticipants').addEventListener('change', event => {
   const id = event.target.dataset.person;
   if (!ready || !canAdmin('raffles.manage') || !id || busy || pending) return;
-  if (event.target.checked) excluded.delete(id); else excluded.add(id);
+  restoredExclusions?.delete(id);
+  if (event.target.checked) {
+    manualExcluded.delete(id);
+    if (previousWinners.has(id)) includedWinners.add(id);
+  }
+  else { manualExcluded.add(id); includedWinners.delete(id); }
+  syncSelection();
   renderParticipants();
 });
 start.addEventListener('click', async () => {
@@ -383,10 +411,10 @@ start.addEventListener('click', async () => {
     // Recovery can happen with no live pool loaded, or after authentication
     // cleared private state. Keep the frozen exclusions bound to this source
     // so refreshing the same pool preserves the administrator's selection.
-    excluded = new Set(selection.excluded);
+    for (const person of draw.winners) includedWinners.delete(person.id);
     loadedEventId = selection.eventId; loadedSource = sourceOf(selection);
-    clearPending(); renderHistory();
-    feedback(`${draw.winners.length} kazanan seçildi ve çekiliş geçmişine kaydedildi.`);
+    clearPending(); syncSelection(); renderParticipants(); renderHistory();
+    feedback(`${draw.winners.length} kazanan seçildi ve çekiliş geçmişine kaydedildi. Kazananların işareti sonraki çekiliş için otomatik kaldırıldı.`);
   } catch (error) {
     if (!ready || current !== version || pending !== selection) return;
     if (timer) clearInterval(timer);
@@ -445,7 +473,7 @@ $('raffleHistory').addEventListener('click', async event => {
       lastDraw = null; $('raffleResults').innerHTML = ''; $('raffleStageName').textContent = 'Yeni çekilişe hazır';
       $('raffleStage').classList.remove('is-celebrating'); stageTitle();
     }
-    renderHistory(); feedback('Çekiliş silindi. Yeni bir çekiliş başlatabilirsiniz.');
+    syncSelection(); renderParticipants(); renderHistory(); feedback('Çekiliş silindi. Başka çekilişte kazanmamış kişiler yeniden dahil edildi.');
   } catch (error) { if (ready && current === version) feedback(error.message, true); }
   finally { if (current === version) { busy = false; finishCatalog(); controls(); } }
 });
@@ -480,7 +508,7 @@ document.addEventListener('admin-logout', event => {
   if (animationTimer) clearInterval(animationTimer);
   animationTimer = null;
   closePresentation();
-  events = []; participants = []; draws = []; excluded.clear();
+  events = []; participants = []; draws = []; resetSelection();
   queuedCatalog = lastDraw = null; loadedEventId = loadedSource = ''; poolVersion = null;
   // An expired cookie can precede login after refresh or an uncertain save.
   // Keep only the anonymous request identity to recover the same saved draw.
@@ -491,6 +519,7 @@ document.addEventListener('admin-logout', event => {
     formCheckedInOnly = false;
     loyaltyToggle.checked = true; entryToggle.checked = entryBonusToggle.checked = false;
   }
+  if (pending) restoredExclusions = new Set(pending.excluded);
   eventSelect.replaceChildren(); $('raffleSearch').value = '';
   $('raffleResults').replaceChildren(); $('raffleStageName').textContent = 'Sıradaki şanslı kim?';
   stage.classList.remove('is-drawing', 'is-celebrating');
