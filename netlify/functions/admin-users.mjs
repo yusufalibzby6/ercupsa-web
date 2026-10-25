@@ -18,8 +18,6 @@ export function createAdminUsersHandler({ getStore, now = () => new Date(), uuid
     const url = new URL(req.url), storage = adminStore(getStore), instant = now();
     if (req.method === "GET") return response(project(await ensureAccounts(storage, instant, uuid)));
     if (!["POST", "PUT", "DELETE"].includes(req.method)) fail(405, "Desteklenmeyen işlem.");
-    // Bootstrap only on an authenticated owner request. The preset has no shared default password.
-    await ensureAccounts(storage, instant, uuid);
     const input = req.method === "DELETE" ? { id: url.searchParams.get("id"), expectedRevision: url.searchParams.get("expectedRevision") } : await body(req);
     keys(input, req.method === "POST" ? ["username", "name", "password", "permissions", "active", "expectedRevision"] :
       ["id", "username", "name", "password", "permissions", "active", "expectedRevision"]);
@@ -32,7 +30,11 @@ export function createAdminUsersHandler({ getStore, now = () => new Date(), uuid
         fail(400, "Bu kullanıcı adı ayrılmıştır.");
     }
     if (Object.hasOwn(input, "name")) changes.name = text(input.name, 120, true);
-    if (Object.hasOwn(input, "permissions")) changes.permissions = normalizedPermissions(input.permissions);
+    if (Object.hasOwn(input, "permissions")) {
+      changes.permissions = normalizedPermissions(input.permissions);
+      if (changes.permissions.some(permission => permission.startsWith("payments.")) && !input.permissions.includes("registrations.view"))
+        fail(400, "Ödeme kontrolü için “Kayıtları görüntüle” (registrations.view) iznini de ayrıca seçin. Katılımcı bilgilerine erişim otomatik verilmez.");
+    }
     if (Object.hasOwn(input, "active")) {
       if (typeof input.active !== "boolean") fail(400, "Geçersiz hesap durumu.");
       changes.active = input.active;
@@ -46,6 +48,8 @@ export function createAdminUsersHandler({ getStore, now = () => new Date(), uuid
           (changes.permissions && JSON.stringify(changes.permissions) !== JSON.stringify(TREASURER_PERMISSIONS)))
         fail(400, "Sayman hesabının kullanıcı adı ve salt okunur yetkileri değiştirilemez.");
     }
+    // Bootstrap only after owner input validation. The preset has no shared default password.
+    await ensureAccounts(storage, instant, uuid);
     const result = await mutateJson(storage, ADMIN_ACCOUNTS_KEY, null, state => {
       accountState(state); revision(input.expectedRevision, state);
       if (req.method === "DELETE") {

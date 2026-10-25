@@ -151,14 +151,12 @@ test('a required photo has a separate error and uploads the original file outsid
   await expect(page.locator('#registration-project_photo')).toBeFocused();
   expect(state.posts).toHaveLength(0);
   await page.locator('#registration-project_photo').setInputFiles({ name: 'ozel-calisma.jpg', mimeType: 'image/jpg', buffer: photo });
-  await page.locator('#registrationReceipt').setInputFiles({ name: 'ozel-dekont.png', mimeType: 'image/png', buffer: photo });
   await expect(page.locator('.registration-photo-preview img')).toHaveAttribute('src', /^blob:/);
   const previewUrl = await page.locator('.registration-photo-preview img').getAttribute('src');
   await page.locator('#registrationSubmit').click();
   await expect(page.locator('#registrationSuccess')).toBeVisible();
   expect(state.posts[0].answers).not.toHaveProperty('project_photo');
   expect(state.posts[0].files['photo:project_photo']).toEqual({ name: 'ozel-calisma.jpg', type: 'image/jpg', bytes: photo });
-  expect(state.posts[0].files.receipt.name).toBe('ozel-dekont.png');
   expect(await page.evaluate(() => window.revokedMediaURLs)).toContain(previewUrl);
   await expect(page.locator('#registrationSuccess')).not.toContainText(/ozel-calisma|ozel-dekont|05551234567|Özel fotoğraf/);
   const downloading = page.waitForEvent('download');
@@ -189,14 +187,14 @@ test('SVG and oversized photos are rejected before upload while original form an
   expect(state.posts[0].files['photo:project_photo'].bytes).toEqual(photo);
 });
 
-test('photo and receipt sizes share one 4 MB budget before the API request', async ({ page }) => {
-  const state = await fixture(page, { receipt: true });
+test('multiple photo questions share one 4 MB budget before the API request', async ({ page }) => {
+  const state = await fixture(page, { fields: [photoField(), { id: 'extra_photo', type: 'photo', label: 'İkinci fotoğraf', required: false }] });
   await open(page);
   await fillCore(page);
   await page.locator('#registration-project_photo').setInputFiles({ name: 'calisma.png', mimeType: 'image/png', buffer: Buffer.alloc(3 * 1024 * 1024) });
-  await page.locator('#registrationReceipt').setInputFiles({ name: 'dekont.png', mimeType: 'image/png', buffer: Buffer.alloc(2 * 1024 * 1024) });
+  await page.locator('#registration-extra_photo').setInputFiles({ name: 'ikinci.png', mimeType: 'image/png', buffer: Buffer.alloc(2 * 1024 * 1024) });
   await page.locator('#registrationSubmit').click();
-  await expect(page.locator('#registration-error-project_photo')).toContainText('Fotoğraflar ve dekont toplam en fazla 4 MB');
+  await expect(page.locator('#registration-error-project_photo')).toContainText('Fotoğraflar toplam en fazla 4 MB');
   expect(state.posts).toHaveLength(0);
   await page.locator('#registration-project_photo').setInputFiles({ name: 'calisma.png', mimeType: 'image/png', buffer: photo });
   await page.locator('#registrationSubmit').click();
@@ -210,7 +208,6 @@ test('a rejected photo request keeps all files, choices and the same retry ident
   await fillCore(page);
   await page.getByRole('radio', { name: 'İki', exact: true }).check();
   await page.locator('#registration-project_photo').setInputFiles({ name: 'calisma.png', mimeType: '', buffer: photo });
-  await page.locator('#registrationReceipt').setInputFiles({ name: 'dekont.png', mimeType: 'image/png', buffer: photo });
   const previewUrl = await page.locator('.registration-photo-preview img').getAttribute('src');
   await page.locator('#registrationSubmit').click();
   await expect(page.locator('#registrationFeedback')).toContainText('Tekrar deneyebilirsin');
@@ -218,7 +215,6 @@ test('a rejected photo request keeps all files, choices and the same retry ident
   await expect(page.locator('#registration-full_name')).toHaveValue('Özel fotoğraf katılımcısı');
   await expect(page.getByRole('radio', { name: 'İki', exact: true })).toBeChecked();
   expect(await page.locator('#registration-project_photo').evaluate(input => input.files[0].name)).toBe('calisma.png');
-  expect(await page.locator('#registrationReceipt').evaluate(input => input.files[0].name)).toBe('dekont.png');
   expect(await page.evaluate(() => window.revokedMediaURLs)).not.toContain(previewUrl);
   await page.locator('#registrationSubmit').click();
   await expect(page.locator('#registrationSuccess')).toBeVisible();

@@ -58,6 +58,8 @@ export async function body(req) {
 export const ADMIN_PERMISSIONS = Object.freeze([
   "events.view", "events.manage", "events.publish",
   "registrations.view", "registrations.manage", "registrations.receipts", "registrations.photos", "registrations.export",
+  "payments.view", "payments.manage", "statistics.view", "audit.view",
+  "yearbooks.view", "yearbooks.manage", "yearbooks.publish",
   "tickets.view", "tickets.manage", "raffles.view", "raffles.manage",
   "attendance.view", "attendance.manage", "accounts.view", "accounts.manage", "instagram.view", "instagram.manage",
 ]);

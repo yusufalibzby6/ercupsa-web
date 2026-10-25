@@ -5,7 +5,7 @@ import { readEvents } from './events.mjs';
 import { operatorFor } from '../lib/staff.mjs';
 import { operationsStore, readCheckins, enterTicket } from '../lib/checkins.mjs';
 import { paged } from '../lib/raffles.mjs';
-import { readRegistrationTicketOwners } from '../lib/registration-ticket-owners.mjs';
+import { readRegistrationTicketOwners, readRegistrationTicketRestrictions, registrationTicketIsBlocked } from '../lib/registration-ticket-owners.mjs';
 
 const codedFail = (status, code, message) => { const error = new Error(message); error.status = status; error.code = code; throw error; };
 export function ticketCode(value, req) {
@@ -26,8 +26,8 @@ const safeEntry = entry => ({ ticketId: entry.ticketId, userId: entry.userId, na
   ...(entry.registrationId ? { registrationId: entry.registrationId, classYear: entry.classYear || '' } : {}),
   ...(entry.accountName ? { accountName: entry.accountName } : {}), enteredAt: entry.enteredAt, method: entry.method });
 const ownerKey = ticket => `${ticket.batch_id}:${ticket.code_hash}`;
-function ticketIdentity(entry, ticket, owners, profileName) {
-  const person = ticket && !ticket.revoked ? owners.get(ownerKey(ticket)) : null;
+function ticketIdentity(entry, ticket, owners, profileName, historical = false) {
+  const person = ticket && (historical || !ticket.revoked) ? owners.get(ownerKey(ticket)) : null;
   // Account claims and form registrations are separate identities. A form
   // ticket keeps the registrant as its primary owner even if someone claims it
   // using a different account name. Never match by name or phone number.
@@ -63,7 +63,7 @@ export function createGateHandler({ read = db, events = readEvents, store = oper
         const names = new Map(profiles.map(profile => [profile.id, profile.name]));
         const byTicket = new Map(claims.map(claim => [claim.ticket_id, claim]));
         const entered = new Map(entries.map(entry => [entry.ticketId, entry.enteredAt]));
-        const owners = new Map((await readRegistrationTicketOwners(eventId, { store: registrationStore })).map(person => [`${person.batchId}:${person.codeHash}`, person]));
+        const owners = new Map((await readRegistrationTicketOwners(eventId, { store: registrationStore, includeInactive: true })).map(person => [`${person.batchId}:${person.codeHash}`, person]));
         const ticketIds = [...new Set([...claims.map(claim => identifier(claim.ticket_id)), ...entries.map(entry => identifier(entry.ticketId))])];
         const tickets = [];
         for (let i = 0; i < ticketIds.length; i += 100) tickets.push(...await paged(`tickets?event_id=eq.${eventId}&id=in.(${ticketIds.slice(i, i + 100).join(',')})&select=id,event_id,batch_id,code_hash,claimed_by,revoked&order=id.asc`, read, { cursor: ['id'] }));
@@ -76,7 +76,7 @@ export function createGateHandler({ read = db, events = readEvents, store = oper
         return response({ event, participants, entries: entries.map(entry => {
           const claim = byTicket.get(entry.ticketId);
           return safeEntry(ticketIdentity(claim ? { ...entry, userId: claim.user_id } : entry,
-            ticketById.get(entry.ticketId), owners, names.get(claim?.user_id)));
+            ticketById.get(entry.ticketId), owners, names.get(claim?.user_id), true));
         }), summary: { claimed: claims.length, entered: entries.length } });
       }
       if (req.method === 'POST' && ['scan', 'manual'].includes(action)) {
@@ -99,6 +99,11 @@ export function createGateHandler({ read = db, events = readEvents, store = oper
           name = profile?.name || 'İsimsiz katılımcı';
         }
         const owners = new Map((await readRegistrationTicketOwners(eventId, { store: registrationStore })).map(person => [`${person.batchId}:${person.codeHash}`, person]));
+        // Check the authoritative lifecycle immediately before recording entry;
+        // profile/owner reads must not leave an earlier eligibility snapshot.
+        const restrictions = await readRegistrationTicketRestrictions(eventId, { store: registrationStore });
+        if (registrationTicketIsBlocked(ticket, restrictions))
+          codedFail(409, 'GATE_INVALID_TICKET', 'Bu kaydın bileti etkinlik girişi için uygun değil veya kayıt iptal edilmiş.');
         const identity = ticketIdentity({ userId: ticket.claimed_by || null, name }, ticket, owners, ticket.claimed_by ? name : null);
         const result = await enterTicket(storage, eventId, { ticketId: identifier(ticket.id), ...identity,
           enteredAt: now().toISOString(), operatorId: operator.id, method: action === 'scan' ? 'qr' : 'manual' });

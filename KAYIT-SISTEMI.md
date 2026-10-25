@@ -1,6 +1,6 @@
 # Etkinlik kayıt sistemi
 
-Katılımcılar site hesabı açmadan etkinliğin kendi formunu doldurabilir. Birden fazla etkinliğin formu aynı anda açık olabilir. Formlar, cevaplar ve dekontlar Netlify Blobs'ta saklanır; bu özellik için yeni ortam değişkeni veya Supabase kurulumu gerekmez.
+Katılımcılar site hesabı açmadan etkinliğin kendi formunu doldurabilir. Birden fazla etkinliğin formu aynı anda açık olabilir. Formlar, cevaplar ve özel fotoğraf cevapları Netlify Blobs'ta saklanır; bu özellik için yeni ortam değişkeni veya Supabase kurulumu gerekmez.
 
 ## Form hazırlama
 
@@ -9,8 +9,8 @@ Katılımcılar site hesabı açmadan etkinliğin kendi formunu doldurabilir. Bi
 3. **Formun üst açıklaması** alanına katılımcının görmesini istediğiniz açıklamayı, ücret ve ödeme bilgilerini yazın. Açıklama formun üstünde görünür; satır sonları korunur.
 4. Ad soyad, sınıf ve telefon alanları hazır gelir. Ad soyad her zaman zorunludur; sınıf ve telefonun zorunluluğunu değiştirebilirsiniz. Sınıf seçeneklerini de düzenleyebilirsiniz.
 5. **Soru ekle** ile kısa/uzun cevap, e-posta, telefon, açılır liste, tek seçim, çoklu seçim veya **Fotoğraf yükleme** soruları ekleyin. Sorunun başlığını, seçeneklerini ve zorunluluğunu belirleyin. Temel alanlarla birlikte en fazla 25 soru olabilir.
-6. İsterseniz dekont yüklemeyi açın ve zorunlu yapın. PNG, JPEG veya PDF dekontları kabul edilir. Fotoğraflar ve dekontun toplam dosya boyutu en fazla **4 MB** olabilir; tek başına dekontun sınırı da 4 MB'dir. Dosya türü gerçek içeriğinden belirlenir; telefonun farklı tür veya uzantı bildirmesi geçerli dekontun reddedilmesine yol açmaz. Gönderilen dosyalar herkese açık bağlantılara dönüştürülmez.
-7. **Kayıt üst sınırı** alanına örneğin `40` yazın. Toplam kayıt sayısı bu sınıra ulaştığında form otomatik kapanır. Sınır istemiyorsanız alanı boş bırakın. Önceden alınmış kayıtlar da toplam sayıya dahildir.
+6. Ücretli etkinliklerde **Ödeme bildirimi** seçeneğini açın. Asıl listeye başvuran kişi **Ödememi gönderdim** kutusunu işaretlemeden gönderemez; göndermeden önce işaretini kaldırabilir. Yedek başvurudan ödeme bildirimi istenmez. Yeni dekont yüklenmez. Özel fotoğraf soruları çalışmaya devam eder; fotoğrafların toplam dosya sınırı **4 MB** ve bağlantıları özeldir.
+7. **Asıl kontenjan** alanına örneğin `40` yazın. Sınırsız olması için boş bırakın. İsterseniz **Yedek kayıt kabul et** seçeneğini açıp ayrı yedek sınırı belirleyin. Yedekler ve **Kalan kontenjanı katılımcılara göster** seçeneği varsayılan olarak kapalıdır.
 8. **Kayıt formunu erişime aç** seçeneğini işaretleyip **Formu kaydet** düğmesine basın. Etkinlik yayımlanmamış olsa da kendi kayıt bağlantısı çalışır. Etkinlik kartındaki **Kayıt linkini kopyala** düğmesi paylaşabileceğiniz bağlantıyı verir.
 
 Etkinliğin yayın durumu ile formun açık/kapalı durumu ayrıdır. **Yayından kaldır**, etkinliği genel etkinlik ve form listelerinden gizler; açık formun doğrudan bağlantısını kapatmaz. Kayıt almayı durdurmak için **Kayıt formunu erişime aç** işaretini kaldırıp kaydedin. Kontenjanı dolan, geçmiş günlerde kalan veya silinen etkinliğin formu yeni kayıt almaz. Kapalı bir taslak etkinliğin bilgileri doğrudan bağlantıyla açıklanmaz.
@@ -19,7 +19,9 @@ Bağlantı `form.html?event=ETKINLIK_KIMLIGI#registrationSection` biçimindedir.
 
 Form erişimini kapatmak mevcut kayıtları silmez. Türkiye tarihine göre günü geçmiş etkinlikler yeni kayıt almaz; aynı gün etkinlik başlangıç saatinin geçmesi formu kendiliğinden kapatmaz.
 
-Kontenjan dolduğunda katılımcı şu mesajı görür: **“İlginiz için teşekkür ederiz. Kontenjanımız dolmuştur. Bir sonraki etkinliklerimize bekleriz.”** Her kayıt bir yer kullanır. Aynı anda gelen başvurular da sınırı aşamaz; aynı gönderimin tekrar denenmesi yeni bir yer kullanmaz. Mevcut kayıt sayısından daha düşük bir sınır belirlerseniz eski kayıtlar korunur, yeni kayıt alınmaz. Sınırı yükseltmek veya boş bırakmak formun diğer erişim koşulları uygunsa tekrar açılmasını sağlar.
+Asıl liste dolduğunda yedek alımı açıksa form başında başvurunun **yedek** olacağı belirtilir; başarı ekranı kesin katılım olmadığını tekrar açıklar. Her iki liste de dolduğunda form kapanır. Yedek kapalıysa eski dolu mesajı korunur. İptal edilenler yer kullanmaz. Aynı anda gelen başvurular asıl veya yedek sınırını aşamaz; aynı gönderimin yeniden denenmesi yeni yer kullanmaz. Sınırı mevcut asıl sayısının altına indirmek eski kayıtları düşürmez.
+
+Asıl kayıt iptalinde veya kontenjan artışında yedekler başvuru sırasıyla aynı atomik kayıt işlemi içinde asıla alınır. Listede yükseltildiği gösterilir ve işlem geçmişine yazılır. Yedek alımını kapatmak mevcut yedekleri silmez. Sayaç kapalıyken herkese açık yanıtta asıl/boş yer sayıları bulunmaz; formun açık, yedek veya dolu olduğu belirtilir. Sayaç açıksa asıl doluluk ve kalan yer gösterilir; sınırsız kontenjanda sayısal ilerleme üretilmez.
 
 Kaydedilmemiş form değişiklikleri etkinlikler arasında geçiş yaparken korunur. Sayfayı kapatmadan önce kaydedin. Soruları sonradan değiştirseniz de eski kayıtların soru başlıkları ve cevapları korunur.
 
@@ -27,15 +29,15 @@ Kaydedilmemiş form değişiklikleri etkinlikler arasında geçiş yaparken koru
 
 **Açılır liste**, **Tek seçim** ve **Çoklu seçim** sorularında her seçeneğin adını kendi satırında düzenleyebilirsiniz. Satırdaki **Fotoğraf ekle** düğmesiyle o seçeneğe görsel yükleyin. Görseli değiştirebilir veya kaldırabilir, seçenekleri yukarı/aşağı taşıyabilir ve yeni seçenek ekleyebilirsiniz. Fotoğraf ile adı aynı seçeneğe bağlı kalır. Formu kaydedince katılımcılar fotoğrafı ve seçeneğin adını birlikte görür. Görsel içeren açılır liste soruları tek seçim yapılabilen kartlar olarak gösterilir; görsel eklenmeyen eski açılır listeler normal görünümünü korur.
 
-Katılımcının kendi fotoğrafını göndermesi için ayrı bir soru ekleyip cevap türünü **Fotoğraf yükleme** seçin. Başlığı örneğin “Çalışmanızın fotoğrafını gönderin” olarak değiştirin ve gerekiyorsa **Zorunlu alan**ı açın. Bu soru dekont alanından bağımsızdır. JPEG, PNG ve WebP fotoğrafları desteklenir; PDF yalnızca dekont alanında kullanılabilir. Tüm fotoğraflar ve dekont birlikte en fazla 4 MB olmalıdır.
+Katılımcının kendi fotoğrafını göndermesi için ayrı bir soru ekleyip cevap türünü **Fotoğraf yükleme** seçin. Başlığı örneğin “Çalışmanızın fotoğrafını gönderin” olarak değiştirin ve gerekiyorsa **Zorunlu alan**ı açın. Bu soru ödeme bildiriminden bağımsızdır. JPEG, PNG ve WebP fotoğrafları desteklenir; PDF fotoğraf cevabı değildir. Tüm fotoğraf cevapları birlikte en fazla 4 MB olmalıdır.
 
-Gönderilen fotoğrafları kayıtların cevapları bölümündeki **Fotoğrafı görüntüle** düğmesinden açabilirsiniz. Yalnızca fotoğraf görüntüleme yetkisi olan yönetici oturumuyla erişilir; CSV'ye dosya adı yazılır, özel dosyanın bağlantısı eklenmez. Kaydı yalnızca baş yönetici silebilir; silmek o kayda bağlı fotoğraflara ve dekonta erişimi de kaldırır. Katılımcının başarı özetinde fotoğraflar veya özel cevaplar bulunmaz. Sayman kayıtları ve dekontları inceler; formu değiştiremez, fotoğraf/CSV/bilet işlemi veya kayıt silme yapamaz.
+Gönderilen fotoğrafları kayıtların cevapları bölümündeki **Fotoğrafı görüntüle** düğmesinden açabilirsiniz. Yalnızca fotoğraf görüntüleme yetkisi olan yönetici oturumuyla erişilir; CSV'ye dosya adı yazılır, özel dosyanın bağlantısı eklenmez. Kaydı yalnızca baş yönetici silebilir; silmek o kayda bağlı fotoğraflara ve dekonta erişimi de kaldırır. Katılımcının başarı özetinde fotoğraflar veya özel cevaplar bulunmaz. Sayman kayıtları, ödeme durumlarını ve kaldırılmamış eski dekontları inceler; formu değiştiremez, fotoğraf/CSV/bilet işlemi veya kayıt silme yapamaz.
 
 ## Kayıtları inceleme
 
-**Kayıt formları** sekmesinde seçilen etkinliğin toplam kayıt sayısını, üst sınırını ve sınıf dağılımını görebilirsiniz. İsim, telefon ve cevaplarda arama yapabilir; sınıfa göre filtreleyebilirsiniz. Kayıtların ayrıca onaylanması veya reddedilmesi gerekmez. Önceki sürümdeki onay/red durumları kayıt sayımını etkilemez.
+**Kayıt formları** sekmesinde seçilen etkinliğin toplam kayıt sayısını, üst sınırını ve sınıf dağılımını görebilirsiniz. İsim, telefon ve cevaplarda arama yapabilir; sınıfa göre filtreleyebilirsiniz. Başvurular **Asıl**, **Yedek** ve **İptal edilen** olarak ayrılır. Başvuru durumundan ayrı olarak ücretli asıl kayıtlarda **Onay bekleniyor / Onaylandı** ödeme durumu bulunur. Ödeme yönetme yetkisi olan yönetici kontrol edip durumu değiştirir. Önceki sürümün genel onay/red alanları yeni kabul veya ödeme durumu yerine kullanılmaz.
 
-**Cevapları göster** tüm cevapları açar. **Dekontu görüntüle** dosyayı yalnızca yönetici oturumuyla getirir. Yanlış veya gereksiz bir başvuruyu **Kaydı sil** düğmesine basıp işlemi doğrulayarak kaldırabilirsiniz. Silinen kaydın dekontuna erişim de kaldırılır. Silme toplam kayıt sayısını azaltır; form erişime açıksa ve etkinliğin günü geçmediyse boşalan yer için tekrar kayıt alınabilir. **CSV indir** filtrelerden bağımsız olarak etkinliğin tüm mevcut kayıtlarını indirir.
+**Cevapları göster** tüm cevapları açar. **Dekontu görüntüle** dosyayı yalnızca yönetici oturumuyla getirir. Katılamayacak kişide **Kaydı iptal et** kullanın: geçmiş korunur, bileti kullanılamaz ve sıradaki yedeğe yer açılır. İptal ve silme yalnızca baş yöneticiye açıktır. Yanlış veya gereksiz bir başvuruyu **Kaydı sil** ile ayrıca kaldırabilirsiniz. Silinen kaydın dekontuna erişim de kaldırılır. Silme toplam kayıt sayısını azaltır; form erişime açıksa ve etkinliğin günü geçmediyse boşalan yer için tekrar kayıt alınabilir. **CSV indir** filtrelerden bağımsız olarak etkinliğin tüm mevcut kayıtlarını indirir.
 
 **Etkinlikleri karşılaştır** bölümünde istediğiniz etkinlikleri seçerek kayıt sayılarını ve sınıflara göre dağılımı yan yana görebilirsiniz. Bunlar form kayıt sayılarıdır. Etkinliğe fiilen gelen kişiler ve QR bilet katılımları ayrı tutulur; form göndermek bilet oluşturmaz.
 
@@ -45,7 +47,7 @@ Aynı etkinlikte aynı telefonla gönderilmiş başvurular **Olası tekrar kayı
 
 ## Form kaydından QR bileti verme
 
-Katılımcının kaydında **Bilet ver** düğmesine basın. O kayda özel tek bir QR bileti hazırlanır. Etkinliğin özel bilet tasarımı varsa aynı tasarım kullanılır. Sonraki **Bileti görüntüle** işlemi aynı bileti açar; bağlantı kesildiğinde yeniden denemek ek bilet oluşturmaz. Form gönderimi otomatik QR bileti veya bilet indirmesi başlatmaz.
+Katılımcının **asıl** kaydında **Bilet ver** düğmesine basın. Ödeme onayı bekleyen yeni kayda veya yedek/iptal kayda bilet verilmez. Eski verilmiş biletler geriye dönük ödeme zorunluluğuyla geçersiz sayılmaz; iptal edilen kaydın bileti ise engellenir. O kayda özel tek bir QR bileti hazırlanır. Etkinliğin özel bilet tasarımı varsa aynı tasarım kullanılır. Sonraki **Bileti görüntüle** işlemi aynı bileti açar; bağlantı kesildiğinde yeniden denemek ek bilet oluşturmaz. Form gönderimi otomatik QR bileti veya bilet indirmesi başlatmaz.
 
 **Bağlantıyı kopyala** veya **WhatsApp’a yönlendir** ile kişiye özel `bilet.html#ERC-…` bağlantısını gönderin. Katılımcı hesaba giriş yapmadan tam bilet görselini açar, **Fotoğraf olarak indir** ile 2232 × 1176 piksel PNG veya **PDF indir** ile tek biletlik A4 yatay PDF indirebilir. Özel tasarımın oranı ve sağdaki QR konumu korunur. Dosya yalnızca indirme düğmesine basınca iner; bağlantıyı tekrar açmak veya dosyayı tekrar indirmek yeni QR oluşturmaz. İptal edilmiş bilet bağlantıları açılmaz. Bilet bağlantısını yalnızca sahibine iletin.
 
@@ -64,6 +66,12 @@ Başarılı form gönderiminden sonra etkinlik bilgileri ve kayıt referansı g�
 Etkinlikteki **Paylaş** veya paneldeki **Etkinliği paylaş** düğmesi `https://ercupsa.com.tr/etkinlik/ETKINLIK_KIMLIGI` bağlantısını kullanır. WhatsApp gibi uygulamalar etkinliğin kendi afişini, adını ve tarihini görür. Açılan kartın düğmesi doğrudan kayıt formuna götürür. Paneldeki doğrudan **Kayıt linkini kopyala** bağlantısı da korunur.
 
 Etkinlik düzenleyicisinde kaydedilmemiş taslaklar aynı tarayıcı sekmesinde etkinlikler arasında geçişte ve yenilemede korunur. **Kaydedilmiş etkinliğe dön** veya **Yeni taslağı sil** ile değişiklikleri kaldırabilirsiniz. Yönetici çıkışı taslakları temizler.
+
+## Fotoğraf ve video yayın izni
+
+Her formda ERCUPSA sitesi ve Instagram için ayrı, **isteğe bağlı** fotoğraf/video yayın izni bulunur. İşaretli gelmez; onay vermeden etkinliğe başvurulabilir. İzin tercihi, metin sürümü, kanallar ve kayıt zamanı tutulur. Eski başvuruların izni sonradan varsayılmaz. Bu tercih ödeme bildirimiyle birleştirilmez. Veri sorumlusu bilgisi beklenen genel KVKK aydınlatma metni ve zorunlu onay bu sürüme dahil değildir.
+
+Yeni dekont alımı kapalıdır; eski dekontlar kendiliğinden silinmez. Ayrı envanter ve açık silme onayı süreci [GELISTIRME-VE-GECIS.md](GELISTIRME-VE-GECIS.md) belgesindedir.
 
 ## Mevcut Google Forms bağlantıları
 

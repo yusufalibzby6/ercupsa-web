@@ -2,6 +2,7 @@ import { getStore } from '@netlify/blobs';
 import { fail, identifier, HttpError } from './security.mjs';
 import { REGISTRATION_STORE, registrationStateKey, entryPrefix, mapConcurrent } from './registrations.mjs';
 import { paged } from './raffles.mjs';
+import { registrationStatus } from './registration-state.mjs';
 
 const READ_JSON = { type: 'json', consistency: 'strong' };
 const MAXIMUM_ENTRIES = 100000;
@@ -35,7 +36,7 @@ function participants(entries, eventId, deleted = []) {
     const person = participant(entry, eventId);
     if (seen.has(person.id)) invalid();
     seen.add(person.id);
-    if (!tombstones.has(person.id)) output.push(person);
+    if (!tombstones.has(person.id) && registrationStatus(entry) === 'main') output.push(person);
   }
   return output.sort((a, b) => a.name.localeCompare(b.name, 'tr') || a.id.localeCompare(b.id));
 }

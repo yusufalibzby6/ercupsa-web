@@ -6,6 +6,9 @@ import "./admin-instagram.js";
 import "./admin-accounts.js";
 import "./admin-users.js";
 import "./admin-team.js";
+import "./admin-statistics.js";
+import "./admin-event-audit.js";
+import "./admin-yearbooks.js";
 import { $, escape, api, status, onAdminEvent, canAdmin, isOwner } from "./common.js";
 import {
   ticketCard,
@@ -21,7 +24,7 @@ let ready = false, authGeneration = 0, catalogLoadVersion = 0;
 let designBusy = false, batchBusy = false, fileReading = false, candidate = null, candidateFile = null;
 let designLoadVersion = 0, fileReadVersion = 0, batchLoadVersion = 0, cardsVersion = 0;
 let designPromise = null, openedBatch = null;
-const tabs = ["events", "registrations", "tickets", "raffles", "attendance", "accounts", "instagram", "team", "adminUsers"];
+const tabs = ["events", "registrations", "tickets", "raffles", "attendance", "accounts", "instagram", "statistics", "audit", "yearbooks", "team", "adminUsers"];
 let currentTab = "";
 const tabAllowed = name => ["adminUsers", "team"].includes(name) ? isOwner() : canAdmin(`${name}.view`);
 function tab(name) {

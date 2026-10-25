@@ -1,5 +1,5 @@
 import { guarded, response, body, fail, decodeAdminCookie, signedAdminCookie, adminLogoutCookie, ownerSession } from "../lib/security.mjs";
-import { adminStore, ADMIN_ACCOUNTS_KEY, accountState, normalizedUsername, getAdminSession,
+import { adminStore, ADMIN_ACCOUNTS_KEY, accountState, ensureAccounts, TREASURER_PERMISSIONS, normalizedUsername, getAdminSession,
   ownerPasswordMatches, passwordMatches, safePrincipal, loginLimit } from "../lib/admin-auth.mjs";
 import { JSON_READ } from "../lib/blob-state.mjs";
 
@@ -27,8 +27,12 @@ export function createAdminAuthHandler({ getStore, now = () => new Date() } = {}
         return response({ session: owner }, 200, { "Set-Cookie": signedAdminCookie(req, owner, instant) });
       }
       const value = await storage.get(ADMIN_ACCOUNTS_KEY, JSON_READ);
-      const account = value ? accountState(value).accounts.find(account => account.username === username && account.active) : null;
+      let account = value ? accountState(value).accounts.find(account => account.username === username && account.active) : null;
       if (!passwordMatches(input.password, account)) fail(401, "Kullanıcı adı veya şifre geçersiz.");
+      if (account.role === "treasurer" && JSON.stringify(account.permissions) !== JSON.stringify(TREASURER_PERMISSIONS)) {
+        account = (await ensureAccounts(storage, instant)).accounts.find(candidate => candidate.id === account.id);
+        if (!account?.active || !passwordMatches(input.password, account)) fail(401, "Kullanıcı adı veya şifre geçersiz.");
+      }
       return response({ session: safePrincipal(account) }, 200, { "Set-Cookie": signedAdminCookie(req, account, instant) });
     }
     fail(405, "Desteklenmeyen işlem.");

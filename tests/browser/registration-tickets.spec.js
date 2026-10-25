@@ -237,7 +237,7 @@ test("duplicate warnings and with or without ticket filters preserve full event 
   await page.locator("#registrationRecordFilter").selectOption("without-ticket");
   await expect(page.locator(".registration-entry")).toHaveCount(2);
   await expect(page.locator('[data-registration-entry="existing"]')).toHaveCount(0);
-  await expect(page.locator("#registrationSummary")).toContainText("Toplam kayıt3");
+  await expect(page.locator("#registrationSummary")).toContainText("Toplam başvuru3");
   await expect(page.locator("#registrationSummary")).toContainText("Olası tekrar kayıt2");
   expect(ticketRequests(state)).toHaveLength(0);
 });

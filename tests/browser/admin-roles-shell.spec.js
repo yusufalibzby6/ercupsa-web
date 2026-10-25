@@ -144,3 +144,30 @@ test("logout clears private UI immediately and offers retry when the logout requ
   await expect(page.locator("#adminLogoutRetry")).toBeVisible(); state.logoutFails = false;
   await page.locator("#adminLogoutRetry").click(); await expect(page.locator("#adminLogoutRetry")).not.toBeVisible();
 });
+
+test("payment permissions require a deliberate registration-view grant and preserve the unfinished account", async ({ page }) => {
+  const { state } = await fixture(page);
+  await expect(page.locator("#app")).toBeVisible();
+  await page.locator('[data-tab="adminUsers"]').click();
+  await expect(page.locator("#adminUserSave")).toBeEnabled();
+  await expect(page.locator("#adminPaymentPermissionHelp")).toContainText("katılımcı bilgilerine erişim verir");
+  await page.locator("#adminUserName").fill("Ödeme sorumlusu");
+  await page.locator("#adminUserUsername").fill("odemesorumlusu");
+  await page.locator("#adminUserPassword").fill("synthetic-payment-password");
+  await page.locator('[data-permission="payments.manage"]').check();
+  await expect(page.locator('[data-permission="payments.view"]')).toBeChecked();
+  await expect(page.locator('[data-permission="registrations.view"]')).not.toBeChecked();
+  await page.locator("#adminUserSave").click();
+  await expect(page.locator("#adminUsersMessage")).toContainText("Kayıtları görüntüle");
+  expect(state.writes).toHaveLength(0);
+  await expect(page.locator("#adminUserName")).toHaveValue("Ödeme sorumlusu");
+  await expect(page.locator("#adminUserUsername")).toHaveValue("odemesorumlusu");
+  await expect(page.locator("#adminUserPassword")).toHaveValue("synthetic-payment-password");
+  await expect(page.locator('[data-permission="payments.manage"]')).toBeChecked();
+  await expect(page.locator('[data-permission="registrations.view"]')).toBeFocused();
+  await page.locator('[data-permission="registrations.view"]').check();
+  await page.locator("#adminUserSave").click();
+  await expect.poll(() => state.writes.length).toBe(1);
+  expect(state.writes[0].permissions).toEqual(["registrations.view", "payments.view", "payments.manage"]);
+  await expect(page.locator("#adminUsersMessage")).toContainText("Yönetici hesabı oluşturuldu");
+});

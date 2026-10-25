@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readRegistrationTicketOwners } from '../netlify/lib/registration-ticket-owners.mjs';
+import { readRegistrationTicketOwners, readRegistrationTicketRestrictions, registrationTicketIsBlocked } from '../netlify/lib/registration-ticket-owners.mjs';
 
 const eventId = 'event-one', key = `state/${eventId}.json`, prefix = `entries/${eventId}/`;
 const code = 'ERC-' + '1'.repeat(24);
@@ -34,6 +34,28 @@ test('pending durable reservations are projected for consumers to verify against
   const owners = await readRegistrationTicketOwners(eventId, { store });
   assert.equal(owners.length, 1); assert.equal(owners[0].classYear, '');
   assert.equal(owners[0].codeHash, createHash('sha256').update(code).digest('hex'));
+});
+
+test('inactive reservations are blocked for live consumers and retained only in explicit historical projections', async () => {
+  const cancelled = entry({ registrationStatus: 'cancelled' });
+  const waitlisted = entry({ id: 'waiting', registrationStatus: 'waitlisted', ticket: { batchId: 'batch-two', code: 'ERC-' + '2'.repeat(24), status: 'issued' } });
+  const store = memory([[key, state([cancelled, waitlisted])]]);
+  assert.deepEqual(await readRegistrationTicketOwners(eventId, { store }), []);
+  const historical = await readRegistrationTicketOwners(eventId, { store, includeInactive: true });
+  assert.deepEqual(historical.map(person => person.id), ['entry-one', 'waiting']);
+  const restrictions = await readRegistrationTicketRestrictions(eventId, { store });
+  assert.equal(restrictions.length, 2);
+  assert.ok(restrictions.every(proof => proof.blocked));
+  assert.equal(registrationTicketIsBlocked({ batch_id: 'batch-one', code_hash: historical[0].codeHash }, restrictions), true);
+  assert.equal(registrationTicketIsBlocked({ batch_id: 'different-batch', code_hash: historical[0].codeHash }, restrictions), false);
+  assert.equal(JSON.stringify(restrictions).includes(code), false);
+});
+
+test('an ID-only tombstone blocks a retained old reservation without reviving the deleted row', async () => {
+  const store = memory([[key, { ...state([entry()]), deleted: [{ id: 'entry-one' }] }]]);
+  assert.deepEqual(await readRegistrationTicketOwners(eventId, { store }), []);
+  const restrictions = await readRegistrationTicketRestrictions(eventId, { store });
+  assert.deepEqual(restrictions, [{ batchId: 'batch-one', codeHash: createHash('sha256').update(code).digest('hex'), registrationId: 'entry-one', blocked: true }]);
 });
 
 test('legacy entries are read once, then a newly established authoritative state wins over stale copies', async () => {

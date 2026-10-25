@@ -6,7 +6,8 @@ import { randomUUID } from "node:crypto";
 import { createCommunityHandler } from "../netlify/functions/community.mjs";
 import { adminLogin } from "../netlify/lib/security.mjs";
 test("community handler integrates with SQL: moderation, profiles, ticket claim and private contact data", async () => {
-  const handler = createCommunityHandler({ moderation: () => ({ getWithMetadata: async () => null }) });
+  const handler = createCommunityHandler({ moderation: () => ({ getWithMetadata: async () => null }),
+    registrationStore: { get: async () => null, list: async () => ({ blobs: [] }) } });
   const pg = new PGlite();
   await pg.exec(
     "create role anon;create role authenticated;create role service_role;create schema auth;create table auth.users(id uuid primary key);",
@@ -81,7 +82,7 @@ test("community handler integrates with SQL: moderation, profiles, ticket claim 
     for (const [key, v] of url.searchParams) {
       if (v.startsWith("eq.")) {
         assert.ok(
-          ["id", "kind", "status", "user_id", "batch_id", "public_name"].includes(key),
+          ["id", "kind", "status", "user_id", "batch_id", "public_name", "code_hash"].includes(key),
         );
         values.push(key === "public_name" ? v.slice(3) === "true" : v.slice(3));
         conditions.push(`${key}=$${values.length}`);

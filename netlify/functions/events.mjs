@@ -69,7 +69,8 @@ export async function readEvents() {
 const has = (session, permission) => session?.role === "owner" || session?.permissions.includes(permission);
 const catalogPermissions = ["events.publish", "registrations.view", "registrations.manage", "registrations.receipts",
   "registrations.photos", "registrations.export", "tickets.view", "tickets.manage", "raffles.view", "raffles.manage",
-  "attendance.view", "attendance.manage", "accounts.view", "accounts.manage"];
+  "attendance.view", "attendance.manage", "accounts.view", "accounts.manage", "payments.view", "payments.manage",
+  "statistics.view", "audit.view", "yearbooks.view", "yearbooks.manage", "yearbooks.publish"];
 function adminCatalog(events, session) {
   if (has(session, "events.view")) return events;
   if (!catalogPermissions.some(permission => has(session, permission))) return [];
@@ -96,7 +97,8 @@ return guarded(async (req) => {
       if (!session) fail(401, "Yönetici girişi gerekli.");
     }
     if (action && action !== "trash") fail(400, "Geçersiz etkinlik işlemi.");
-    const saved = eventArray(await getStore(CONTENT_STORE).get(EVENTS_KEY, READ_JSON), seedEvents);
+    const stored = await getStore(CONTENT_STORE).get(EVENTS_KEY, READ_JSON);
+    const saved = eventArray(stored, seedEvents);
     if (action === "trash") {
       const trash = saved.filter(record => isDeletedEvent(record) && !isPurgedEvent(record)).map(record => ({ id: record.id, event: projectEvent(record.event, true),
         revision: record.revision, deletedAt: record.deletedAt, source: "trash" }));
@@ -111,6 +113,7 @@ return guarded(async (req) => {
     }
     const events = await hydrate(activeEvents(saved, adminList), getStore);
     return response({
+      ...(!adminList ? { verified: stored != null } : {}),
       events:
         adminList
           ? adminCatalog(events, session)
@@ -139,19 +142,19 @@ return guarded(async (req) => {
   if (action === "publish" && typeof input.published !== "boolean") fail(400, "Geçersiz yayın durumu.");
   if (action === "purge" && typeof input.confirmation !== "string") fail(400, "Etkinlik başlığını yazarak silmeyi onaylayın.");
   const store = getStore(CONTENT_STORE);
+  const operationId = randomUUID(), at = now().toISOString();
   for (let attempt = 0; attempt < 12; attempt++) {
     const snapshot = await store.getWithMetadata(EVENTS_KEY, READ_JSON);
     if (snapshot && (typeof snapshot.etag !== "string" || !snapshot.etag)) fail(503, "Etkinlik listesi doğrulanamadı.");
     const events = eventArray(snapshot?.data, seedEvents);
     const index = events.findIndex((e) => e.id === id);
     const current = index >= 0 ? events[index] : null;
-    const at = now().toISOString();
     let event, type;
     if (req.method === "DELETE") {
       if (!current || isDeletedEvent(current)) fail(409, "Etkinlik silinmiş veya artık listede bulunmuyor. Listeyi yenileyin.");
       assertEventRevision(expectedRevision, eventRevision(current));
       events[index] = { id, deleted: true, event: projectEvent(current), deletedAt: at,
-        revision: identifier(uuid()), operations: operationHistory(current, "delete", at, session), lastOperation: eventOperation("delete", at, session) };
+        revision: identifier(uuid()), operations: operationHistory(current, "delete", at, session, operationId), lastOperation: eventOperation("delete", at, session) };
     } else if (action === "purge") {
       if (current && (!isDeletedEvent(current) || isPurgedEvent(current))) fail(409, "Etkinlik çöp kutusunda bulunmuyor. Listeyi yenileyin.");
       const retained = current || registrationRecovery(await getStore(REGISTRATION_STORE).get(registrationStateKey(id), READ_JSON), id);
@@ -161,7 +164,7 @@ return guarded(async (req) => {
       // The marker blocks stale edits and recovery from registration snapshots,
       // while permanently discarding the archived event metadata and media.
       const marker = { id, deleted: true, purged: true, deletedAt: current?.deletedAt || at, purgedAt: at,
-        revision: identifier(uuid()) };
+        revision: identifier(uuid()), operations: operationHistory(current, "purge", at, session, operationId), lastOperation: eventOperation("purge", at, session) };
       if (index >= 0) events[index] = marker; else events.unshift(marker);
     } else if (action === "restore") {
       if (isPurgedEvent(current)) fail(404, "Bu etkinlik kalıcı olarak silinmiş; geri getirilemez.");
@@ -177,7 +180,7 @@ return guarded(async (req) => {
         retained = recovery.event; type = "recover";
       }
       event = { ...projectEvent(retained), published: false, createdAt: retained.createdAt || at,
-        updatedAt: at, revision: identifier(uuid()), operations: operationHistory(current || retained, type, at, session), lastOperation: eventOperation(type, at, session) };
+        updatedAt: at, revision: identifier(uuid()), operations: operationHistory(current || retained, type, at, session, operationId), lastOperation: eventOperation(type, at, session) };
       if (index >= 0) events[index] = event; else events.unshift(event);
     } else {
       if (action === "publish" || providedId) {
@@ -193,7 +196,13 @@ return guarded(async (req) => {
       event = { ...(action === "publish" ? projectEvent(current) : normalized), id,
         ...(action === "publish" ? { published: input.published } : {}),
         createdAt: current?.createdAt || at, updatedAt: at, revision: identifier(uuid()),
-        operations: operationHistory(current, type, at, session), lastOperation: eventOperation(type, at, session) };
+        operations: operationHistory(current, type, at, session, operationId), lastOperation: eventOperation(type, at, session) };
+      // A normal editor save can also publish/unpublish. Retain both facts in
+      // the same CAS write so this change remains visible in the audit screen.
+      if (save && normalized.published !== (current?.published !== false && Boolean(current))) {
+        const publication = normalized.published ? "publish" : "unpublish";
+        event.operations = operationHistory(event, publication, at, session, `${operationId}-publication`);
+      }
       if (index >= 0) events[index] = event;
       else events.unshift(event);
     }

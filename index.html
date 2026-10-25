@@ -33,7 +33,9 @@
 
 
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="assets/home-instagram.css?v=instagram-1">
+    <link rel="stylesheet" href="assets/home-instagram.css?v=privacy-1">
+    <link rel="stylesheet" href="assets/home-v2.css?v=home-2">
+    <link rel="stylesheet" href="assets/privacy-preferences.css?v=privacy-1">
     <style>
         .social-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .social-card:hover { transform: translateY(-5px); }
@@ -55,7 +57,7 @@
     </script>
 <meta name="google-site-verification" content="dcdfdey51j22jg-wnv2X_4nwiY6ssLhzJIKnDGAQXwo" />
 <script type="module" src="assets/shell.js?v=panel-2"></script><script src="fun.js"></script></head>
-<body class="text-gray-800 antialiased overflow-x-hidden">
+<body class="home-page text-gray-800 antialiased overflow-x-hidden">
 
 
 
@@ -90,47 +92,30 @@
     </div>
     <script src="assets/index-inline-2.js"></script>
 
-    <main class="pt-32 pb-10 lg:pt-40 lg:pb-14 relative band-dark overflow-hidden">
-        <div class="absolute -top-24 -right-16 w-96 h-96 bg-ercupsaRed/25 rounded-full blur-3xl pointer-events-none" aria-hidden="true"></div>
-        <div class="absolute top-32 -left-20 w-80 h-80 bg-ercupsaAccent/25 rounded-full blur-3xl pointer-events-none" aria-hidden="true"></div>
-        <div class="absolute bottom-0 left-1/3 w-72 h-72 bg-ercupsaAccent/15 rounded-full blur-3xl pointer-events-none" aria-hidden="true"></div>
-        <div class="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-            <i class="fa-solid fa-pills text-white/[0.06] absolute text-[7rem] md:text-[10rem] -left-6 top-6 rotate-[-15deg]"></i>
-            <i class="fa-solid fa-mortar-pestle text-white/[0.06] absolute text-[6rem] md:text-[9rem] -right-4 top-2 rotate-[12deg]"></i>
-            <i class="fa-solid fa-capsules text-white/[0.05] absolute text-[5rem] md:text-[7rem] left-10 bottom-2 rotate-[8deg] hidden md:block"></i>
-            <i class="fa-solid fa-prescription-bottle-medical text-white/[0.05] absolute text-[5rem] md:text-[7rem] right-10 bottom-0 rotate-[-10deg] hidden md:block"></i>
-            <i class="fa-solid fa-dna text-white/[0.05] absolute text-[9rem] left-1/2 -translate-x-1/2 top-0 hidden lg:block"></i>
+    <main class="home-hero" id="homeHero">
+      <div class="home-hero-layout home-shell">
+        <div class="home-hero-copy">
+          <span class="home-eyebrow"><span aria-hidden="true"></span> ERCİYES ÜNİVERSİTESİ · ECZACILIK FAKÜLTESİ</span>
+          <h1>Birlikte öğreniyor,<br><em>iz bırakıyoruz.</em></h1>
+          <p>Bilimsel buluşmalardan teknik gezilere, sosyal etkinliklerden dayanışmaya. ERCUPSA ile eczacılık öğrenciliğinin paylaştıkça büyüyen tarafını keşfet.</p>
+          <div class="home-primary-actions">
+            <a id="discoverEvents" href="etkinlikler.html" class="home-button home-button-primary">Etkinlikleri keşfet <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+            <a href="galeri.html" class="home-button home-button-outline">Neler yaptık? <i class="fa-regular fa-images" aria-hidden="true"></i></a>
+          </div>
+          <div class="home-social-actions" aria-label="Duyurularımızı takip et">
+            <a href="https://www.instagram.com/ercupsa" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-instagram" aria-hidden="true"></i> Instagram’da takip et</a>
+            <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp duyuruları</a>
+          </div>
         </div>
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
-
-            <span class="badge-chip-dark inline-block py-1.5 px-4 rounded-full text-xs font-bold tracking-wider mb-6 uppercase">
-                Geleceğin Eczacıları Topluluğu
-            </span>
-
-            <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
-                <span class="text-ercupsaAccent">Birlikte öğreniyor,</span><br/><span class="text-white">iz bırakıyoruz.</span>
-            </h1>
-
-            <p class="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
-                ERCUPSA ile mesleki buluşmaları, teknik gezileri ve sosyal sorumluluk çalışmalarımızı keşfet. Etkinliklerimizden anılar burada; yeni duyurularımız Instagram ve WhatsApp’ta.
-            </p>
-
-            <div class="home-primary-actions">
-                <a id="discoverEvents" href="etkinlikler.html" class="btn-primary rounded-2xl px-7 py-4 font-bold inline-flex items-center gap-2"><i class="fa-regular fa-calendar" aria-hidden="true"></i> Etkinlikleri keşfet</a>
-                <a href="galeri.html" class="home-gallery-action"><i class="fa-regular fa-images" aria-hidden="true"></i> Neler yaptık?</a>
-            </div>
-            <div class="home-social-actions" aria-label="Duyurularımızı takip et">
-                <a href="https://www.instagram.com/ercupsa?igsh=MTR4ZzZrcXl5a3ZqbA%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-instagram" aria-hidden="true"></i> Instagram’da takip et</a>
-                <a href="https://chat.whatsapp.com/E9Rxa6ikg489pwGOyL0nTy?s=cl&p=i&ilr=2" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp duyuruları</a>
-            </div>
-
-            <a href="test.html" class="badge-chip-dark inline-flex items-center gap-2 mt-6 px-4 py-2 rounded-full text-xs font-bold hover:scale-105 transition">
-                🧪 Hangi Eczacı Tipisin? Teste Gir <i class="fa-solid fa-arrow-right"></i>
-            </a>
-
-        </div>
+        <aside id="homeSpotlight" class="home-spotlight" aria-label="Öne çıkan etkinlik" aria-live="polite">
+          <div class="home-spotlight-empty"><img src="ercupsa.PNG" width="120" height="120" alt="ERCUPSA"><span>Bir sonraki buluşmada görüşürüz.</span><p>Yeni etkinliklerimizi ve birlikte biriktirdiğimiz anıları keşfet.</p><a href="etkinlikler.html">Etkinliklere göz at <span aria-hidden="true">↗</span></a></div>
+        </aside>
+      </div>
+      <div class="home-hero-bottom home-shell"><span>Bilimsel buluşmalar</span><span>Mesleki deneyimler</span><span>Sosyal sorumluluk</span><a href="test.html">Hangi eczacı tipisin? <span aria-hidden="true">↗</span></a></div>
     </main>
 
+<section class="home-activities home-shell" aria-labelledby="homeActivitiesTitle"><div class="home-section-intro"><span class="home-eyebrow">ÖĞRENMEK · PAYLAŞMAK · KATKI SUNMAK</span><h2 id="homeActivitiesTitle">Bir topluluktan<br><em>daha fazlasını paylaşırız.</em></h2><p>Merakımızı mesleğimize, enerjimizi birlikte ürettiğimiz işlere taşıyoruz.</p></div><div class="home-activity-grid"><a href="etkinlikler.html" class="home-activity"><i class="fa-solid fa-microscope" aria-hidden="true"></i><span>01 / BİLİM</span><h3>Bilgiyle buluşuyoruz.</h3><p>Konferanslar ve mesleki buluşmalarla eczacılığın farklı alanlarını keşfediyoruz.</p><span class="home-activity-arrow" aria-hidden="true">↗</span></a><a href="galeri.html" class="home-activity"><i class="fa-solid fa-compass" aria-hidden="true"></i><span>02 / DENEYİM</span><h3>Yerinde öğreniyoruz.</h3><p>Teknik geziler, atölyeler ve paylaştığımız deneyimlerle ufkumuzu genişletiyoruz.</p><span class="home-activity-arrow" aria-hidden="true">↗</span></a><a href="galeri.html" class="home-activity"><i class="fa-solid fa-hands-holding-circle" aria-hidden="true"></i><span>03 / DAYANIŞMA</span><h3>Birlikte iz bırakıyoruz.</h3><p>Sosyal sorumluluk çalışmalarında ve sosyal etkinliklerde bir araya geliyoruz.</p><span class="home-activity-arrow" aria-hidden="true">↗</span></a></div></section>
+<section id="homeYearbookAnnouncement" class="home-yearbook home-shell" hidden aria-labelledby="homeYearbookTitle"><div><span class="home-eyebrow">ERCUPSA YILLIKLARI</span><h2 id="homeYearbookTitle"></h2><p id="homeYearbookDescription"></p></div><a id="homeYearbookLink" class="home-button home-button-primary">Yıllığı keşfet <span aria-hidden="true">↗</span></a></section>
 <section class="pt-12 pb-16 bg-gradient-to-b from-slate-50 to-white reveal">
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8"><div class="flex items-end justify-between gap-4 mb-8"><div><span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Takvim</span><h2 class="text-3xl md:text-4xl font-black mt-2">Yaklaşan <span class="text-ercupsaRed">Etkinlikler</span></h2></div><a href="etkinlikler.html" class="text-sm font-bold text-ercupsaRed">Tüm etkinlikler →</a></div><div id="home-events" class="flex md:grid md:grid-cols-3 gap-5 overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-4 px-4 md:mx-0 md:px-0 pb-2 md:pb-0" style="scrollbar-width:none;-ms-overflow-style:none"></div></div>
 </section>
@@ -140,7 +125,7 @@
 
         <div class="flex flex-wrap justify-center gap-4 mb-16">
             <a href="ekip.html" class="px-8 py-4 rounded-2xl bg-white text-ercupsaDark font-bold shadow-md hover:shadow-xl transition-all border border-gray-100 flex items-center gap-3">
-                <i class="fa-solid fa-users text-ercupsaRed"></i> Ekibimizle Tanışın (21 Üye)
+                <i class="fa-solid fa-users text-ercupsaRed"></i> Ekibimizle tanışın
             </a>
             <a href="galeri.html" class="px-8 py-4 rounded-2xl bg-white text-ercupsaDark font-bold shadow-md hover:shadow-xl transition-all border border-gray-100 flex items-center gap-3">
                 <i class="fa-regular fa-images text-ercupsaRed"></i> Fotoğraf Galerisi
@@ -196,7 +181,7 @@
             <p class="text-gray-400 text-[11px] md:text-sm font-semibold uppercase tracking-wider mt-2">Aktif Üye</p>
         </div>
         <div>
-            <div id="eventCounter" class="counter counter-glow text-4xl md:text-5xl font-black" data-target="0">0</div>
+            <div id="eventCounter" class="counter counter-glow text-4xl md:text-5xl font-black">—</div>
             <p class="text-gray-400 text-[11px] md:text-sm font-semibold uppercase tracking-wider mt-2">Etkinlik</p>
         </div>
         <div>
@@ -210,6 +195,7 @@
     <div class="home-instagram-content max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <span class="badge-chip inline-block px-3 py-1 rounded-full text-ercupsaRed text-xs font-black tracking-widest uppercase">Sosyal Medya</span>
         <h2 class="text-3xl md:text-4xl font-black mt-2 mb-10">Instagram'dan <span class="text-ercupsaRed">Son Paylaşımlar</span></h2>
+        <div id="instagramPrivacy" class="privacy-preferences"><p>Instagram içeriklerini bu sayfada göstermek isteğe bağlıdır. Paylaşımları doğrudan Instagram’da açabilirsiniz.</p></div>
         <div id="homeInstagramCards" class="home-instagram-grid">
             <article class="home-instagram-card">
                 <div class="home-instagram-card-heading"><i class="fa-brands fa-instagram" aria-hidden="true"></i><strong>@ercupsa</strong><span>01</span></div>
@@ -237,10 +223,11 @@
         </a>
     </div>
 </section>
-<script type="module" src="assets/home-instagram.js?v=instagram-1"></script>
+<script type="module" src="assets/home-instagram.js?v=privacy-1"></script>
 
     <footer class="bg-ercupsaDark text-white py-10 border-t-4 border-ercupsaRed text-center"><p>ERCUPSA · Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu</p><a href="iletisim.html">İletişim</a></footer>
 <script src="assets/events-common.js"></script>
-<script src="assets/index-inline-3.js"></script>
-<script src="assets/index-inline-4.js"></script></body>
+<script src="assets/index-inline-3.js?v=home-2"></script>
+<script src="assets/index-inline-4.js"></script>
+<script type="module" src="assets/home-v2.js?v=home-2"></script></body>
 </html>

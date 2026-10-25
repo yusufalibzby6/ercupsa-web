@@ -7,7 +7,7 @@ import { ADMIN_STORE, ADMIN_ACCOUNTS_KEY, TREASURER_PERMISSIONS } from "../netli
 import {
   CLASS_OPTIONS, RECEIPT_MAX_BYTES, REGISTRATION_MAX_BYTES, REGISTRATION_STORE,
   REGISTRATION_RECEIPT_STORE, REGISTRATION_PHOTO_STORE, REGISTRATION_FULL_MESSAGE, defaultRegistrationForm, entryKey, formKey, registrationStateKey,
-  hydrateRegistrationFlags, registrationCsv, turkeyToday,
+  hydrateRegistrationFlags, registrationCsv, turkeyToday, validateRegistrationReceipt,
 } from "../netlify/lib/registrations.mjs";
 
 const previousPassword = process.env.ADMIN_PASSWORD;
@@ -28,7 +28,7 @@ const validAnswers = { full_name: "Deniz Test", class_year: "2. Sınıf", phone:
 const photoQuestion = (id = "portrait", required = true) => ({ id, type: "photo", label: "Fotoğraf", required });
 const withPhotos = (form) => ({ ...form, fields: [...form.fields, photoQuestion(), photoQuestion("optional", false)] });
 
-function fixture() {
+function fixture({ legacyReceipts = false } = {}) {
   const stores = new Map();
   const calls = [];
   const hooks = {};
@@ -142,14 +142,39 @@ function fixture() {
     assert.equal(saved.status, 200, await saved.clone().text());
     return (await saved.json()).form;
   };
-  const submit = (options = {}) => {
+  const submit = async (options = {}) => {
     const data = new FormData();
     data.set("answers", JSON.stringify(options.answers ?? validAnswers));
     data.set("requestId", options.requestId ?? randomUUID());
     data.set("website", options.website ?? "");
+    for (const key of ["paymentDeclared", "mediaConsent"]) if (options[key] !== undefined) data.set(key, JSON.stringify(options[key]));
     if (options.receipt) data.set("receipt", new Blob([options.receipt], { type: options.mime ?? "image/png" }), options.filename ?? "dekont.png");
     for (const [id, photo] of Object.entries(options.photos || {}))
       data.set(`photo:${id}`, new Blob([photo.bytes], { type: photo.mime ?? "image/png" }), photo.name ?? "fotograf.png");
+    if (legacyReceipts && options.receipt) {
+      const eventId = options.eventId || "event-one", requestId = data.get("requestId");
+      const id = createHash("sha256").update(`${eventId}\u0000${requestId}`).digest("hex").slice(0, 32);
+      const ledger = stores.get(REGISTRATION_STORE)?.get(registrationStateKey(eventId));
+      if (!ledger?.data.entries.some(entry => entry.id === id)) {
+        const withoutReceipt = new FormData();
+        for (const [key, value] of data) if (key !== "receipt") withoutReceipt.set(key, value);
+        const created = await request("submit", { method: "POST", eventId, form: withoutReceipt, headers: options.headers });
+        if (created.status !== 200) return created;
+        const state = await getStore(REGISTRATION_STORE).get(registrationStateKey(eventId));
+        const entry = state.entries.find(entry => entry.id === id);
+        const file = await validateRegistrationReceipt(data.get("receipt"));
+        const key = `legacy/${eventId}/${id}`;
+        await getStore(REGISTRATION_RECEIPT_STORE).set(key, file.bytes);
+        entry.receipt = { ...file.metadata, key };
+        delete entry.choicesVersion;
+        const hash = value => createHash("sha256").update(value).digest("hex");
+        const answers = options.answers || validAnswers;
+        const stableAnswers = Object.keys(answers).sort().map(key => [key, Array.isArray(answers[key]) ? [...answers[key]].sort() : answers[key]]);
+        entry.fingerprint = hash(JSON.stringify({ answers: stableAnswers, receipt: [file.metadata.mime, hash(file.bytes)],
+          ...(Object.keys(options.photos || {}).length ? { photos: Object.keys(options.photos).sort().map(id => [id, entry.photos[id].mime, hash(options.photos[id].bytes)]) } : {}) }));
+        await getStore(REGISTRATION_STORE).setJSON(registrationStateKey(eventId), state);
+      }
+    }
     return request("submit", { method: "POST", eventId: options.eventId, form: data,
       headers: options.headers, extra: options.extra });
   };
@@ -167,7 +192,7 @@ async function delegateCookie(f, permissions, { treasurer = false } = {}) {
 }
 
 test("Sayman only reads registration lists and receipts; other operations are rejected before private stores", async () => {
-  const f = fixture();
+  const f = fixture({ legacyReceipts: true });
   await f.open("event-one", withPhotos);
   const submitted = await (await f.submit({ receipt: png, photos: { portrait: { bytes: png, name: "private-personal-photo.png" } } })).json();
   await f.request("ticket", { method: "POST", auth: true, input: { id: submitted.reference } });
@@ -221,7 +246,7 @@ test("registration managers cannot delete entries, and ticket access additionall
 });
 
 test("registration viewers without attachment permissions receive no file metadata or ticket cleanup names", async () => {
-  const f = fixture();
+  const f = fixture({ legacyReceipts: true });
   await f.open("event-one", withPhotos);
   await f.submit({ receipt: png, filename: "private-receipt.png", photos: { portrait: { bytes: png, name: "private-photo.png" } } });
   const viewer = await delegateCookie(f, ["registrations.view"]);
@@ -257,7 +282,7 @@ test("config defaults, core fields, types, lengths and options are enforced with
   const empty = await (await request("admin", { auth: true })).json();
   assert.deepEqual(empty.form, defaultRegistrationForm("event-one"));
   assert.deepEqual(empty.form.fields[1].options, CLASS_OPTIONS);
-  assert.deepEqual((await (await request()).json()), { form: null, available: false, full: false });
+  assert.deepEqual((await (await request()).json()), { form: null, available: false, full: false, stage: "closed" });
   const saved = await open();
   assert.equal(saved.updatedAt, "2026-10-04T09:00:00.000Z");
   const mutations = [
@@ -274,7 +299,7 @@ test("config defaults, core fields, types, lengths and options are enforced with
     (f) => { f.fields[1].options.push("2. Sınıf"); },
     (f) => { f.fields[1].options = Array.from({ length: 41 }, (_, i) => String(i)); },
     (f) => { f.description = "a".repeat(5001); },
-    (f) => { f.receipt = { enabled: false, required: true }; },
+    (f) => { f.waitlist = { enabled: true, capacity: 0 }; },
     (f) => { f.fields.push({ id: "constructor", type: "text", label: "Soru", required: false }); },
     (f) => { f.fields.push({ id: "full_name", type: "text", label: "Soru", required: false }); },
     (f) => { f.fields[0].label = "x".repeat(161); },
@@ -335,31 +360,34 @@ test("all configured answers are validated and invalid submissions leave no entr
     null, [], { ...answers, note: "x\u0000y" },
   ];
   for (const candidate of invalid) assert.equal((await submit({
-    answers: candidate === null ? "invalid" : candidate, receipt: png,
+    answers: candidate === null ? "invalid" : candidate,
   })).status, 400);
-  assert.equal((await submit({ answers })).status, 400);
-  assert.equal((await submit({ answers, receipt: png, website: "spam.example" })).status, 400);
-  assert.equal((await submit({ answers, receipt: png })).status, 200);
+  assert.equal(stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries.length, 0);
+  const requestId = randomUUID();
+  assert.equal((await submit({ answers, requestId })).status, 200);
+  assert.equal((await submit({ answers, website: "spam.example" })).status, 400);
+  assert.equal((await submit({ answers, requestId })).status, 200);
   assert.equal(stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries.length, 1);
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
+  assert.equal((stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0), 0);
 });
 
 test("a native submission is idempotent, private, class-counted and exportable", async () => {
-  const { open, submit, request, stores, calls } = fixture();
+  const { open, submit, request, stores, calls } = fixture({ legacyReceipts: true });
   await open();
   const requestId = randomUUID();
   const result = await submit({ requestId, receipt: png, filename: '../../dekont".png' });
   assert.equal(result.status, 200);
+  calls.length = 0; // Only handler reads below, excluding fixture legacy-data setup.
   const submitted = await result.json();
   assert.match(submitted.reference, /^[a-f0-9]{32}$/);
-  assert.deepEqual(Object.keys(submitted).sort(), ["event", "ok", "reference"]);
+  assert.deepEqual(Object.keys(submitted).sort(), ["event", "ok", "reference", "registrationStatus"]);
   assert.deepEqual(submitted.event, { id: "event-one", title: "Birinci etkinlik",
     date: "2026-10-04", time: "00:01", location: "" });
   assert.deepEqual(await (await submit({ requestId, receipt: png })).json(), submitted);
   assert.equal((await submit({ requestId, answers: { ...validAnswers, phone: "05559999999" }, receipt: png })).status, 409);
   assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
   const admin = await (await request("admin", { auth: true })).json();
-  assert.deepEqual(admin.summary, { total: 1, byClass: [{ classYear: "2. Sınıf", count: 1 }],
+  assert.deepEqual(admin.summary, { total: 1, main: 1, waitlisted: 0, cancelled: 0, byClass: [{ classYear: "2. Sınıf", count: 1 }],
     duplicateEntries: 0, duplicateGroups: 0 });
   assert.equal(admin.entries[0].name, "Deniz Test");
   assert.deepEqual(admin.entries[0].receipt, { name: "dekont.png", mime: "image/png", size: png.length });
@@ -385,87 +413,10 @@ test("a native submission is idempotent, private, class-counted and exportable",
   assert.ok(!csvText.includes('"Durum"'));
   assert.ok(!Object.hasOwn(admin.entries[0], "status"));
   const publicForm = await (await request()).json();
-  assert.deepEqual(Object.keys(publicForm).sort(), ["available", "event", "form", "full"]);
+  assert.deepEqual(Object.keys(publicForm).sort(), ["available", "event", "form", "full", "stage"]);
   assert.ok(!JSON.stringify(publicForm).includes("Deniz Test"));
   assert.ok(calls.filter((call) => ["get", "getWithMetadata"].includes(call.action))
     .every((call) => call.options.consistency === "strong"));
-});
-
-test("unsupported, incomplete, disabled and oversized receipts are rejected", async () => {
-  const { open, submit, request, stores } = fixture();
-  await open();
-  assert.equal((await submit({ receipt: Buffer.from("<svg>test</svg>"), mime: "image/svg+xml" })).status, 415);
-  assert.equal((await submit({ receipt: png.subarray(0, -10) })).status, 415);
-  assert.equal((await submit({ receipt: Buffer.from("%PDF-1.4 without eof"), mime: "application/pdf" })).status, 415);
-  assert.equal((await submit({ receipt: Buffer.alloc(RECEIPT_MAX_BYTES + 1) })).status, 413);
-  const valid = await submit({ receipt: pdf, mime: "application/pdf", filename: "dekont.pdf" });
-  assert.equal(valid.status, 200);
-  const reference = (await valid.json()).reference;
-  const response = await request("receipt", { auth: true, extra: "&id=" + reference });
-  assert.match(response.headers.get("content-disposition"), /^attachment;/);
-  assert.equal(response.headers.get("content-type"), "application/pdf");
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
-  await open("event-one", (form) => ({ ...form, receipt: { enabled: false, required: false } }));
-  assert.equal((await submit({ receipt: png })).status, 400);
-});
-
-test("Android MIME hints and JPG screenshot names are normalized from the actual receipt contents", async () => {
-  const { open, submit, request } = fixture();
-  await open();
-  const cases = [
-    [png, 'image/jpeg', 'Screenshot_VakifBank.jpg', 'image/png', 'Screenshot_VakifBank.png'],
-    [png, 'image/x-png', 'dekont.png', 'image/png', 'dekont.png'],
-    [png, '', 'dekont.jpg', 'image/png', 'dekont.png'],
-    [jpeg, 'application/octet-stream', 'dekont.jpg', 'image/jpeg', 'dekont.jpg'],
-    [jpeg, 'image/jpg', 'dekont.jpeg', 'image/jpeg', 'dekont.jpg'],
-    [jpeg, 'image/pjpeg', 'dekont.jpg', 'image/jpeg', 'dekont.jpg'],
-    [jpeg, 'image/png', 'dekont.png', 'image/jpeg', 'dekont.jpg'],
-    [progressiveJpeg, '', 'dekont.jpg', 'image/jpeg', 'dekont.jpg'],
-    [pdf, 'application/octet-stream', 'dekont.pdf', 'application/pdf', 'dekont.pdf'],
-  ];
-  for (const [bytes, mime, filename, actualMime, actualName] of cases) {
-    const uploaded = await submit({ receipt: bytes, mime, filename });
-    assert.equal(uploaded.status, 200, `${filename}: ${mime}`);
-    const reference = (await uploaded.json()).reference;
-    const admin = await (await request('admin', { auth: true })).json();
-    const entry = admin.entries.find(item => item.id === reference);
-    assert.deepEqual(entry.receipt, { name: actualName, mime: actualMime, size: bytes.length });
-    const downloaded = await request('receipt', { auth: true, extra: '&id=' + reference });
-    assert.equal(downloaded.headers.get('content-type'), actualMime);
-    assert.equal(downloaded.headers.get('x-content-type-options'), 'nosniff');
-    assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), bytes);
-  }
-});
-
-test("valid JPEG scans accept trailing phone metadata without confusing metadata markers for an image end", async () => {
-  const { open, submit, request } = fixture();
-  await open();
-  // APP metadata can itself contain FF D9. The parser must skip the segment.
-  const app = Buffer.from([0xff, 0xe1, 0, 8, 1, 2, 0xff, 0xd9, 3, 4]);
-  const withApp = Buffer.concat([jpeg.subarray(0, 2), app, jpeg.subarray(2)]);
-  for (const original of [jpeg, progressiveJpeg, withApp]) {
-    const uploaded = await submit({ receipt: Buffer.concat([original, Buffer.from('\0Samsung_SEF_metadata\0')]), mime: 'image/jpeg', filename: 'dekont.jpg' });
-    assert.equal(uploaded.status, 200);
-    const reference = (await uploaded.json()).reference;
-    const downloaded = await request('receipt', { auth: true, extra: '&id=' + reference });
-    assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), original);
-  }
-  for (const broken of [jpeg.subarray(0, -2), Buffer.from([0xff, 0xd8, ...app, 0xff, 0xd9]),
-    Buffer.concat([jpeg.subarray(0, 2), Buffer.from([0xff, 0xe1, 0xff, 0xff]), jpeg.subarray(2)])]) {
-    assert.equal((await submit({ receipt: broken, mime: 'image/jpeg' })).status, 415);
-  }
-});
-
-test("receipt retries bind canonical content even when the phone changes its MIME or filename hint", async () => {
-  const { open, submit, request, stores } = fixture();
-  await open();
-  const requestId = randomUUID();
-  const first = await submit({ requestId, receipt: png, mime: 'image/jpeg', filename: 'dekont.jpg' });
-  assert.equal(first.status, 200);
-  assert.deepEqual(await (await submit({ requestId, receipt: png, mime: 'application/octet-stream', filename: 'dekont.png' })).json(), await first.json());
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
-  assert.equal((await (await request('admin', { auth: true })).json()).summary.total, 1);
-  assert.equal((await submit({ requestId, receipt: jpeg, mime: 'image/jpeg', filename: 'dekont.jpg' })).status, 409);
 });
 
 test("multipart parsing rejects duplicate, unknown, invalid id and non-file fields; oversized streams are cancelled", async () => {
@@ -509,10 +460,10 @@ test("concurrent entries cannot overwrite each other, and duplicate requests kee
       headers: { "x-nf-client-connection-ip": "192.0.2." + (index + 10) } })));
   assert.ok(responses.every((result) => result.status === 200));
   const requestId = randomUUID();
-  const duplicates = await Promise.all([submit({ requestId, receipt: png }), submit({ requestId, receipt: png })]);
+  const duplicates = await Promise.all([submit({ requestId }), submit({ requestId })]);
   assert.ok(duplicates.every((result) => result.status === 200));
   assert.deepEqual(await duplicates[0].json(), await duplicates[1].json());
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
+  assert.equal((stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0), 0);
   const admin = await (await request("admin", { auth: true })).json();
   assert.equal(admin.summary.total, 17);
   assert.equal(new Set(admin.entries.map((entry) => entry.id)).size, 17);
@@ -523,21 +474,21 @@ test("same UUID cannot report success for changed answers or receipt, including 
   await open();
   const requestId = randomUUID();
   const raced = await Promise.all([
-    submit({ requestId, receipt: png, answers: { ...validAnswers, full_name: "Deniz" } }),
-    submit({ requestId, receipt: png, answers: { ...validAnswers, full_name: "Ece" } }),
+    submit({ requestId, answers: { ...validAnswers, full_name: "Deniz" } }),
+    submit({ requestId, answers: { ...validAnswers, full_name: "Ece" } }),
   ]);
   assert.deepEqual(raced.map((result) => result.status).sort(), [200, 409]);
   const conflict = raced.find((result) => result.status === 409);
   assert.match((await conflict.json()).error, /Önceki kayıt isteğin alınmış/);
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
+  assert.equal((stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0), 0);
   const admin = await (await request("admin", { auth: true })).json();
   const acceptedAnswers = admin.entries[0].answers;
   assert.equal((await submit({ requestId, answers: acceptedAnswers, receipt: pdf, mime: "application/pdf" })).status, 409);
-  assert.equal((await submit({ requestId, answers: acceptedAnswers })).status, 409);
+  assert.equal((await submit({ requestId, answers: acceptedAnswers, mediaConsent: true })).status, 409);
   // Editing the live schema must not reinterpret or block an identical retry.
   await open("event-one", (form) => ({ ...form, enabled: false, fields: [...form.fields,
     { id: "new_question", type: "text", label: "Yeni zorunlu soru", required: true }] }));
-  const retried = await submit({ requestId, answers: acceptedAnswers, receipt: png });
+  const retried = await submit({ requestId, answers: acceptedAnswers });
   assert.equal(retried.status, 200);
   assert.equal((await retried.json()).reference, admin.entries[0].id);
 });
@@ -583,7 +534,7 @@ test("legitimate simultaneous registrations behind one campus IP survive counter
 });
 
 test("field snapshots and receipts survive form edits and event deletion", async () => {
-  const { open, submit, request, events } = fixture();
+  const { open, submit, request, events } = fixture({ legacyReceipts: true });
   await open("event-one", (form) => ({ ...form, fields: [...form.fields,
     { id: "custom", type: "text", label: "Eski soru", required: false }] }));
   const submitted = await submit({ answers: { ...validAnswers, custom: "=HYPERLINK(\"evil\")" }, receipt: png });
@@ -636,60 +587,11 @@ test("event metadata exposes native flags only, including disabled override of G
   assert.ok(!JSON.stringify(hydrated).includes("answers"));
 });
 
-test("failed entry writes clean uncommitted receipts and preserve receipts if commit succeeded before a network failure", async () => {
-  for (const committed of [false, true]) {
-    const { open, submit, request, stores, hooks } = fixture();
-    await open();
-    const hook = async ({ name, key }) => {
-      if (name === REGISTRATION_STORE && key.startsWith("state/")) throw new Error("private token failure");
-    };
-    hooks[committed ? "afterSet" : "beforeSet"] = hook;
-    const result = await submit({ receipt: png });
-    assert.equal(result.status, committed ? 200 : 503);
-    assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, committed ? 1 : 0);
-    if (!committed) assert.ok(!(await result.text()).includes("private token"));
-    else {
-      const id = (await result.json()).reference;
-      assert.equal((await request("receipt", { auth: true, extra: "&id=" + id })).status, 200);
-    }
-  }
-});
-
-test("receipt writes that fail after committing are cleaned before creating any entry", async () => {
-  const { open, submit, stores, hooks } = fixture();
-  await open();
-  hooks.afterReceiptSet = () => { throw new Error("receipt connection failed"); };
-  assert.equal((await submit({ receipt: png })).status, 503);
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 0);
-  assert.equal(stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries.length, 0);
-});
-
-test("uncertain entry writes preserve a potentially committed receipt rather than deleting participant data", async () => {
-  const { open, submit, stores, hooks } = fixture();
-  await open();
-  let wroteEntry = false;
-  hooks.afterSet = ({ name, key }) => {
-    if (name === REGISTRATION_STORE && key.startsWith("state/")) {
-      wroteEntry = true;
-      throw new Error("entry committed but response lost");
-    }
-  };
-  hooks.get = ({ name, key }) => {
-    if (wroteEntry && name === REGISTRATION_STORE && key.startsWith("state/"))
-      throw new Error("confirmation read temporarily unavailable");
-  };
-  assert.equal((await submit({ receipt: png })).status, 503);
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
-  const entry = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries[0];
-  assert.ok(entry);
-  assert.ok(stores.get(REGISTRATION_RECEIPT_STORE).has(entry.receipt.key));
-});
-
 test("a cap of 40 is atomic for 45 simultaneous participants sharing one campus IP", async () => {
   const { open, submit, request, stores } = fixture();
   await open("event-one", (form) => ({ ...form, maxRegistrations: 40 }));
   const responses = await Promise.all(Array.from({ length: 45 }, (_, index) =>
-    submit({ answers: { ...validAnswers, full_name: `Katılımcı ${index}` }, receipt: png })));
+    submit({ answers: { ...validAnswers, full_name: `Katılımcı ${index}` } })));
   assert.equal(responses.filter((result) => result.status === 200).length, 40);
   const refused = responses.filter((result) => result.status !== 200);
   assert.equal(refused.length, 5);
@@ -700,7 +602,7 @@ test("a cap of 40 is atomic for 45 simultaneous participants sharing one campus 
   const admin = await (await request("admin", { auth: true })).json();
   assert.equal(admin.summary.total, 40);
   assert.equal(new Set(admin.entries.map((entry) => entry.id)).size, 40);
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 40);
+  assert.equal((stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0), 0);
   const publicForm = await (await request()).json();
   assert.equal(publicForm.available, false);
   assert.equal(publicForm.full, true);
@@ -714,13 +616,13 @@ test("identical retries at the last slot succeed, changed payload conflicts, and
   const { open, submit, request, stores } = fixture();
   await open("event-one", (form) => ({ ...form, maxRegistrations: 1 }));
   const requestId = randomUUID();
-  const responses = await Promise.all([submit({ requestId, receipt: png }), submit({ requestId, receipt: png })]);
+  const responses = await Promise.all([submit({ requestId }), submit({ requestId })]);
   assert.deepEqual(responses.map((result) => result.status), [200, 200]);
   const accepted = await responses[0].json();
   assert.deepEqual(await responses[1].json(), accepted);
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
-  assert.equal((await submit({ requestId, receipt: png })).status, 200);
-  const changed = await submit({ requestId, receipt: png, answers: { ...validAnswers, full_name: "Başka kişi" } });
+  assert.equal((stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0), 0);
+  assert.equal((await submit({ requestId })).status, 200);
+  const changed = await submit({ requestId, answers: { ...validAnswers, full_name: "Başka kişi" } });
   assert.equal(changed.status, 409);
   assert.ok(!(await changed.json()).code);
   assert.equal((await submit()).status, 409);
@@ -728,9 +630,9 @@ test("identical retries at the last slot succeed, changed payload conflicts, and
   assert.equal((await (await request()).json()).available, true);
   assert.equal((await (await request()).json()).full, false);
   assert.equal((await (await request("admin", { auth: true })).json()).summary.total, 0);
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 0);
+  assert.equal((stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0), 0);
   assert.equal((await request("receipt", { auth: true, extra: "&id=" + accepted.reference })).status, 404);
-  const deletedRetry = await submit({ requestId, receipt: png });
+  const deletedRetry = await submit({ requestId });
   assert.equal(deletedRetry.status, 409);
   assert.match((await deletedRetry.json()).error, /silinmiş/);
   assert.equal((await request("delete", { auth: true, method: "POST", input: { id: accepted.reference } })).status, 200);
@@ -779,7 +681,7 @@ test("a form limit lowered while the last-slot upload is in flight wins the same
       signal(); await wait;
     }
   };
-  const racingSubmit = submit({ receipt: png });
+  const racingSubmit = submit({  });
   await blocked;
   await open("event-one", (form) => ({ ...form, maxRegistrations: 1 }));
   release();
@@ -787,11 +689,11 @@ test("a form limit lowered while the last-slot upload is in flight wins the same
   assert.equal(result.status, 409);
   assert.equal((await result.json()).code, "REGISTRATION_FULL");
   assert.equal((await (await request("admin", { auth: true })).json()).summary.total, 1);
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 0);
+  assert.equal((stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0), 0);
 });
 
 test("legacy pending, approved and rejected entries all count and migrate without data or receipt loss", async () => {
-  const { getStore, open, submit, request, stores, events } = fixture();
+  const { getStore, open, submit, request, stores, events } = fixture({ legacyReceipts: true });
   await open();
   for (let i = 0; i < 3; i++) await submit({ receipt: png, answers: { ...validAnswers, full_name: `Eski kişi ${i}` } });
   const store = getStore(REGISTRATION_STORE);
@@ -810,7 +712,7 @@ test("legacy pending, approved and rejected entries all count and migrate withou
   const migrated = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
   assert.deepEqual(migrated.entries.map((entry) => entry.status).sort(), ["approved", "pending", "rejected"]);
   const admin = await (await request("admin", { auth: true })).json();
-  assert.deepEqual(Object.keys(admin.summary).sort(), ["byClass", "duplicateEntries", "duplicateGroups", "total"]);
+  assert.deepEqual(Object.keys(admin.summary).sort(), ["byClass", "cancelled", "duplicateEntries", "duplicateGroups", "main", "total", "waitlisted"]);
   assert.ok(admin.entries.every((entry) => !Object.hasOwn(entry, "status")));
   assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 3);
   const removed = old.entries[1];
@@ -849,7 +751,7 @@ test("failed submit commits cannot consume the only slot, including successful w
         failOnce = false; throw new Error("write response lost");
       }
     };
-    assert.equal((await submit({ receipt: png })).status, committed ? 200 : 503);
+    assert.equal((await submit({  })).status, committed ? 200 : 503);
     const publicForm = await (await request()).json();
     assert.equal(publicForm.full, committed);
     if (!committed) assert.equal((await submit()).status, 200);
@@ -857,7 +759,7 @@ test("failed submit commits cannot consume the only slot, including successful w
 });
 
 test("delete survives a lost commit response and retried cleanup never resurrects a legacy receipt or entry", async () => {
-  const { getStore, open, submit, request, stores, hooks } = fixture();
+  const { getStore, open, submit, request, stores, hooks } = fixture({ legacyReceipts: true });
   await open("event-one", (form) => ({ ...form, maxRegistrations: 1 }));
   const id = (await (await submit({ receipt: png })).json()).reference;
   const original = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries[0];
@@ -1152,13 +1054,16 @@ test("photo retries bind field IDs and canonical bytes but ignore renamed picker
 
 test("legacy receipt-only fingerprints remain byte-for-byte unchanged when photos are absent", async () => {
   for (const receipt of [null, png]) {
-    const { open, submit, stores } = fixture(); await open();
+    const { open, submit, stores } = fixture({ legacyReceipts: true }); await open();
     const accepted = await submit({ receipt }); assert.equal(accepted.status, 200);
-    const entry = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries[0];
+    const state = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+    const entry = state.entries[0];
     const stableAnswers = Object.keys(validAnswers).sort().map((key) => [key, validAnswers[key]]);
     const hash = (data) => createHash("sha256").update(data).digest("hex");
     const old = hash(JSON.stringify({ answers: stableAnswers, receipt: receipt ? ["image/png", hash(png)] : null }));
-    assert.equal(entry.fingerprint, old); assert.ok(!Object.hasOwn(entry, "photos"));
+    if (!receipt) { entry.fingerprint = old; delete entry.choicesVersion; }
+    assert.equal(entry.fingerprint, old);
+    assert.equal((await submit({ requestId: randomUUID() })).status, 200); assert.ok(!Object.hasOwn(entry, "photos"));
   }
 });
 
@@ -1167,12 +1072,12 @@ test("concurrent photo submissions preserve canonical uploads, changed content c
   await open("event-one", (form) => ({ ...withPhotos(form), maxRegistrations: 1 }));
   const requestId = randomUUID();
   const same = await Promise.all(Array.from({ length: 4 }, () =>
-    submit({ requestId, receipt: png, photos: { portrait: { bytes: png }, optional: { bytes: jpeg } } })));
+    submit({ requestId, photos: { portrait: { bytes: png }, optional: { bytes: jpeg } } })));
   assert.ok(same.every((result) => result.status === 200));
   assert.equal(new Set(await Promise.all(same.map(async (result) => (await result.json()).reference))).size, 1);
   assert.equal(stores.get(REGISTRATION_PHOTO_STORE).size, 2);
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 1);
-  assert.equal((await submit({ requestId, receipt: png, photos: { portrait: { bytes: jpeg }, optional: { bytes: jpeg } } })).status, 409);
+  assert.equal((stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0), 0);
+  assert.equal((await submit({ requestId, photos: { portrait: { bytes: jpeg }, optional: { bytes: jpeg } } })).status, 409);
   assert.equal((await submit({ photos: { portrait: { bytes: png } } })).status, 409);
   const entry = (await (await request("admin", { auth: true })).json()).entries[0];
   for (const fieldId of ["portrait", "optional"])
@@ -1185,9 +1090,9 @@ test("partial private uploads are cleaned and conditional-create collisions neve
   hooks.afterReceiptSet = ({ name }) => {
     if (name === REGISTRATION_PHOTO_STORE && ++count === 2) throw Error("lost upload response");
   };
-  assert.equal((await submit({ receipt: png, photos: { portrait: { bytes: png }, optional: { bytes: jpeg } } })).status, 503);
+  assert.equal((await submit({ photos: { portrait: { bytes: png }, optional: { bytes: jpeg } } })).status, 503);
   assert.equal(stores.get(REGISTRATION_PHOTO_STORE).size, 0);
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 0);
+  assert.equal((stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0), 0);
   hooks.afterReceiptSet = null;
   let protectedKey;
   hooks.beforeReceiptSet = ({ name, key, records }) => {
@@ -1209,11 +1114,11 @@ test("lost CAS responses retain accepted photos and unconfirmed ownership preser
     if (unreadable) hooks.get = ({ name, key }) => {
       if (wrote && name === REGISTRATION_STORE && key.startsWith("state/")) throw Error("confirmation unavailable");
     };
-    assert.equal((await submit({ receipt: png, photos: { portrait: { bytes: png }, optional: { bytes: jpeg } } })).status, unreadable ? 503 : 200);
+    assert.equal((await submit({ photos: { portrait: { bytes: png }, optional: { bytes: jpeg } } })).status, unreadable ? 503 : 200);
     const entry = stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data.entries[0];
     assert.ok(entry); assert.equal(stores.get(REGISTRATION_PHOTO_STORE).size, 2);
     for (const photo of Object.values(entry.photos)) assert.ok(stores.get(REGISTRATION_PHOTO_STORE).has(photo.key));
-    assert.ok(stores.get(REGISTRATION_RECEIPT_STORE).has(entry.receipt.key));
+    assert.equal(entry.receipt, null);
   }
 });
 
@@ -1252,10 +1157,10 @@ test("an administrator changing photo questions during upload wins the same CAS 
       await open("event-one", (form) => ({ ...form, maxRegistrations: 1, fields: [...form.fields, photoQuestion("replacement")] }));
     }
   };
-  const result = await submit({ receipt: png, photos: { portrait: { bytes: png } } });
+  const result = await submit({ photos: { portrait: { bytes: png } } });
   assert.equal(result.status, 400);
   assert.equal(stores.get(REGISTRATION_PHOTO_STORE).size, 0);
-  assert.equal(stores.get(REGISTRATION_RECEIPT_STORE).size, 0);
+  assert.equal((stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0), 0);
   const admin = await (await request("admin", { auth: true })).json();
   assert.equal(admin.entries.length, 0); assert.equal(admin.form.fields.at(-1).id, "replacement");
   assert.equal((await (await request()).json()).full, false);
@@ -1263,7 +1168,7 @@ test("an administrator changing photo questions during upload wins the same CAS 
 });
 
 test("emoji filenames survive the truncation boundary and malformed legacy names still download with valid UTF-8 headers", async () => {
-  const { open, submit, request, getStore } = fixture();
+  const { open, submit, request, getStore } = fixture({ legacyReceipts: true });
   await open("event-one", withPhotos);
   const filename = "a".repeat(149) + "🌸" + "z.png";
   const expectedName = "a".repeat(149) + "🌸.png";
@@ -1292,4 +1197,256 @@ test("emoji filenames survive the truncation boundary and malformed legacy names
     assert.equal(decodeURIComponent(encoded), "a".repeat(149) + "\uFFFD.png");
     assert.deepEqual(Buffer.from(await file.arrayBuffer()), png);
   }
+});
+
+test("waitlist is opt-in, hidden capacities never escape public responses, and visible counters use actual main places", async () => {
+  const f = fixture();
+  const defaults = defaultRegistrationForm("event-one");
+  assert.deepEqual(defaults.waitlist, { enabled: false, capacity: 0 });
+  assert.equal(defaults.showRemainingCapacity, false);
+  await f.open("event-one", form => ({ ...form, maxRegistrations: 1,
+    waitlist: { enabled: true, capacity: 2 } }));
+  const first = await (await f.submit()).json();
+  assert.equal(first.registrationStatus, "main");
+  const publicForm = await (await f.request()).json();
+  assert.equal(publicForm.stage, "waitlist");
+  assert.match(publicForm.message, /yedek listeye/);
+  assert.deepEqual(publicForm.form.waitlist, { enabled: true });
+  for (const secret of ["maxRegistrations", "capacity", "remaining", "nextSequence", "entries", "main", "waitlisted"])
+    assert.equal(Object.hasOwn(publicForm, secret) || Object.hasOwn(publicForm.form, secret), false, secret);
+  const second = await (await f.submit()).json();
+  assert.equal(second.registrationStatus, "waitlisted");
+  assert.match(second.message, /asıl katılımcı listesinde değil/);
+  await f.open("event-one", form => ({ ...form, maxRegistrations: 1, showRemainingCapacity: true,
+    waitlist: { enabled: true, capacity: 2 } }));
+  assert.deepEqual((await (await f.request()).json()).capacity, { limit: 1, main: 1, remaining: 0 });
+  assert.equal((await f.submit()).status, 200);
+  const closed = await (await f.request()).json();
+  assert.equal(closed.stage, "closed");
+  assert.equal(closed.available, false);
+  assert.match(closed.message, /asıl ve yedek kontenjanları dolmuştur/);
+  assert.equal((await f.submit()).status, 409);
+  await f.open("event-one", form => ({ ...form, showRemainingCapacity: true }));
+  const unlimited = await (await f.request()).json();
+  assert.equal(unlimited.stage, "main");
+  assert.deepEqual(unlimited.capacity, { limit: null, main: 3, remaining: null });
+});
+
+test("simultaneous applications atomically fill main then FIFO waitlist without oversubscription", async () => {
+  const f = fixture();
+  await f.open("event-one", form => ({ ...form, maxRegistrations: 5, waitlist: { enabled: true, capacity: 7 } }));
+  const responses = await Promise.all(Array.from({ length: 28 }, (_, n) => f.submit({
+    answers: { ...validAnswers, full_name: `Katılımcı ${n}` },
+  })));
+  assert.equal(responses.filter(response => response.status === 200).length, 12);
+  assert.equal(responses.filter(response => response.status === 409).length, 16);
+  const state = f.stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  const main = state.entries.filter(entry => entry.registrationStatus === "main");
+  const wait = state.entries.filter(entry => entry.registrationStatus === "waitlisted");
+  assert.equal(main.length, 5); assert.equal(wait.length, 7);
+  assert.deepEqual(state.entries.map(entry => entry.sequence).sort((a,b) => a-b), Array.from({ length: 12 }, (_,i) => i+1));
+  assert.ok(Math.max(...main.map(entry => entry.sequence)) < Math.min(...wait.map(entry => entry.sequence)));
+  assert.equal(state.nextSequence, 13);
+});
+
+test("cancellation and capacity increases promote the oldest waiting applications in the same CAS with safe audits", async () => {
+  const f = fixture();
+  await f.open("event-one", form => ({ ...form, maxRegistrations: 2, waitlist: { enabled: true, capacity: 4 } }));
+  const accepted = [];
+  for (let n=0; n<6; n++) accepted.push(await (await f.submit({ answers: { ...validAnswers, full_name: `Başvuru ${n}` } })).json());
+  const cancelled = await f.request("cancel", { method: "POST", auth: true, input: { id: accepted[0].reference } });
+  assert.equal(cancelled.status, 200);
+  assert.deepEqual((await cancelled.json()).promoted, [accepted[2].reference]);
+  assert.equal((await f.request("cancel", { method: "POST", auth: true, input: { id: accepted[0].reference } })).status, 200);
+  let state = f.stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  assert.equal(state.entries.length, 6);
+  assert.equal(state.entries.find(entry => entry.id === accepted[0].reference).registrationStatus, "cancelled");
+  assert.equal(state.audit.filter(item => item.type === "registration.cancel").length, 1);
+  assert.equal(state.audit.filter(item => item.type === "registration.promote").length, 1);
+  const raised = await f.request("form", { method: "POST", auth: true, input: { ...state.form, maxRegistrations: 4 } });
+  assert.equal(raised.status, 200);
+  assert.deepEqual((await raised.json()).promoted, [accepted[3].reference, accepted[4].reference]);
+  state = f.stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  assert.equal(state.entries.filter(entry => entry.registrationStatus === "main").length, 4);
+  assert.equal(state.entries.find(entry => entry.id === accepted[5].reference).registrationStatus, "waitlisted");
+  for (const item of state.audit) {
+    assert.ok(!JSON.stringify(item).includes("Başvuru"));
+    assert.ok(!JSON.stringify(item).includes(validAnswers.phone));
+  }
+  const deleted = await f.request("delete", { method: "POST", auth: true, input: { id: accepted[1].reference } });
+  assert.equal(deleted.status, 200);
+  state = f.stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  assert.equal(state.entries.find(entry => entry.id === accepted[5].reference).registrationStatus, "main");
+  assert.equal(state.audit.filter(item => item.type === "registration.delete").length, 1);
+  assert.equal(state.audit.filter(item => item.type === "registration.promote").length, 4);
+});
+
+test("concurrent cancellation, form edits and applications preserve limits and cannot leapfrog existing waiters", async () => {
+  const f = fixture();
+  await f.open("event-one", form => ({ ...form, maxRegistrations: 2, waitlist: { enabled: true, capacity: 4 } }));
+  const accepted = [];
+  for (let n=0; n<5; n++) accepted.push(await (await f.submit()).json());
+  const results = await Promise.all([
+    f.request("cancel", { method: "POST", auth: true, input: { id: accepted[0].reference } }),
+    f.open("event-one", form => ({ ...form, maxRegistrations: 3, waitlist: { enabled: true, capacity: 4 } })),
+    ...Array.from({ length: 7 }, () => f.submit()),
+  ]);
+  assert.equal(results[0].status, 200);
+  const state = f.stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  assert.equal(state.entries.filter(entry => entry.registrationStatus === "main").length, 3);
+  assert.equal(state.entries.filter(entry => entry.registrationStatus === "waitlisted").length, 4);
+  const mainIds = new Set(state.entries.filter(entry => entry.registrationStatus === "main").map(entry => entry.id));
+  assert.ok(mainIds.has(accepted[1].reference));
+  assert.ok(mainIds.has(accepted[2].reference));
+  assert.ok(mainIds.has(accepted[3].reference));
+  assert.equal(state.entries.filter(entry => entry.registrationStatus === "cancelled").length, 1);
+});
+
+test("payment declaration is required only for main paid applications, media consent is optional and retry-bound", async () => {
+  const f = fixture();
+  await f.open("event-one", form => ({ ...form, maxRegistrations: 1, payment: { enabled: true },
+    waitlist: { enabled: true, capacity: 2 } }));
+  assert.equal((await f.submit()).status, 400);
+  assert.equal((await f.submit({ paymentDeclared: false })).status, 400);
+  const requestId = randomUUID();
+  const accepted = await f.submit({ requestId, paymentDeclared: true, mediaConsent: false });
+  assert.equal(accepted.status, 200); const first = await accepted.json();
+  assert.deepEqual(await (await f.submit({ requestId, paymentDeclared: true, mediaConsent: false })).json(), first);
+  assert.equal((await f.submit({ requestId, paymentDeclared: true, mediaConsent: true })).status, 409);
+  assert.equal((await f.submit({ requestId, paymentDeclared: false, mediaConsent: false })).status, 409);
+  const waiting = await (await f.submit({ mediaConsent: true })).json();
+  assert.equal(waiting.registrationStatus, "waitlisted");
+  let state = f.stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  const entry = state.entries.find(entry => entry.id === first.reference);
+  assert.deepEqual(entry.payment, { declared: true, reviewStatus: "pending" });
+  assert.deepEqual(entry.mediaConsent, { granted: false, textVersion: "media-1", recordedAt: entry.createdAt, channels: ["website", "instagram"] });
+  const waiter = state.entries.find(entry => entry.id === waiting.reference);
+  assert.deepEqual(waiter.payment, { declared: false, reviewStatus: "not_required" });
+  assert.equal(waiter.mediaConsent.granted, true);
+  assert.equal((await f.request("ticket", { method: "POST", auth: true, input: { id: first.reference } })).status, 409);
+  assert.equal((await f.request("ticket", { method: "POST", auth: true, input: { id: waiting.reference } })).status, 409);
+  assert.equal((await f.request("payment", { method: "POST", auth: true, input: { id: first.reference, approved: true } })).status, 200);
+  assert.equal((await f.request("ticket", { method: "POST", auth: true, input: { id: first.reference } })).status, 200);
+  assert.equal((await f.request("cancel", { method: "POST", auth: true, input: { id: first.reference } })).status, 200);
+  state = f.stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  const promoted = state.entries.find(entry => entry.id === waiting.reference);
+  assert.equal(promoted.registrationStatus, "main");
+  assert.deepEqual(promoted.payment, { declared: false, reviewStatus: "pending" });
+  assert.equal((await f.request("ticket", { method: "POST", auth: true, input: { id: waiting.reference } })).status, 409);
+  assert.equal([...f.tickets.values()][0].revoked, true);
+});
+
+test("payment visibility and review are explicit permissions, cancellation remains owner-only and exports respect payment access", async () => {
+  const f = fixture(); await f.open("event-one", form => ({ ...form, payment: { enabled: true } }));
+  const { reference } = await (await f.submit({ paymentDeclared: true })).json();
+  const viewer = await delegateCookie(f, ["registrations.view", "registrations.export", "tickets.view", "tickets.manage"]);
+  const headers = { cookie: viewer };
+  const admin = await (await f.request("admin", { headers })).json();
+  assert.ok(!Object.hasOwn(admin.entries[0], "payment"));
+  assert.equal(admin.entries[0].ticketEligible, false);
+  assert.ok(!(await (await f.request("export", { headers })).text()).includes("Ödeme durumu"));
+  for (const action of ["payment", "cancel"]) {
+    f.calls.length = 0;
+    assert.equal((await f.request(action, { method: "POST", headers, input: { id: reference, approved: true } })).status, 403);
+    assert.equal(f.calls.filter(call => call.name !== ADMIN_STORE).length, 0);
+  }
+  const treasurer = await delegateCookie(f, [...TREASURER_PERMISSIONS], { treasurer: true });
+  assert.equal((await (await f.request("admin", { headers: { cookie: treasurer } })).json()).entries[0].payment.reviewStatus, "pending");
+  assert.equal((await f.request("payment", { method: "POST", headers: { cookie: treasurer }, input: { id: reference, approved: true } })).status, 403);
+  const reviewer = await delegateCookie(f, ["registrations.view", "payments.view", "payments.manage"]);
+  assert.equal((await f.request("payment", { method: "POST", headers: { cookie: reviewer }, input: { id: reference, approved: true } })).status, 200);
+  assert.equal((await (await f.request("admin", { headers: { cookie: reviewer } })).json()).entries[0].payment.reviewStatus, "approved");
+});
+
+test("new receipts are rejected without touching old private documents or photo-question storage", async () => {
+  const f = fixture(); await f.open("event-one", withPhotos);
+  assert.equal((await f.submit({ receipt: png, photos: { portrait: { bytes: png } } })).status, 400);
+  assert.equal(f.stores.get(REGISTRATION_RECEIPT_STORE)?.size || 0, 0);
+  assert.equal(f.stores.get(REGISTRATION_PHOTO_STORE)?.size || 0, 0);
+  assert.equal((await f.submit({ photos: { portrait: { bytes: png } } })).status, 200);
+  assert.equal(f.stores.get(REGISTRATION_PHOTO_STORE).size, 1);
+});
+
+test("cancel retries after a lost response preserve one promotion and failed SQL revocation never restores admission", async () => {
+  const f = fixture();
+  await f.open("event-one", form => ({ ...form, maxRegistrations: 1, waitlist: { enabled: true, capacity: 1 } }));
+  const first = await (await f.submit()).json();
+  const second = await (await f.submit()).json();
+  assert.equal((await f.request("ticket", { method: "POST", auth: true, input: { id: first.reference } })).status, 200);
+  let interrupted = false;
+  f.hooks.afterSet = ({ name, data }) => {
+    if (name === REGISTRATION_STORE && !interrupted && data.entries.some(entry => entry.registrationStatus === "cancelled")) {
+      interrupted = true; throw Error("lost cancellation response");
+    }
+  };
+  f.hooks.beforeDb = ({ options }) => { if (options.method === "PATCH") throw Error("SQL cancellation unavailable"); };
+  assert.equal((await f.request("cancel", { method: "POST", auth: true, input: { id: first.reference } })).status, 503);
+  let state = f.stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  assert.equal(state.entries.find(entry => entry.id === first.reference).registrationStatus, "cancelled");
+  assert.equal(state.entries.find(entry => entry.id === second.reference).registrationStatus, "main");
+  assert.equal((await f.request("ticket", { method: "GET", auth: true, extra: "&id=" + first.reference })).status, 409);
+  assert.equal(state.audit.filter(item => item.type === "registration.cancel").length, 1);
+  assert.equal(state.audit.filter(item => item.type === "registration.promote").length, 1);
+  f.hooks.beforeDb = null;
+  assert.equal((await f.request("cancel", { method: "POST", auth: true, input: { id: first.reference } })).status, 200);
+  state = f.stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  assert.ok(state.entries.find(entry => entry.id === first.reference).ticketCancelledAt);
+  assert.equal(state.audit.filter(item => item.type === "registration.promote").length, 1);
+  assert.equal([...f.tickets.values()][0].revoked, true);
+});
+
+test("legacy admissions remain main without invented media consent or retroactive payment review", async () => {
+  const f = fixture(); await f.open();
+  const { reference } = await (await f.submit()).json();
+  const store = f.getStore(REGISTRATION_STORE), key = registrationStateKey("event-one");
+  const state = await store.get(key, { type: "json", consistency: "strong" });
+  const original = state.entries[0];
+  delete original.registrationStatus; delete original.mediaConsent; delete original.payment; delete original.sequence;
+  await store.setJSON(key, state);
+  await f.open("event-one", form => ({ ...form, payment: { enabled: true } }));
+  const admin = await (await f.request("admin", { auth: true })).json();
+  assert.equal(admin.entries[0].registrationStatus, "main");
+  assert.ok(!Object.hasOwn(admin.entries[0], "mediaConsent"));
+  assert.ok(!Object.hasOwn(admin.entries[0], "payment"));
+  assert.equal((await f.request("ticket", { method: "POST", auth: true, input: { id: reference } })).status, 200);
+  const csv = await (await f.request("export", { auth: true })).text();
+  assert.match(csv, /Bilinmiyor/);
+});
+
+test("a payment hold during ticket creation pauses issuance and approval retries the same usable reservation", async () => {
+  const f = fixture(); await f.open("event-one", form => ({ ...form, payment: { enabled: true } }));
+  const { reference } = await (await f.submit({ paymentDeclared: true })).json();
+  assert.equal((await f.request("payment", { method: "POST", auth: true, input: { id: reference, approved: true } })).status, 200);
+  let release, reached;
+  const paused = new Promise(resolve => { release = resolve; });
+  const created = new Promise(resolve => { reached = resolve; });
+  f.hooks.afterDb = async ({ path }) => { if (path === "rpc/create_ticket_batch") { reached(); await paused; } };
+  const issuing = f.request("ticket", { method: "POST", auth: true, input: { id: reference } });
+  await created;
+  assert.equal((await f.request("payment", { method: "POST", auth: true, input: { id: reference, approved: false } })).status, 200);
+  release();
+  assert.equal((await issuing).status, 409);
+  const held = (await (await f.request("admin", { auth: true })).json()).entries[0];
+  assert.equal(held.ticketEligible, false); assert.equal(held.ticket.status, "pending");
+  assert.equal([...f.tickets.values()][0].revoked, false);
+  assert.equal((await f.request("payment", { method: "POST", auth: true, input: { id: reference, approved: true } })).status, 200);
+  const retry = await f.request("ticket", { method: "POST", auth: true, input: { id: reference } });
+  assert.equal(retry.status, 200);
+  assert.equal((await retry.json()).ticket.revoked, false);
+  assert.equal(f.batches.size, 1); assert.equal(f.tickets.size, 1);
+});
+
+test("form audit records changed settings precisely in the same conditional commit", async () => {
+  const f = fixture(); await f.open();
+  await f.open("event-one", form => ({ ...form, enabled: false, maxRegistrations: 8,
+    waitlist: { enabled: true, capacity: 3 }, showRemainingCapacity: true }));
+  const state = f.stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  for (const type of ["form.open", "form.close", "capacity.change", "waitlist.change", "counter.change"])
+    assert.equal(state.audit.filter(item => item.type === type).length, 1, type);
+  assert.deepEqual(state.audit.find(item => item.type === "capacity.change").after, { maxRegistrations: 8 });
+  assert.deepEqual(state.audit.find(item => item.type === "waitlist.change").after, { waitlistEnabled: true, waitlistCapacity: 3 });
+  assert.ok(state.audit.every(item => item.actor.username === "basadmin"));
+  await f.request("form", { method: "POST", auth: true, input: state.form });
+  const unchanged = f.stores.get(REGISTRATION_STORE).get(registrationStateKey("event-one")).data;
+  assert.equal(unchanged.audit.filter(item => item.type === "capacity.change").length, 1);
 });

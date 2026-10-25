@@ -3,6 +3,10 @@ import { $, escape, api, onAdminEvent, isOwner } from "./common.js";
 const groups = [
   ["events", "Etkinlikler", [["view", "Görüntüle"], ["manage", "Oluştur ve düzenle"], ["publish", "Yayınla / yayından kaldır"]]],
   ["registrations", "Kayıt formları", [["view", "Kayıtları görüntüle"], ["manage", "Formu ve kayıtları düzenle"], ["receipts", "Dekontları görüntüle"], ["photos", "Gönderilen fotoğrafları görüntüle"], ["export", "Excel / CSV indir"]]],
+  ["payments", "Ödeme kontrolü", [["view", "Ödeme durumlarını görüntüle"], ["manage", "Ödemeleri onayla / onayı kaldır"]]],
+  ["statistics", "İstatistikler", [["view", "Toplu raporları görüntüle"]]],
+  ["audit", "Etkinlik denetimi", [["view", "İşlem geçmişini görüntüle"]]],
+  ["yearbooks", "Yıllıklar", [["view", "Taslakları ve önizlemeyi görüntüle"], ["manage", "Yıllık oluştur ve düzenle"], ["publish", "Yayımla / yayından kaldır"]]],
   ["tickets", "Biletler", [["view", "Görüntüle ve yazdır"], ["manage", "Bilet oluştur, iptal et ve tasarım değiştir"]]],
   ["raffles", "Çekilişler", [["view", "Görüntüle"], ["manage", "Çekiliş yap ve sonuçları yönet"]]],
   ["attendance", "Giriş ve katılım", [["view", "Katılımı görüntüle"], ["manage", "Bilet okut ve giriş kaydet"]]],
@@ -16,7 +20,7 @@ function message(text, error = false) { $("adminUsersMessage").textContent = tex
 const selected = () => accounts.find(account => account.id === selectedId);
 function renderPermissions(chosen = []) {
   const values = new Set(chosen);
-  $("adminUserPermissionGroups").innerHTML = groups.map(([module, title, permissions]) => `<section class="admin-user-permission-group"><h4>${title}</h4><div>${permissions.map(([action, label]) => {
+  $("adminUserPermissionGroups").innerHTML = groups.map(([module, title, permissions]) => `<section class="admin-user-permission-group"><h4>${title}</h4>${module === "payments" ? '<p id="adminPaymentPermissionHelp" class="admin-user-note">Ödeme kontrolü kayıtlar üzerinden yapılır. Bu izinler için Kayıt formları bölümündeki “Kayıtları görüntüle” iznini de ayrıca seçin. Bu seçim katılımcı bilgilerine erişim verir.</p>' : ""}<div>${permissions.map(([action, label]) => {
     const key = `${module}.${action}`;
     return `<label><input type="checkbox" data-permission="${key}" ${values.has(key) ? "checked" : ""}><span>${label}</span></label>`;
   }).join("")}</div></section>`).join("");
@@ -30,7 +34,7 @@ function controls() {
   $("adminUsersList").querySelectorAll("button").forEach(button => { button.disabled = !ready || busy; });
 }
 function renderList() {
-  $("adminUsersList").innerHTML = accounts.map(account => `<button type="button" class="admin-user-card${account.id === selectedId ? " is-selected" : ""}" data-admin-user="${escape(account.id)}" aria-pressed="${account.id === selectedId}"><span class="admin-user-card-heading"><strong>${escape(account.name || account.username)}</strong><span class="admin-user-badge${account.active ? "" : " is-inactive"}">${account.active ? "Aktif" : "Kapalı"}</span></span><span>@${escape(account.username)} · ${account.fixedPreset ? "Sayman" : "Yönetici"}</span><small>${account.fixedPreset ? "Kayıtlar ve dekontlar · salt okunur" : account.permissions?.length ? `${account.permissions.length} erişim izni` : "Bölüm izni verilmemiş"}${account.hasPassword ? "" : " · Şifre bekliyor"}</small></button>`).join("") || '<p class="admin-user-note">Henüz başka yönetici yok.</p>';
+  $("adminUsersList").innerHTML = accounts.map(account => `<button type="button" class="admin-user-card${account.id === selectedId ? " is-selected" : ""}" data-admin-user="${escape(account.id)}" aria-pressed="${account.id === selectedId}"><span class="admin-user-card-heading"><strong>${escape(account.name || account.username)}</strong><span class="admin-user-badge${account.active ? "" : " is-inactive"}">${account.active ? "Aktif" : "Kapalı"}</span></span><span>@${escape(account.username)} · ${account.fixedPreset ? "Sayman" : "Yönetici"}</span><small>${account.fixedPreset ? "Kayıtlar ve ödeme durumları · salt okunur" : account.permissions?.length ? `${account.permissions.length} erişim izni` : "Bölüm izni verilmemiş"}${account.hasPassword ? "" : " · Şifre bekliyor"}</small></button>`).join("") || '<p class="admin-user-note">Henüz başka yönetici yok.</p>';
   controls();
 }
 function edit(account) {
@@ -92,6 +96,11 @@ $("adminUserForm").addEventListener("submit", async event => {
   const password = $("adminUserPassword").value;
   const payload = { ...(id ? { id } : {}), name: $("adminUserName").value.trim(), active: $("adminUserActive").checked,
     expectedRevision: revision, ...(!account?.fixedPreset ? { username: $("adminUserUsername").value.trim(), permissions: [...$("adminUserPermissions").querySelectorAll("[data-permission]:checked")].map(input => input.dataset.permission) } : {}), ...(password ? { password } : {}) };
+  if (payload.permissions?.some(permission => permission.startsWith("payments.")) && !payload.permissions.includes("registrations.view")) {
+    message("Ödeme kontrolü için Kayıt formları bölümündeki “Kayıtları görüntüle” iznini de ayrıca seçin. Katılımcı bilgilerine erişim otomatik verilmez.", true);
+    $("adminUserPermissions").querySelector('[data-permission="registrations.view"]').focus();
+    return;
+  }
   busy = true; controls(); message("Hesap kaydediliyor…");
   try {
     const data = await api("/api/admin-users", { method: id ? "PUT" : "POST", body: JSON.stringify(payload) });

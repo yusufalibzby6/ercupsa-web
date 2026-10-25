@@ -4,12 +4,13 @@ import { db } from '../lib/database.mjs';
 import { readEvents } from './events.mjs';
 import { readCheckins } from '../lib/checkins.mjs';
 import { readRegistrationParticipants, checkedInRegistrationParticipants } from '../lib/raffle-registrations.mjs';
-import { readRegistrationTicketOwners } from '../lib/registration-ticket-owners.mjs';
+import { readRegistrationTicketOwners, readRegistrationTicketRestrictions, registrationTicketIsBlocked } from '../lib/registration-ticket-owners.mjs';
 import { paged, participantsFor, poolVersion, drawChances, drawInput, weightedWinners, savedDraw, drawHistory, saveDraw, deleteDraw, updatePrize, RaffleError, raffleFail } from '../lib/raffles.mjs';
 
 export function createHandler({ read = db, events = readEvents, checkins = readCheckins,
   registrations = readRegistrationParticipants,
   ticketOwners = readRegistrationTicketOwners,
+  ticketRestrictions = readRegistrationTicketRestrictions,
   store = () => getStore({ name: 'ercupsa-raffles', consistency: 'strong' }), adminStore } = {}) {
   const withSource = draw => draw ? { ...draw, source: draw.source ?? 'qr' } : null;
   async function history(storage, eventId) { return (await drawHistory(storage, eventId)).map(withSource); }
@@ -31,7 +32,30 @@ export function createHandler({ read = db, events = readEvents, checkins = readC
     // attendance is written by claim_ticket when a QR ticket is added to an
     // account. A cutoff and keyset pages avoid admitting later claims partway
     // through a read or skipping unrelated people after an earlier deletion.
-    const selected = await paged(`attendance?event_id=eq.${encodeURIComponent(eventId)}&created_at=lte.${cutoff}&select=user_id,event_id,ticket_id,created_at&order=user_id.asc,event_id.asc`, read, { cursor: ['user_id', 'event_id'] });
+    let selected = await paged(`attendance?event_id=eq.${encodeURIComponent(eventId)}&created_at=lte.${cutoff}&select=user_id,event_id,ticket_id,created_at&order=user_id.asc,event_id.asc`, read, { cursor: ['user_id', 'event_id'] });
+    const restrictions = await ticketRestrictions(eventId);
+    if (!Array.isArray(restrictions) || restrictions.some(item => !item || typeof item.blocked !== 'boolean' ||
+      typeof item.batchId !== 'string' || typeof item.codeHash !== 'string' || !/^[a-f0-9]{64}$/.test(item.codeHash)))
+      fail(503, 'Katılımcı bilet durumları doğrulanamadı.');
+    if (restrictions.some(item => item.blocked)) {
+      const ticketIds = [...new Set(selected.map(claim => identifier(claim.ticket_id)))], denied = new Set(), seen = new Set();
+      const requested = new Set(ticketIds);
+      for (let i = 0; i < ticketIds.length; i += 100) {
+        const tickets = await paged(`tickets?event_id=eq.${encodeURIComponent(eventId)}&id=in.(${ticketIds.slice(i, i + 100).join(',')})&select=id,event_id,batch_id,code_hash,revoked&order=id.asc`, read, { cursor: ['id'] });
+        for (const ticket of tickets) {
+          if (!ticket || ticket.event_id !== eventId || typeof ticket.batch_id !== 'string' ||
+            !/^[a-f0-9]{64}$/.test(ticket.code_hash || '') || typeof ticket.revoked !== 'boolean')
+            fail(503, 'Katılımcı bilet durumları doğrulanamadı.');
+          const id = identifier(ticket.id);
+          if (seen.has(id) || !requested.has(id)) fail(503, 'Katılımcı bilet durumları doğrulanamadı.');
+          seen.add(id);
+          if (ticket.revoked || registrationTicketIsBlocked(ticket, restrictions)) denied.add(id);
+        }
+      }
+      // A vanished ticket cannot establish an eligible claim while revocation
+      // or deletion is propagating between the two stores.
+      selected = selected.filter(claim => seen.has(claim.ticket_id) && !denied.has(claim.ticket_id));
+    }
     const ids = [...new Set(selected.map(a => identifier(a.user_id)))];
     let attendance = [], profiles = [];
     for (let i = 0; i < ids.length; i += 100) {

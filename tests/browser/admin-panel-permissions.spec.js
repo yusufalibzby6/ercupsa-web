@@ -68,22 +68,24 @@ test('readonly raffles show pools and history but cannot draw, exclude, delete o
   await expect(page.locator('#raffleParticipants')).toContainText(participant.name);
   await expect(page.locator('#raffleStart')).toBeHidden(); await expect(page.locator('#raffleCount')).toBeDisabled();
   await expect(page.locator('#raffleParticipants input')).toBeDisabled();
+  // This person already won in the fixture's earlier draw and starts excluded.
+  await expect(page.locator('#raffleSummary')).toContainText('0 kişi dahil');
   await expect(page.locator('[data-delete-draw]')).toBeHidden(); await expect(page.locator('[data-prize-draw]')).toBeHidden();
   await expect(page.locator('[data-export-draw]')).toBeVisible();
   await page.evaluate(() => {
     for (const selector of ['#raffleStart', '[data-delete-draw]', '[data-prize-draw]']) document.querySelector(selector).dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    const option = document.querySelector('#raffleParticipants input'); option.checked = false; option.dispatchEvent(new Event('change', { bubbles: true }));
+    const option = document.querySelector('#raffleParticipants input'); option.checked = true; option.dispatchEvent(new Event('change', { bubbles: true }));
   });
   expect(state.mutations).toEqual([]);
-  await expect(page.locator('#raffleSummary')).toContainText('1 kişi dahil'); expect(state.errors).toEqual([]);
+  await expect(page.locator('#raffleSummary')).toContainText('0 kişi dahil'); expect(state.errors).toEqual([]);
 });
 
 test('hidden panels never request other scopes, including forged tab events', async ({ page }) => {
   const state = await fixture(page, ['events.view']);
-  for (const tab of ['accounts', 'raffles', 'instagram', 'attendance']) await expect(page.locator(`[data-tab=${tab}]`)).toBeHidden();
+  for (const tab of ['accounts', 'raffles', 'instagram', 'attendance', 'statistics', 'audit', 'yearbooks']) await expect(page.locator(`[data-tab=${tab}]`)).toBeHidden();
   await page.evaluate(() => {
-    for (const tab of ['accounts', 'raffles', 'instagram', 'attendance']) document.dispatchEvent(new CustomEvent('admin-tab', { detail: tab }));
+    for (const tab of ['accounts', 'raffles', 'instagram', 'attendance', 'statistics', 'audit', 'yearbooks']) document.dispatchEvent(new CustomEvent('admin-tab', { detail: tab }));
   });
-  for (const path of ['/api/accounts', '/api/raffles', '/api/site-content', '/api/gate', '/api/staff', '/api/registrations', '/api/community']) expect(reads(state, path)).toEqual([]);
+  for (const path of ['/api/accounts', '/api/raffles', '/api/site-content', '/api/gate', '/api/staff', '/api/registrations', '/api/community', '/api/statistics', '/api/event-audit', '/api/yearbooks']) expect(reads(state, path)).toEqual([]);
   expect(state.mutations).toEqual([]); expect(state.errors).toEqual([]);
 });

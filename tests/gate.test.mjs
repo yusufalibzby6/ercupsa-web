@@ -326,6 +326,38 @@ test('existing gate admissions are enriched from actual form ticket proof withou
   assert.equal(storage.calls.filter(call => call.action === 'setJSON').length, 1);
 });
 
+test('cancelled and waitlisted registrations cannot enter even when database revocation has failed', async () => {
+  for (const registrationStatus of ['cancelled', 'waitlisted']) {
+    const { formEntry, saveForm, scan, state, storage } = fixture();
+    await saveForm([formEntry({ registrationStatus })]);
+    assert.equal(state.tickets.find(ticket => ticket.id === unclaimedId).revoked, false);
+    const result = await scan(unclaimedCode);
+    assert.equal(result.status, 409);
+    assert.equal((await result.json()).code, 'GATE_INVALID_TICKET');
+    assert.equal(await storage.get(entryKey('event-one')), null);
+    assert.equal((await scan(claimedCode)).status, 200, 'an unrelated manual batch ticket remains usable');
+  }
+});
+
+test('later cancellation or deletion never removes a real entrance and its proved historical owner', async () => {
+  for (const deleted of [false, true]) {
+    const { formEntry, saveForm, scan, state, storage, request } = fixture();
+    const entry = formEntry();
+    await saveForm([entry]);
+    assert.equal((await scan(unclaimedCode)).status, 200);
+    const before = await storage.get(entryKey('event-one'));
+    if (deleted) await saveForm([], [{ ...entry }]);
+    else await saveForm([{ ...entry, registrationStatus: 'cancelled' }]);
+    assert.equal((await scan(unclaimedCode)).status, 409);
+    state.tickets.find(ticket => ticket.id === unclaimedId).revoked = true;
+    const dashboard = await (await request()).json();
+    assert.equal(dashboard.entries.length, 1);
+    assert.equal(dashboard.entries[0].name, entry.name);
+    assert.equal(dashboard.entries[0].registrationId, entry.id);
+    assert.deepEqual(await storage.get(entryKey('event-one')), before);
+  }
+});
+
 test('form owners require both canonical batch and code hash proof; deleted registrations and unrelated form names never match', async () => {
   for (const reservation of [
     { batchId: 'another-batch', code: unclaimedCode, status: 'issued' },

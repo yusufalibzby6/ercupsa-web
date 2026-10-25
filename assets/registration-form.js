@@ -58,12 +58,12 @@ window.ercupsaRegistration = (() => {
     container.replaceChildren(message);
   }
 
-  function full(container, focus = false) {
+  function full(container, focus = false, text = fullMessage) {
     const message = node('div', 'registration-full');
     message.id = 'nativeRegistrationFull';
     message.setAttribute('role', 'status');
     message.tabIndex = -1;
-    message.append(node('p', '', fullMessage));
+    message.append(node('p', '', text));
     const back = node('a', 'event-secondary-action', 'Diğer etkinlikleri keşfet');
     back.href = 'etkinlikler.html';
     message.append(back);
@@ -103,8 +103,10 @@ window.ercupsaRegistration = (() => {
     success.id = 'registrationSuccess';
     success.setAttribute('role', 'status');
     success.tabIndex = -1;
-    success.append(node('span', 'registration-success-mark', '✓'), node('h3', '', 'Kaydın alındı!'),
-      node('p', '', 'Bilgilerin organizatörlere iletildi. Bu özeti saklayabilir, etkinlik duyurularını takip edebilirsin.'));
+    const waitlisted = result.registrationStatus === 'waitlisted';
+    success.classList.toggle('registration-success-waitlisted', waitlisted);
+    success.append(node('span', 'registration-success-mark', waitlisted ? '↗' : '✓'), node('h3', '', waitlisted ? 'Yedek kaydın alındı!' : 'Kaydın alındı!'),
+      node('p', '', waitlisted ? 'Yedek kaydınız başarıyla oluşturuldu! Şu anda etkinliğin asıl katılımcı listesinde değil, yedek listesindesiniz. Kontenjanda yer açılması durumunda sizinle iletişime geçilecektir.' : 'Bilgilerin organizatörlere iletildi. Bu özeti saklayabilir, etkinlik duyurularını takip edebilirsin.'));
     const summary = node('section', 'registration-summary');
     summary.setAttribute('aria-labelledby', 'registrationSummaryTitle');
     const heading = node('h4', '', title);
@@ -117,6 +119,7 @@ window.ercupsaRegistration = (() => {
       wrap.append(node('dt', '', label), content);
       facts.append(wrap);
     };
+    fact('Kayıt durumu', waitlisted ? 'Yedek liste · kesin katılım değildir' : 'Asıl katılımcı listesi');
     fact('Tarih', dateLabel, 'registrationSummaryDate');
     fact('Saat', timeLabel, 'registrationSummaryTime');
     if (location) fact('Konum', location);
@@ -124,7 +127,7 @@ window.ercupsaRegistration = (() => {
     summary.append(heading, facts);
     if (reference) {
       const savedText = ['ERCUPSA — Etkinlik kayıt özeti', `Etkinlik: ${title}`, `Tarih: ${dateLabel}`,
-        `Saat: ${timeLabel}`, ...(location ? [`Konum: ${location}`] : []), `Kayıt numarası: ${reference}`,
+        `Saat: ${timeLabel}`, ...(location ? [`Konum: ${location}`] : []), `Kayıt numarası: ${reference}`, `Kayıt durumu: ${waitlisted ? 'Yedek liste; kesin katılım değildir' : 'Asıl liste'}`,
         '', 'Bu kayıt numarası QR bilet kodu değildir. Bilet bilgisi organizatörler tarafından ayrıca paylaşılır.'].join('\n');
       const actions = node('div', 'registration-summary-actions');
       const copy = node('button', 'event-secondary-action', 'Kayıt numaramı kopyala');
@@ -165,7 +168,25 @@ window.ercupsaRegistration = (() => {
     return success;
   }
 
-  function renderForm(container, config, event) {
+  function renderForm(container, config, event, availability = {}) {
+    let currentStage = availability.stage || 'main';
+    let paymentEnabled = config.payment?.enabled === true;
+    let availabilityTimer = null, refreshing = false;
+    const statusBox = node('section', 'registration-availability');
+    statusBox.id = 'registrationAvailability';
+    statusBox.setAttribute('aria-live', 'polite');
+    let updateAvailability;
+    const refreshAvailability = async () => {
+      if (disposed || pending || refreshing || document.hidden) return;
+      refreshing = true;
+      try {
+        const response = await timedFetch(endpoint('form', event.id));
+        const data = await response.json();
+        if (!disposed && response.ok && data?.form) updateAvailability(data);
+      } catch { /* Preserve entered answers and use the submission's final capacity check. */ }
+      finally { refreshing = false; }
+    };
+    const visible = () => { if (!document.hidden) refreshAvailability(); };
     let pending = false;
     let disposed = false;
     const photoPreviews = new Map();
@@ -176,6 +197,8 @@ window.ercupsaRegistration = (() => {
     };
     const dispose = () => {
       disposed = true;
+      clearInterval(availabilityTimer);
+      document.removeEventListener('visibilitychange', visible);
       for (const input of photoPreviews.keys()) revokePreview(input);
     };
     const form = node('form', 'registration-form');
@@ -185,12 +208,12 @@ window.ercupsaRegistration = (() => {
     const description = node('p', 'registration-description', config.description || 'Etkinliğe katılmak için aşağıdaki bilgileri doldur.');
     description.id = 'registrationDescription';
     intro.append(description, node('p', 'registration-required-note', '* işaretli alanların doldurulması zorunludur.'));
-    if (config.receipt?.enabled || config.fields.some(field => field.type === 'photo')) {
-      const budget = node('p', 'registration-upload-budget', 'Fotoğraflar ve dekont için toplam dosya sınırı 4 MB. Daha küçük dosyalar seçebilirsin.');
+    if (config.fields.some(field => field.type === 'photo')) {
+      const budget = node('p', 'registration-upload-budget', 'Fotoğraflar için toplam dosya sınırı 4 MB. Daha küçük dosyalar seçebilirsin.');
       budget.id = 'registrationUploadBudget';
       intro.append(budget);
     }
-    form.append(intro);
+    form.append(statusBox, intro);
     const fieldsContainer = node('div', 'registration-fields');
     const controls = new Map();
 
@@ -260,7 +283,7 @@ window.ercupsaRegistration = (() => {
           wrap.append(clear);
         }
       } else if (field.type === 'photo') {
-        const help = node('p', 'registration-help', 'JPG, PNG veya WebP · Yalnızca etkinlik organizatörleri görüntüleyebilir. Fotoğraflar ve dekont toplam en fazla 4 MB olabilir.');
+        const help = node('p', 'registration-help', 'JPG, PNG veya WebP · Yalnızca etkinlik organizatörleri görüntüleyebilir. Fotoğraflar toplam en fazla 4 MB olabilir.');
         help.id = `registration-help-${field.id}`;
         const input = node('input', 'registration-file');
         input.type = 'file';
@@ -347,30 +370,22 @@ window.ercupsaRegistration = (() => {
     }
     form.append(fieldsContainer);
 
-    let receiptInput, receiptError;
-    if (config.receipt?.enabled) {
-      const wrap = node('div', 'registration-receipt');
-      const label = node('label', 'registration-label', 'Dekont');
-      label.htmlFor = 'registrationReceipt';
-      if (config.receipt.required) {
-        const marker = node('span', 'registration-required', ' *');
-        marker.setAttribute('aria-hidden', 'true');
-        label.append(marker);
-      }
-      const note = node('p', 'registration-help', 'JPG, PNG veya PDF · En fazla 4 MB. Fotoğraflar ve dekont birlikte toplam 4 MB sınırına dahildir. Dosyanı yalnızca etkinlik organizatörleri görüntüleyebilir.');
-      note.id = 'registrationReceiptHelp';
-      receiptInput = node('input', 'registration-file');
-      receiptInput.type = 'file';
-      receiptInput.id = 'registrationReceipt';
-      receiptInput.name = 'receipt';
-      receiptInput.accept = 'image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf';
-      receiptInput.required = config.receipt.required === true;
-      receiptInput.setAttribute('aria-describedby', 'registrationReceiptHelp registration-error-receipt');
-      receiptError = node('p', 'registration-field-error hidden');
-      receiptError.id = 'registration-error-receipt';
-      wrap.append(label, note, receiptInput, receiptError);
-      form.append(wrap);
-    }
+    const declarations = node('section', 'registration-declarations');
+    const paymentWrap = node('div', 'registration-declaration registration-payment');
+    const paymentLabel = node('label');
+    const paymentInput = node('input'); paymentInput.type = 'checkbox'; paymentInput.id = 'registrationPaymentDeclared';
+    paymentInput.name = 'paymentDeclared'; paymentInput.setAttribute('aria-describedby', 'registrationPaymentHelp registration-error-payment');
+    paymentLabel.append(paymentInput, node('span', '', 'Ödememi gönderdim *'));
+    const paymentHelp = node('p', 'registration-help', 'Bu bir ödeme beyanıdır. Organizatörler banka hareketlerini kontrol ederek ödemenizi onaylar. Dekont yüklemeniz gerekmez.');
+    paymentHelp.id = 'registrationPaymentHelp';
+    const paymentError = node('p', 'registration-field-error hidden'); paymentError.id = 'registration-error-payment';
+    paymentWrap.append(paymentLabel, paymentHelp, paymentError);
+    const mediaWrap = node('div', 'registration-declaration');
+    const mediaLabel = node('label');
+    const mediaInput = node('input'); mediaInput.type = 'checkbox'; mediaInput.id = 'registrationMediaConsent'; mediaInput.name = 'mediaConsent';
+    mediaLabel.append(mediaInput, node('span', '', 'Etkinlikte çekilen fotoğraf ve videolarda yer alan görüntülerimin ERCUPSA’nın internet sitesinde ve Instagram hesabında yayımlanmasına izin veriyorum.'));
+    mediaWrap.append(mediaLabel, node('p', 'registration-help', 'İsteğe bağlıdır. İzin vermeden de etkinliğe başvurabilirsiniz. Yayın tercihinizi değiştirmek için organizatörlerle iletişime geçebilirsiniz.'));
+    declarations.append(paymentWrap, mediaWrap); form.append(declarations);
 
     const trap = node('div', 'registration-honeypot');
     trap.setAttribute('aria-hidden', 'true');
@@ -385,7 +400,7 @@ window.ercupsaRegistration = (() => {
     trap.append(trapLabel, trapInput);
     form.append(trap);
 
-    const privacy = node('p', 'registration-privacy', 'Bilgilerin, varsa fotoğrafların ve dekontun bu etkinliğin kayıtlarını yönetmek amacıyla organizatörlere iletilir. Yüklediğin dosyalar sitede herkese açık paylaşılmaz. Kayıt için site hesabı oluşturman gerekmez.');
+    const privacy = node('p', 'registration-privacy', 'Bilgilerin ve varsa yüklediğin fotoğraflar bu etkinliğin kayıtlarını yönetmek amacıyla organizatörlere iletilir. Yüklediğin dosyalar sitede herkese açık paylaşılmaz. Kayıt için site hesabı oluşturman gerekmez.');
     const feedback = node('p', 'registration-feedback hidden');
     feedback.id = 'registrationFeedback';
     feedback.setAttribute('role', 'alert');
@@ -410,14 +425,14 @@ window.ercupsaRegistration = (() => {
     for (const control of controls.values()) {
       for (const input of control.inputs) input.addEventListener('input', () => clearError(control));
     }
-    if (receiptInput) receiptInput.addEventListener('change', () => clearError({ inputs: [receiptInput], error: receiptError }));
+    paymentInput.addEventListener('change', () => clearError({ inputs: [paymentInput], error: paymentError }));
     form.addEventListener('reset', () => queueMicrotask(() => {
       if (disposed) return;
       for (const control of controls.values()) {
         control.updatePhotoPreview?.();
         clearError(control);
       }
-      if (receiptInput) clearError({ inputs: [receiptInput], error: receiptError });
+      clearError({ inputs: [paymentInput], error: paymentError });
     }));
 
     form.addEventListener('submit', async submission => {
@@ -456,25 +471,20 @@ window.ercupsaRegistration = (() => {
           firstInvalid ||= inputs[0];
         }
       }
-      const file = receiptInput?.files?.[0];
-      if (receiptInput) {
-        const control = { inputs: [receiptInput], error: receiptError };
-        clearError(control);
-        let error = '';
-        if (config.receipt.required && !file) error = 'Dekont dosyanı yüklemelisin.';
-        else if (file && file.size > receiptLimit) error = 'Dosya en fazla 4 MB olabilir.';
-        // Android file providers can omit or mislabel MIME types and extensions.
-        // Submit the original file; the server validates its actual JPG/PNG/PDF bytes.
-        if (error) {
-          setError(control, error);
-          firstInvalid ||= receiptInput;
-        }
+      clearError({ inputs: [paymentInput], error: paymentError });
+      if (paymentEnabled && currentStage === 'main' && !paymentInput.checked) {
+        setError({ inputs: [paymentInput], error: paymentError }, 'Ödemenizi gönderdikten sonra bu kutucuğu işaretlemelisiniz.');
+        firstInvalid ||= paymentInput;
       }
-      const uploads = [...photos.map(photo => photo.file), ...(file ? [file] : [])];
+      if (currentStage === 'closed') {
+        feedback.textContent = 'Bu etkinlik için yeni kayıt alınmıyor. Girdiğin bilgiler bu ekranda korunuyor.';
+        feedback.classList.remove('hidden'); feedback.focus(); return;
+      }
+      const uploads = photos.map(photo => photo.file);
       if (uploads.every(upload => upload.size <= receiptLimit)
         && uploads.reduce((total, upload) => total + upload.size, 0) > receiptLimit) {
-        const control = photos[0]?.control || { inputs: [receiptInput], error: receiptError };
-        setError(control, 'Fotoğraflar ve dekont toplam en fazla 4 MB olabilir. Daha küçük dosyalar seç.');
+        const control = photos[0].control;
+        setError(control, 'Fotoğraflar toplam en fazla 4 MB olabilir. Daha küçük dosyalar seç.');
         firstInvalid ||= control.inputs[0];
       }
       if (firstInvalid) {
@@ -488,7 +498,8 @@ window.ercupsaRegistration = (() => {
       payload.set('answers', JSON.stringify(answers));
       payload.set('requestId', idempotencyKey);
       payload.set('website', trapInput.value);
-      if (file) payload.set('receipt', file, file.name);
+      payload.set('paymentDeclared', JSON.stringify(paymentEnabled && currentStage === 'main' && paymentInput.checked));
+      payload.set('mediaConsent', JSON.stringify(mediaInput.checked));
       for (const { control, file: photo } of photos) payload.set(`photo:${control.field.id}`, photo, photo.name);
       pending = true;
       submit.disabled = true;
@@ -504,8 +515,9 @@ window.ercupsaRegistration = (() => {
         if (disposed) return;
         if (!response.ok || result?.ok !== true) {
           if (response.status === 409 && result?.code === 'REGISTRATION_FULL') {
-            dispose();
-            return full(container, true);
+            currentStage = 'closed';
+            updateAvailability({ stage: 'closed', available: false, form: config, message: result.error || result.message || fullMessage });
+            throw new Error(result.error || result.message || fullMessage);
           }
           if (response.status === 409 || response.status === 404) {
             throw new Error(typeof result?.error === 'string' ? result.error
@@ -529,12 +541,38 @@ window.ercupsaRegistration = (() => {
         feedback.focus();
       } finally {
         pending = false;
-        submit.disabled = false;
+        submit.disabled = currentStage === 'closed';
         submit.textContent = 'Kaydımı gönder';
         form.removeAttribute('aria-busy');
         editable.forEach(input => { input.disabled = false; });
       }
     });
+    updateAvailability = data => {
+      if (disposed) return;
+      currentStage = ['main', 'waitlist', 'closed'].includes(data.stage) ? data.stage : data.available === false ? 'closed' : 'main';
+      paymentEnabled = data.form?.payment?.enabled === true;
+      paymentWrap.hidden = !paymentEnabled || currentStage !== 'main';
+      paymentInput.required = paymentEnabled && currentStage === 'main';
+      paymentInput.setAttribute('aria-required', String(paymentInput.required));
+      statusBox.replaceChildren();
+      statusBox.dataset.stage = currentStage;
+      if (currentStage === 'waitlist') statusBox.append(node('p', 'registration-stage-message', 'Etkinliğimizin asıl kontenjanı dolmuştur. Ancak yedek kayıtlarımız devam etmektedir. Başvurunuz yedek listeye alınacaktır.'), node('p', 'registration-help', 'Yedek başvuru kesin katılım değildir. Bu aşamada ödeme beyanı istenmez.'));
+      else if (currentStage === 'closed') statusBox.append(node('p', 'registration-stage-message', data.message || 'Bu etkinlik için yeni kayıt alınmıyor.'));
+      if (data.form?.showRemainingCapacity === true && data.capacity && currentStage !== 'closed') {
+        const { limit, main, remaining } = data.capacity;
+        if (limit === null) statusBox.append(node('p', 'registration-capacity-label', 'Kayıtlar açık · Kontenjan sınırsız'));
+        else if (Number.isInteger(limit) && limit > 0 && Number.isInteger(main) && main >= 0 && Number.isInteger(remaining) && remaining >= 0) {
+          const label = currentStage === 'waitlist' || remaining === 0 ? 'Asıl kontenjan doldu.' : remaining <= 3 ? `Son ${remaining} kişilik yer kaldı!` : `${remaining} kişilik yer kaldı.`;
+          statusBox.append(node('p', 'registration-capacity-label', label));
+          const progress = node('progress', 'registration-capacity-progress'); progress.max = limit; progress.value = Math.min(main, limit); progress.setAttribute('aria-label', 'Asıl kontenjan doluluk durumu'); statusBox.append(progress);
+        }
+      }
+      statusBox.hidden = !statusBox.childElementCount;
+      if (!pending) submit.disabled = currentStage === 'closed';
+    };
+    updateAvailability({ ...availability, form: config });
+    document.addEventListener('visibilitychange', visible);
+    availabilityTimer = setInterval(refreshAvailability, 30000);
     return dispose;
   }
 
@@ -550,13 +588,13 @@ window.ercupsaRegistration = (() => {
       let data;
       try { data = await response.json(); } catch {}
       if (mounts.get(container) !== state) return;
-      if ((response.ok && data?.full === true) || (response.status === 409 && data?.code === 'REGISTRATION_FULL')) return full(container);
+      if ((response.ok && data?.full === true && data?.stage !== 'waitlist') || (response.status === 409 && data?.code === 'REGISTRATION_FULL')) return full(container, false, data.message || data.error || fullMessage);
       if (response.status === 404 || response.status === 409) return unavailable(container);
       if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Kayıt formu şu anda yüklenemedi. Tekrar deneyebilirsin.');
       if (!data) throw new Error('Kayıt formu bilgileri okunamadı. Tekrar deneyebilirsin.');
       if (!data.available || !data.form?.enabled) return unavailable(container);
       if (!validateConfig(data.form)) throw new Error('Form bilgileri geçersiz.');
-      state.dispose = renderForm(container, data.form, event);
+      state.dispose = renderForm(container, data.form, event, data);
     } catch (error) {
       if (mounts.get(container) !== state) return;
       const errorState = node('div', 'registration-load-error');

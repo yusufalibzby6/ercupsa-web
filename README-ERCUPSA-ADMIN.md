@@ -24,7 +24,7 @@ Bu sürüm, Netlify üzerinde çalışan küçük bir içerik yönetim sistemi e
 
 Baş yönetici **Yönetici hesapları** bölümünden ayrı kullanıcı adı ve şifreyle hesap oluşturur. Her hesapta bölüm görüntüleme ve işlem yetkilerini ayrı seçebilir: örneğin yalnızca **Etkinlikler** ve **Instagram**, bu bölümlerde de görüntüleme veya düzenleme. **Etkinliğin yayın durumunu değiştirme** ayrıca seçilir. Düzenleme yetkisi baş yönetici yetkisi vermez.
 
-**Sayman** hesabı `sayman` kullanıcı adıyla hazır gelir. İlk kez bu bölümü açınca özel depoda oluşturulur; başlangıçta pasiftir ve varsayılan şifresi yoktur. **Düzenle** ile en az 12 karakterlik bir şifre belirleyip etkinleştirin. Sabit yetkileri kayıt listesini ve dekontları görüntülemektir. Form hazırlama, kayıt silme, fotoğraf görüntüleme, CSV indirme ve bilet işlemleri yapamaz. Saymanın adı, şifresi ve aktifliği değiştirilebilir; sabit yetkileri ve kullanıcı adı değişmez. Diğer hesapların bölüm/işlem yetkileri düzenlenebilir.
+**Sayman** hesabı `sayman` kullanıcı adıyla hazır gelir. İlk kez bu bölümü açınca özel depoda oluşturulur; başlangıçta pasiftir ve varsayılan şifresi yoktur. **Düzenle** ile en az 12 karakterlik bir şifre belirleyip etkinleştirin. Sabit yetkileri kayıt listesini, ödeme durumlarını ve henüz kaldırılmamış eski dekontları görüntülemektir. Ödeme onayı veremez. Eski sabit Sayman hesabı yetkileri güvenli geçişle güncellenir; parola korunur ve eski oturum geçersiz olur. Form hazırlama, kayıt silme, fotoğraf görüntüleme, CSV indirme ve bilet işlemleri yapamaz. Saymanın adı, şifresi ve aktifliği değiştirilebilir; sabit yetkileri ve kullanıcı adı değişmez. Diğer hesapların bölüm/işlem yetkileri düzenlenebilir.
 
 Etkinlik silme, silinen etkinliklere erişme/geri alma/kalıcı silme, girilmiş kayıtları silme, yönetici hesapları ve kapı görevlisi hesaplarını yönetme yalnızca baş yöneticiye açıktır. Sunucu bu sınırları her istekte kontrol eder; görünmeyen bir düğmenin API adresini kullanmak yetki vermez.
 
@@ -34,7 +34,7 @@ Yönetici hesapları özel Netlify Blobs deposunda saklanır. Yeni SQL veya zoru
 
 ## Panel bölümleri
 
-Baş yönetici panelinde **Etkinlikler**, **Kayıt formları**, **Biletler**, **Çekilişler**, **Giriş ve görevliler**, **Kullanıcılar**, **Instagram**, **Ekibimiz** ve **Yönetici hesapları** bölümleri bulunur. Diğer hesaplar yalnızca izin verilen bölümleri görür. Geniş ekranda soldaki menüden, telefonda üstteki menüden geçiş yapılır. Öneriler, deneyimler ve değerlendirmeler sekmeleri kaldırılmıştır.
+Baş yönetici panelinde **Etkinlikler**, **Kayıt formları**, **Biletler**, **Çekilişler**, **Giriş ve görevliler**, **Kullanıcılar**, **Instagram**, **İstatistikler**, **Etkinlik denetimi**, **Yıllıklar**, **Ekibimiz** ve **Yönetici hesapları** bölümleri bulunur. Diğer hesaplar yalnızca izin verilen bölümleri görür. Geniş ekranda soldaki menüden, telefonda üstteki menüden geçiş yapılır. Öneriler, deneyimler ve değerlendirmeler sekmeleri kaldırılmıştır.
 
 Hesaplar ve QR bilet kurulumu için [SUPABASE-KURULUM.md](SUPABASE-KURULUM.md), kapı girişleri için [ETKINLIK-GIRIS.md](ETKINLIK-GIRIS.md), çekiliş kuralları için [CEKILISLER.md](CEKILISLER.md) belgesini izleyin. Yönetici parolası tarayıcı depolamasında tutulmaz. `npm ci`, `npm run build` ve `npm test` kullanılabilir.
 
@@ -60,7 +60,7 @@ Yalnızca `https://www.instagram.com/p/.../` ve `https://www.instagram.com/reel/
 
 ## Etkinlik kayıt formları
 
-Site içi form hazırlama, sınıf ve telefon alanları, zorunlu sorular, özel dekontlar ve etkinlik karşılaştırması için [KAYIT-SISTEMI.md](KAYIT-SISTEMI.md) belgesini izleyin. Bu özellik mevcut Netlify kurulumuyla çalışır.
+Site içi form hazırlama, sınıf ve telefon alanları, zorunlu sorular, ödeme bildirimleri, yedek kayıtlar ve özel fotoğraf cevapları ve etkinlik karşılaştırması için [KAYIT-SISTEMI.md](KAYIT-SISTEMI.md) belgesini izleyin. Bu özellik mevcut Netlify kurulumuyla çalışır.
 
 ## Silinen etkinlikleri geri alma
 
@@ -75,3 +75,9 @@ Baş yönetici çöp kutusunda **Kalıcı sil** düğmesine basıp etkinliğin a
 Panel, etkinliği açtığınız sürüm değişmişse eski düzenlemeyle üzerine yazmayı reddeder. Yayınlama düğmesi yalnızca yayın durumunu değiştirir. Yeni etkinlik işlemleri zaman damgası ve işlemi yapan hesabın kimliği/kullanıcı adıyla kayda geçer. Bu özellik eklenmeden önceki silme işlemlerini kimin yaptığı geriye dönük belirlenemez.
 
 Yetkisiz yönetici erişiminden şüpheleniyorsanız Netlify **Project configuration → Environment variables → ADMIN_PASSWORD** değerini güçlü, yeni bir parola ile değiştirin ve yeniden yayımlayın. Yeni parola sunucuda devreye girdiğinde önceki yönetici çerezleri de geçersiz olur. Parolayı yalnızca yetkili yöneticilerle paylaşın; sohbet veya GitHub dosyalarına yazmayın.
+
+## Yeni raporlar, yıllık ve gizlilik tercihleri
+
+İstatistikler ve etkinlik denetimi için ayrı görüntüleme yetkileri; yıllıklarda görüntüleme, düzenleme ve yayımlama için ayrı yetkiler vardır. Mevcut yetkili hesaplara bunlar otomatik verilmez. Baş yönetici hepsine erişir. Ayrıntılı kullanım ve güvenli geçiş için [GELISTIRME-VE-GECIS.md](GELISTIRME-VE-GECIS.md) belgesini izleyin.
+
+Ana sayfada Instagram gömmeleri ziyaretçi izin verince yüklenir. Ziyaretçi reddedebilir, paylaşımı doğrudan Instagram’da açabilir veya tercihini yeniden değiştirebilir. Bu tercih gereksiz bir genel çerez onay kutusuna dönüştürülmez. Genel KVKK metni veri sorumlusu bilgisi geldikten sonra ayrıca eklenecektir.

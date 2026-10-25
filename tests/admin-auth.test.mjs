@@ -88,7 +88,7 @@ test("login requires both username and password, issues HttpOnly 8-hour cookie, 
 test("owner visits bootstrap an inactive Sayman account without any shared default password", async () => {
   const f = fixture(), first = await f.list();
   assert.equal(first.accounts.length, 1);
-  assert.deepEqual(first.accounts[0].permissions, ["registrations.view", "registrations.receipts"]);
+  assert.deepEqual(first.accounts[0].permissions, ["registrations.view", "registrations.receipts", "payments.view"]);
   assert.equal(first.accounts[0].username, "sayman"); assert.equal(first.accounts[0].role, "treasurer");
   assert.equal(first.accounts[0].active, false); assert.equal(first.accounts[0].hasPassword, false);
   assert.equal(first.accounts[0].fixedPreset, true);
@@ -106,7 +106,8 @@ test("owner visits bootstrap an inactive Sayman account without any shared defau
   const cookie = logged.headers.get("set-cookie").split(";")[0], req = new Request(origin, { headers: { Cookie: cookie } });
   assert.equal(admin(req), false); assert.throws(() => requireAdmin(req), error => error.status === 403);
   await requirePermission(req, "registrations.receipts", { getStore: f.getStore });
-  for (const permission of ["registrations.manage", "registrations.photos", "registrations.export", "tickets.view", "events.manage", "events.delete"])
+  await requirePermission(req, "payments.view", { getStore: f.getStore });
+  for (const permission of ["payments.manage", "statistics.view", "audit.view", "yearbooks.view", "registrations.manage", "registrations.photos", "registrations.export", "tickets.view", "events.manage", "events.delete"])
     await assert.rejects(requirePermission(req, permission, { getStore: f.getStore }), error => error.status === 403);
 });
 
@@ -120,6 +121,42 @@ test("Sayman preset and owner identity cannot be escalated by CRUD payloads", as
   assert.equal((await f.request("users", "PUT", { id: "owner", name: "Hijacked", expectedRevision: list.revision }, ownerCookie())).status, 400);
   assert.equal((await f.request("users", "POST", { username: "basadmin", name: "Other", password: "synthetic-duplicate-password", permissions: [], expectedRevision: list.revision }, ownerCookie())).status, 400);
   assert.equal((await f.list()).revision, list.revision);
+});
+
+test("legacy Sayman registry upgrades without losing credentials and never gains payment approval", async () => {
+  const f = fixture(), first = await f.list();
+  const enabled = await f.request("users", "PUT", { id: "sayman", active: true, password: "synthetic-old-treasurer-password", expectedRevision: first.revision }, ownerCookie());
+  assert.equal(enabled.status, 200);
+  const record = f.storage.records.get(ADMIN_ACCOUNTS_KEY);
+  const old = record.data.accounts[0];
+  old.permissions = ["registrations.view", "registrations.receipts"];
+  const credentials = { salt: old.salt, passwordHash: old.passwordHash, version: old.version };
+  const oldCookie = signedAdminCookie(new Request(origin), old).split(";")[0];
+  // Old persisted state stays readable until an authorized migration occurs.
+  assert.equal((await getAdminSession(new Request(origin, { headers: { Cookie: oldCookie } }), { getStore: f.getStore })).role, "treasurer");
+  const current = await f.list();
+  assert.deepEqual(current.accounts[0].permissions, ["registrations.view", "registrations.receipts", "payments.view"]);
+  assert.equal(current.accounts[0].active, true);
+  const migrated = f.storage.records.get(ADMIN_ACCOUNTS_KEY).data.accounts[0];
+  assert.equal(migrated.salt, credentials.salt); assert.equal(migrated.passwordHash, credentials.passwordHash);
+  assert.notEqual(migrated.version, credentials.version);
+  assert.equal(await getAdminSession(new Request(origin, { headers: { Cookie: oldCookie } }), { getStore: f.getStore }), null);
+  const login = await f.login("sayman", "synthetic-old-treasurer-password");
+  assert.equal(login.status, 200);
+  const principal = await login.clone().json();
+  assert.ok(principal.session.permissions.includes("payments.view"));
+  assert.ok(!principal.session.permissions.includes("payments.manage"));
+  const req = new Request(origin, { headers: { Cookie: login.headers.get("set-cookie").split(";")[0] } });
+  await assert.rejects(requirePermission(req, "payments.manage", { getStore: f.getStore }), error => error.status === 403);
+});
+
+test("new administrator modules require an explicit permission grant", async () => {
+  const f = fixture();
+  await f.create(); const login = await f.login();
+  const req = new Request(origin, { headers: { Cookie: login.headers.get("set-cookie").split(";")[0] } });
+  for (const permission of ["payments.manage", "statistics.view", "audit.view", "yearbooks.view", "yearbooks.publish"])
+    await assert.rejects(requirePermission(req, permission, { getStore: f.getStore }), error => error.status === 403);
+  assert.deepEqual(normalizedPermissions(["yearbooks.publish", "payments.manage"]), ["payments.view", "payments.manage", "yearbooks.view", "yearbooks.publish"]);
 });
 
 test("delegated sessions revalidate every request; permission/password/active changes immediately revoke old sessions", async () => {
@@ -216,4 +253,37 @@ test("foreign-origin mutations fail before storage and private state failures do
   const broken = await f.request("users", "GET", undefined, ownerCookie());
   assert.equal(broken.status, 503); assert.equal((await broken.text()).includes("private-secret"), false);
   assert.throws(() => passwordRecord("short"), error => error.status === 400);
+});
+
+test("new payment grants require explicit registration viewing without implicitly expanding participant access", async () => {
+  const f = fixture();
+  const first = await f.list(), initialRecord = structuredClone(f.storage.records.get(ADMIN_ACCOUNTS_KEY));
+  for (const permissions of [["payments.view"], ["payments.manage"], ["registrations.receipts", "payments.view"]]) {
+    const result = await f.request("users", "POST", { username: "payment-editor", name: "Ödeme sorumlusu", password: "synthetic-payment-password",
+      permissions, expectedRevision: first.revision }, ownerCookie());
+    assert.equal(result.status, 400);
+    assert.match((await result.json()).error, /registrations.view/);
+    assert.deepEqual(f.storage.records.get(ADMIN_ACCOUNTS_KEY), initialRecord);
+  }
+  const created = await f.create({ permissions: ["registrations.view", "payments.manage"] });
+  assert.deepEqual(created.account.permissions, ["registrations.view", "payments.view", "payments.manage"]);
+  const beforeUpdate = structuredClone(f.storage.records.get(ADMIN_ACCOUNTS_KEY));
+  const rejected = await f.request("users", "PUT", { id: created.account.id, permissions: ["payments.view"], expectedRevision: created.revision }, ownerCookie());
+  assert.equal(rejected.status, 400);
+  assert.deepEqual(f.storage.records.get(ADMIN_ACCOUNTS_KEY), beforeUpdate);
+  const accepted = await f.request("users", "PUT", { id: created.account.id, permissions: ["registrations.view", "payments.view"], expectedRevision: created.revision }, ownerCookie());
+  assert.equal(accepted.status, 200);
+  assert.deepEqual((await accepted.json()).account.permissions, ["registrations.view", "payments.view"]);
+});
+
+test("a legacy payment-only account remains readable and accepts unrelated account changes", async () => {
+  const f = fixture(), created = await f.create({ permissions: ["registrations.view", "payments.view"] });
+  const persisted = f.storage.records.get(ADMIN_ACCOUNTS_KEY).data.accounts.find(account => account.id === created.account.id);
+  persisted.permissions = ["payments.view"];
+  const current = await f.list();
+  const existing = current.accounts.find(account => account.id === created.account.id);
+  assert.deepEqual(existing.permissions, ["payments.view"]);
+  const changed = await f.request("users", "PUT", { id: created.account.id, name: "Eski hesabın yeni adı", expectedRevision: current.revision }, ownerCookie());
+  assert.equal(changed.status, 200);
+  assert.deepEqual((await changed.json()).account.permissions, ["payments.view"]);
 });

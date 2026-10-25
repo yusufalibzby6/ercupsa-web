@@ -3,6 +3,7 @@ import { getStore as getBlobStore } from "@netlify/blobs";
 import { db } from "../lib/database.mjs";
 import { guarded, response, body, fail } from "../lib/security.mjs";
 import { readEvents as readStoredEvents } from "./events.mjs";
+import { readRegistrationTicketRestrictions, registrationTicketIsBlocked } from "../lib/registration-ticket-owners.mjs";
 import { TICKET_DESIGN_WIDTH, TICKET_DESIGN_HEIGHT, TICKET_DESIGN_MAX_BYTES,
   validateTicketDesign } from "../lib/ticket-design.mjs";
 
@@ -35,7 +36,7 @@ function publicDesign(design) {
 }
 
 export function createPublicTicketHandler({ read = db, readEvents = readStoredEvents,
-  getStore = getBlobStore } = {}) {
+  getStore = getBlobStore, registrationStore } = {}) {
   const handle = guarded(async req => {
     if (req.method !== "POST") fail(405, "Desteklenmeyen işlem.");
     const input = await body(req);
@@ -59,6 +60,9 @@ export function createPublicTicketHandler({ read = db, readEvents = readStoredEv
     const batch = batches[0];
     if (batches.length !== 1 || batch?.id !== ticket.batch_id || batch.event_id !== ticket.event_id ||
         !Array.isArray(batch.codes) || !batch.codes.includes(code)) missing();
+    const restrictions = await readRegistrationTicketRestrictions(ticket.event_id, { store: registrationStore });
+    if (registrationTicketIsBlocked(ticket, restrictions))
+      fail(410, "Bu kayıt için bilet kullanılamıyor. Lütfen organizatörle iletişime geçin.");
     const events = await readEvents();
     if (!Array.isArray(events)) fail(503, "Etkinlik bilgileri alınamadı. Lütfen tekrar deneyin.");
     const current = events.find(event => event?.id === ticket.event_id);

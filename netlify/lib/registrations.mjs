@@ -1,6 +1,7 @@
 import { fail, identifier, text } from "./security.mjs";
 import { receiptFormat } from "./receipt-format.mjs";
 import { photoFormat } from "./photo-format.mjs";
+import { registrationStatus, registrationCounts, ticketEligible } from "./registration-state.mjs";
 
 export const REGISTRATION_STORE = "ercupsa-registrations";
 export const REGISTRATION_RECEIPT_STORE = "ercupsa-registration-receipts";
@@ -34,7 +35,8 @@ export function defaultRegistrationForm(eventId) {
       { id: "class_year", type: "select", label: "Sınıf", required: true, options: [...CLASS_OPTIONS] },
       { id: "phone", type: "tel", label: "Telefon numarası", required: true },
     ],
-    receipt: { enabled: true, required: false },
+    receipt: { enabled: false, required: false },
+    waitlist: { enabled: false, capacity: 0 }, showRemainingCapacity: false, payment: { enabled: false },
   };
 }
 
@@ -93,14 +95,20 @@ export function normalizeRegistrationForm(input, eventId, updatedAt) {
   for (const id of Object.keys(CORE_TYPES)) {
     if (!seen.has(id)) fail(400, "Ad soyad, sınıf ve telefon alanları formda bulunmalı.");
   }
-  const receipt = input.receipt;
-  if (!receipt || typeof receipt.enabled !== "boolean" || typeof receipt.required !== "boolean")
-    fail(400, "Dekont ayarı geçersiz.");
-  if (receipt.required && !receipt.enabled) fail(400, "Zorunlu dekont alanı açık olmalı.");
+  const waitlist = input.waitlist ?? { enabled: false, capacity: 0 };
+  if (!waitlist || typeof waitlist.enabled !== "boolean" || !Number.isInteger(waitlist.capacity) ||
+      waitlist.capacity < 0 || waitlist.capacity > 10000 || waitlist.enabled && waitlist.capacity < 1)
+    fail(400, "Yedek kontenjanı 1 ile 10000 arasında tam sayı olmalı.");
+  if (input.showRemainingCapacity !== undefined && typeof input.showRemainingCapacity !== "boolean")
+    fail(400, "Kontenjan görünürlüğü geçersiz.");
+  const payment = input.payment ?? { enabled: false };
+  if (!payment || typeof payment.enabled !== "boolean") fail(400, "Ödeme ayarı geçersiz.");
   return {
     eventId: identifier(eventId), enabled: input.enabled, maxRegistrations,
     description: text(input.description, 5000), fields,
-    receipt: { enabled: receipt.enabled, required: receipt.required }, updatedAt,
+    receipt: { enabled: false, required: false },
+    waitlist: { enabled: waitlist.enabled, capacity: waitlist.capacity },
+    showRemainingCapacity: input.showRemainingCapacity === true, payment: { enabled: payment.enabled }, updatedAt,
   };
 }
 
@@ -221,7 +229,7 @@ export async function readRegistrationSubmission(req) {
   let data;
   try { data = await new Response(bytes, { headers: { "Content-Type": contentType } }).formData(); }
   catch { fail(400, "Form içeriği okunamadı. Lütfen tekrar deneyin."); }
-  const allowed = new Set(["answers", "receipt", "requestId", "website"]);
+  const allowed = new Set(["answers", "receipt", "requestId", "website", "paymentDeclared", "mediaConsent"]);
   for (const name of data.keys()) {
     if ((!allowed.has(name) && !/^photo:[A-Za-z][A-Za-z0-9_-]{0,59}$/.test(name)) ||
         data.getAll(name).length !== 1) fail(400, "Geçersiz form alanı.");
@@ -251,7 +259,13 @@ export async function readRegistrationSubmission(req) {
   }
   if (total > REGISTRATION_FILES_MAX_BYTES)
     fail(413, "Fotoğraflar ve dekont toplam en fazla 4 MB olabilir.");
-  return { requestId: requestId.toLowerCase(), answers, receipt: receipt?.size ? receipt : null, photos };
+  const choices = {};
+  for (const key of ["paymentDeclared", "mediaConsent"]) {
+    const value = data.get(key);
+    if (value !== null && !["true", "false"].includes(value)) fail(400, "Form tercihleri geçersiz.");
+    choices[key] = value === "true";
+  }
+  return { requestId: requestId.toLowerCase(), answers, receipt: receipt?.size ? receipt : null, photos, ...choices };
 }
 
 export async function validateRegistrationReceipt(file) {
@@ -276,11 +290,11 @@ export async function validateRegistrationPhoto(file) {
     mime: detected.mime, size: detected.bytes.length } };
 }
 
-export function entryForAdmin(entry, { tickets = true, photoAccess = true, receiptAccess = true } = {}) {
-  const { receipt, photos, fingerprint, status, ticket, ...rest } = entry;
+export function entryForAdmin(entry, { tickets = true, photoAccess = true, receiptAccess = true, paymentAccess = true } = {}) {
+  const { receipt, photos, fingerprint, status, ticket, payment, ...rest } = entry;
   const safeAnswers = photoAccess ? rest.answers : Object.fromEntries(Object.entries(rest.answers || {})
     .filter(([id]) => !Object.hasOwn(photos || {}, id)));
-  return { ...rest, answers: safeAnswers, ...(tickets && ticket ? { ticket: { batchId: ticket.batchId, status: ticket.status,
+  return { ...rest, ...(paymentAccess && payment ? { payment } : {}), ...(tickets ? { ticketEligible: ticketEligible(entry) } : {}), registrationStatus: registrationStatus(entry), answers: safeAnswers, ...(tickets && ticket ? { ticket: { batchId: ticket.batchId, status: ticket.status,
     ...(ticket.issuedAt ? { issuedAt: ticket.issuedAt } : {}) } } : {}),
     ...(photoAccess && photos ? { photos: Object.fromEntries(Object.entries(photos).map(([id, photo]) =>
       [id, { name: photo.name, mime: photo.mime, size: photo.size }])) } : {}),
@@ -311,7 +325,7 @@ export function registrationSummary(entries) {
   const annotated = annotateRegistrationDuplicates(entries);
   const duplicatePhones = new Set(annotated.filter((entry) => entry.possibleDuplicate)
     .map((entry) => normalizedRegistrationPhone(entry.phone)));
-  const summary = { total: entries.length, byClass: [],
+  const summary = { ...registrationCounts({ entries }), byClass: [],
     duplicateEntries: annotated.filter((entry) => entry.possibleDuplicate).length,
     duplicateGroups: duplicatePhones.size };
   const classes = new Map();
@@ -332,7 +346,7 @@ const csvCell = (value) => {
   if (/^[\s]*[=+\-@]/.test(string)) string = "'" + string;
   return `"${string.replaceAll('"', '""')}"`;
 };
-export function registrationCsv(entries) {
+export function registrationCsv(entries, { paymentAccess = true } = {}) {
   const questions = new Map();
   for (const entry of entries) {
     for (const field of entry.fields || []) {
@@ -342,12 +356,12 @@ export function registrationCsv(entries) {
     }
   }
   const columns = [...questions.values()];
-  const rows = [["Kayıt kimliği", "Kayıt tarihi", "Ad soyad", "Sınıf", "Telefon", "Dekont", ...columns.map((field) => field.label)]];
+  const rows = [["Kayıt kimliği", "Kayıt tarihi", "Ad soyad", "Sınıf", "Telefon", "Kayıt durumu", ...(paymentAccess ? ["Ödeme durumu"] : []), "Görsel yayın tercihi", ...columns.map((field) => field.label)]];
   for (const entry of entries) {
     const snapshots = new Set((entry.fields || []).map((field) => `${field.id}\u0000${field.label}`));
     rows.push([
       entry.id, entry.createdAt, entry.name, entry.classYear, entry.phone,
-      entry.receipt ? "Var" : "Yok",
+      registrationStatus(entry), ...(paymentAccess ? [entry.payment?.reviewStatus || "not_required"] : []), entry.mediaConsent ? (entry.mediaConsent.granted ? "İzin verdi" : "İzin vermedi") : "Bilinmiyor",
       ...columns.map((field) => snapshots.has(`${field.id}\u0000${field.label}`) ? entry.answers?.[field.id] : ""),
     ]);
   }

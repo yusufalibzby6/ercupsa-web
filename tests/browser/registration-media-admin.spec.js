@@ -85,7 +85,7 @@ test("admin configures a photo question and labeled image choices without changi
   await question.locator('[data-field-prop="type"]').selectOption("photo");
   await question.locator('[data-field-prop="label"]').fill("Yaptığın tasarımın fotoğrafı");
   await question.locator('[data-field-prop="required"]').check();
-  await expect(question).toContainText("Fotoğraflar ve dekont birlikte en fazla 4 MB");
+  await expect(question).toContainText("Fotoğraflar toplam en fazla 4 MB");
   await row(page, 0).locator("[data-option-label]").fill("Pembe tasarım");
   await row(page, 0).locator("[data-option-upload]").click();
   await expect(page.locator("#registrationSave")).toBeDisabled();

@@ -1,16 +1,10 @@
 import { mockOwnerSession } from "./admin-session-fixture.js";
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { gunzipSync } from "node:zlib";
 
 const today = new Date("2026-10-04T19:00:00+03:00");
 const fullMessage = "İlginiz için teşekkür ederiz. Kontenjanımız dolmuştur. Bir sonraki etkinliklerimize bekleriz.";
 const receiptBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=", "base64");
-// A real white JPEG, also used in ticket-design tests; the browser tests only inspect multipart transmission.
-const jpegBytes = gunzipSync(Buffer.from(
-  "H4sIAPBxwWoC/+3XzQ7BQBDA8Rml29VtWCpBttRHgqQRqgkS4iBpQjyCh/FmHDyEj4s3WeVWXNznN7f/YWavqy/6AcVtvIkBEQCTAX2HNVimycycxRjj3MoL1xG2LWqlcsH16s2GV1fK7w57fjvoKNWfDoLROIqiZm++nIWL4SQKX0uQcy5sUXWcathSrfBv+gTSyuyyewPbkJFoSNRnqLyfmsKS7BY/K7wq/qzyu95AGJhcMSSs4HgAQgghhBBCCCGEpP/O1yfr59ehSBAAAA==",
-  "base64",
-));
 const classOptions = ["Hazırlık", "1. Sınıf", "2. Sınıf", "3. Sınıf", "4. Sınıf", "5. Sınıf", "Mezun", "Diğer"];
 const coreFields = [
   { id: "full_name", type: "text", label: "Ad soyad", required: true },
@@ -34,10 +28,10 @@ const events = [
 function formConfig(eventId, custom = false) {
   return {
     eventId, enabled: eventId !== "native-disabled",
-    description: eventId === "native-today" ? "Kayıt öncesinde okuyun: dekontunuzu hazırlayın.\nEtkinliğe girişte kaydınızı kontrol edeceğiz." : "İkinci etkinliğin açıklaması.",
+    description: eventId === "native-today" ? "Kayıt öncesinde okuyun: etkinlik ayrıntılarını kontrol edin.\nEtkinliğe girişte kaydınızı kontrol edeceğiz." : "İkinci etkinliğin açıklaması.",
     maxRegistrations: null,
     fields: structuredClone([...coreFields, ...(custom ? questions : [])]),
-    receipt: { enabled: true, required: custom },
+    receipt: { enabled: false, required: false }, payment: { enabled: false }, waitlist: { enabled: false, capacity: 0 }, showRemainingCapacity: false,
   };
 }
 
@@ -55,7 +49,7 @@ function summarize(entries) {
   const byClass = new Map();
   for (const value of entries) byClass.set(value.classYear, (byClass.get(value.classYear) || 0) + 1);
   return {
-    total: entries.length,
+    total: entries.length, main: entries.filter(value => !value.registrationStatus || value.registrationStatus === "main").length, waitlisted: entries.filter(value => value.registrationStatus === "waitlisted").length, cancelled: entries.filter(value => value.registrationStatus === "cancelled").length,
     byClass: [...byClass].map(([classYear, count]) => ({ classYear, count })),
   };
 }
@@ -67,7 +61,7 @@ async function fixture(page, { custom = false } = {}) {
       ["native-today", [entry("first", "2. Sınıf", true), entry("second", "1. Sınıf"), entry("third", "2. Sınıf")]],
       ["native-next", [entry("fourth", "3. Sınıf", false, "native-next")]],
     ]),
-    submissions: [], saves: [], deletions: [], receiptReads: [], requests: [], submitFailures: [], formFailures: [], deleteFailures: [],
+    payments: [], cancellations: [], submissions: [], saves: [], deletions: [], receiptReads: [], requests: [], submitFailures: [], formFailures: [], deleteFailures: [],
   };
   await page.clock.install({ time: today });
   await page.route("https://**/*", route => route.abort());
@@ -88,10 +82,16 @@ async function fixture(page, { custom = false } = {}) {
       const form = state.forms.get(eventId) || null;
       const event = events.find(value => value.id === eventId);
       const open = !!form?.enabled && event?.published && event.date >= "2026-10-04";
-      const full = !!open && form.maxRegistrations !== null && (state.entries.get(eventId)?.length || 0) >= form.maxRegistrations;
+      const counts = summarize(state.entries.get(eventId) || []);
+      const mainFull = !!open && form.maxRegistrations !== null && counts.main >= form.maxRegistrations;
+      const waitlistAvailable = mainFull && form.waitlist.enabled && counts.waitlisted < form.waitlist.capacity;
+      const full = mainFull && !waitlistAvailable;
+      const stage = !open || full ? "closed" : waitlistAvailable ? "waitlist" : "main";
       const publicForm = form ? structuredClone(form) : null;
-      if (publicForm) delete publicForm.maxRegistrations;
-      return route.fulfill({ json: { form: publicForm, available: !!open && !full, full, ...(full ? { message: fullMessage } : {}) } });
+      if (publicForm) { delete publicForm.maxRegistrations; delete publicForm.waitlist.capacity; }
+      return route.fulfill({ json: { form: publicForm, available: !!open && !full, stage, full,
+        ...(form?.showRemainingCapacity ? { capacity: { limit: form.maxRegistrations, main: counts.main, remaining: form.maxRegistrations == null ? null : Math.max(0, form.maxRegistrations - counts.main) } } : {}),
+        ...(full ? { message: form.waitlist.enabled ? "Etkinliğimizin asıl ve yedek kontenjanları dolmuştur. İlginiz için teşekkür ederiz." : fullMessage } : {}) } });
     }
     if (action === "submit") {
       const data = await new Request("http://fixture.test", { method: "POST", headers: { "content-type": request.headers()["content-type"] }, body: request.postDataBuffer() }).formData();
@@ -99,13 +99,16 @@ async function fixture(page, { custom = false } = {}) {
       state.submissions.push({
         eventId, answers: JSON.parse(data.get("answers")), requestId: data.get("requestId"), website: data.get("website"),
         receipt: file ? { name: file.name, type: file.type, bytes: Buffer.from(await file.arrayBuffer()) } : null,
+        paymentDeclared: data.get("paymentDeclared"), mediaConsent: data.get("mediaConsent"),
         contentType: request.headers()["content-type"],
       });
       if (state.submitFailures.length) {
         const failure = state.submitFailures.shift();
         return route.fulfill({ status: typeof failure === "number" ? failure : failure.status, json: { error: typeof failure === "number" ? "Kayıt henüz doğrulanamadı. Lütfen tekrar deneyin." : failure.error, ...(failure.code ? { code: failure.code } : {}) } });
       }
-      return route.fulfill({ json: { ok: true, reference: "test-reference" } });
+      const currentForm = state.forms.get(eventId), counts = summarize(state.entries.get(eventId) || []);
+      const registrationStatus = currentForm.maxRegistrations != null && counts.main >= currentForm.maxRegistrations ? "waitlisted" : "main";
+      return route.fulfill({ json: { ok: true, reference: "test-reference", registrationStatus } });
     }
     if (action === "form" && request.method() === "POST") {
       const form = { ...request.postDataJSON(), eventId };
@@ -120,6 +123,20 @@ async function fixture(page, { custom = false } = {}) {
     }
     if (action === "summary") {
       return route.fulfill({ json: { events: events.map(event => ({ eventId: event.id, title: event.title, ...summarize(state.entries.get(event.id) || []) })) } });
+    }
+    if (action === "payment") {
+      const body = request.postDataJSON(); state.payments.push({ eventId, ...body });
+      const value = (state.entries.get(eventId) || []).find(value => value.id === body.id);
+      value.payment = { ...value.payment, reviewStatus: body.approved ? "approved" : "pending" };
+      return route.fulfill({ json: { ok: true } });
+    }
+    if (action === "cancel") {
+      const body = request.postDataJSON(); state.cancellations.push({ eventId, ...body });
+      const values = state.entries.get(eventId) || [], value = values.find(value => value.id === body.id);
+      value.registrationStatus = "cancelled";
+      const next = values.filter(value => value.registrationStatus === "waitlisted").sort((a,b) => a.sequence - b.sequence)[0];
+      if (next) { next.registrationStatus = "main"; next.promotedAt = "2026-10-04T16:00:00Z"; }
+      return route.fulfill({ json: { ok: true } });
     }
     if (action === "delete") {
       const body = request.postDataJSON();
@@ -167,7 +184,7 @@ test("native registration opens at the description and inputs on mobile without 
   await expect(page.locator("body")).not.toContainText(/kontenjan|kayıt sayacı|toplam kayıt/i);
 });
 
-test("anonymous registration validates required core and custom answers, then sends the selected private receipt as multipart", async ({ page }) => {
+test("anonymous registration validates required core and custom answers without requesting a receipt or optional media consent", async ({ page }) => {
   const state = await fixture(page, { custom: true });
   await page.goto("/form.html?event=native-today#registrationSection");
   await expect(page.locator("#registration-full_name")).toBeVisible();
@@ -185,10 +202,8 @@ test("anonymous registration validates required core and custom answers, then se
   await page.locator("#registration-topics-0").check();
   await page.locator("#registration-topics-1").check();
   await page.locator("#registration-notes").fill("Ulaşım için bilgilendirme rica ederim.");
-  await page.locator("#registrationSubmit").click();
-  expect(state.submissions).toHaveLength(0);
-  await expect(page.locator("#registration-error-receipt")).toBeVisible();
-  await page.locator("#registrationReceipt").setInputFiles({ name: "dekont.png", mimeType: "image/png", buffer: receiptBytes });
+  await expect(page.locator("#registrationReceipt")).toHaveCount(0);
+  await expect(page.locator("#registrationMediaConsent")).not.toBeChecked();
   await page.locator("#registrationSubmit").click();
   await expect(page.locator("#registrationSuccess")).toBeVisible();
   expect(state.submissions).toHaveLength(1);
@@ -198,95 +213,30 @@ test("anonymous registration validates required core and custom answers, then se
   expect(submitted.answers).toEqual({ full_name: "Yerel test katılımcısı", class_year: "2. Sınıf", phone: "05551234567", session: "Öğleden sonra", diet: "Vejetaryen", topics: ["Klinik eczacılık", "Araştırma"], notes: "Ulaşım için bilgilendirme rica ederim." });
   expect(submitted.requestId).toBeTruthy();
   expect(submitted.website || "").toBe("");
-  expect(submitted.receipt).toEqual({ name: "dekont.png", type: "image/png", bytes: receiptBytes });
+  expect(submitted.receipt).toBeNull();
+  expect(submitted.paymentDeclared).toBe("false");
+  expect(submitted.mediaConsent).toBe("false");
   expect(state.requests.some(request => ["admin", "summary", "receipt"].includes(request.action))).toBe(false);
   await expect(page.locator("body")).not.toContainText(/toplam kayıt|bekleyen kayıt|kontenjan/i);
 });
 
-for (const sample of [
-  { label: "a Samsung JPG-named screenshot with PNG bytes", name: "Screenshot_20261008_123139_VakifBank.jpg", mime: "image/jpeg", bytes: receiptBytes },
-  { label: "a JPEG reported as generic binary data", name: "dekont.jpg", mime: "application/octet-stream", bytes: jpegBytes },
-  { label: "the image/jpg MIME alias", name: "dekont.jpg", mime: "image/jpg", bytes: jpegBytes },
-  { label: "a supported file with no MIME type", name: "dekont.jpg", mime: "", bytes: jpegBytes },
-]) {
-  test(`receipt selection submits ${sample.label} unchanged for server validation`, async ({ page }) => {
-    const state = await fixture(page);
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/form.html?event=native-today");
-    await fillCore(page);
-    // Construct Files directly: automation file pickers can fill an absent MIME type themselves.
-    await page.locator("#registrationReceipt").evaluate((input, sample) => {
-      const selection = new DataTransfer();
-      selection.items.add(new File([new Uint8Array(sample.bytes)], sample.name, { type: sample.mime }));
-      input.files = selection.files;
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-    }, { name: sample.name, mime: sample.mime, bytes: [...sample.bytes] });
-    expect(await page.locator("#registrationReceipt").evaluate(input => input.files[0].type)).toBe(sample.mime);
-    await page.locator("#registrationSubmit").click();
-    await expect(page.locator("#registrationSuccess")).toBeVisible();
-    expect(state.submissions).toHaveLength(1);
-    // Browsers serialize empty File.type as application/octet-stream in multipart.
-    expect(state.submissions[0].receipt).toEqual({ name: sample.name, type: sample.mime || "application/octet-stream", bytes: sample.bytes });
-  });
-}
-
-test("a server-rejected receipt preserves inputs and the selected file until the participant replaces it and retries", async ({ page }) => {
-  const state = await fixture(page);
-  const error = "Dekont JPG, PNG veya PDF dosyası olmalı. Dosyanı kontrol edip tekrar yükle.";
-  state.submitFailures.push({ status: 415, error });
-  await page.goto("/form.html?event=native-today");
-  await fillCore(page);
-  await page.locator("#registrationReceipt").setInputFiles({ name: "gecersiz.jpg", mimeType: "image/jpeg", buffer: Buffer.from("this is not an image") });
-  await page.locator("#registrationSubmit").click();
-  await expect(page.locator("#registrationFeedback")).toHaveText(error);
-  await expect(page.locator("#registrationSuccess")).not.toBeVisible();
-  await expect(page.locator("#registration-full_name")).toHaveValue("Yerel test katılımcısı");
-  await expect(page.locator("#registration-class_year")).toHaveValue("2. Sınıf");
-  await expect(page.locator("#registration-phone")).toHaveValue("05551234567");
-  expect(await page.locator("#registrationReceipt").evaluate(input => input.files[0].name)).toBe("gecersiz.jpg");
-  await expect(page.locator("#registrationSubmit")).toBeEnabled();
-  await expect(page.locator("#registrationReceipt")).toBeEnabled();
-  await page.locator("#registrationReceipt").setInputFiles({ name: "dekont.png", mimeType: "image/png", buffer: receiptBytes });
-  await page.locator("#registrationSubmit").click();
-  await expect(page.locator("#registrationSuccess")).toBeVisible();
-  expect(state.submissions).toHaveLength(2);
-  expect(state.submissions[1].requestId).toBe(state.submissions[0].requestId);
-  expect(state.submissions[1].answers).toEqual(state.submissions[0].answers);
-  expect(state.submissions[1].receipt).toEqual({ name: "dekont.png", type: "image/png", bytes: receiptBytes });
-});
-
-test("an oversized receipt is rejected before submission and can be replaced without losing the answers", async ({ page }) => {
-  const state = await fixture(page);
-  await page.goto("/form.html?event=native-today");
-  await fillCore(page);
-  await page.locator("#registrationReceipt").setInputFiles({ name: "buyuk.jpg", mimeType: "application/octet-stream", buffer: Buffer.alloc(4 * 1024 * 1024 + 1) });
-  await page.locator("#registrationSubmit").click();
-  await expect(page.locator("#registration-error-receipt")).toHaveText("Dosya en fazla 4 MB olabilir.");
-  await expect(page.locator("#registrationReceipt")).toBeFocused();
-  await expect(page.locator("#registration-full_name")).toHaveValue("Yerel test katılımcısı");
-  expect(state.submissions).toHaveLength(0);
-  await page.locator("#registrationReceipt").setInputFiles({ name: "dekont.png", mimeType: "image/png", buffer: receiptBytes });
-  await page.locator("#registrationSubmit").click();
-  await expect(page.locator("#registrationSuccess")).toBeVisible();
-  expect(state.submissions).toHaveLength(1);
-});
-
-test("a failed registration keeps answers and the receipt, and a retry reuses its idempotency key", async ({ page }) => {
+test("a failed registration keeps answers and optional media choice, and a retry reuses its idempotency key", async ({ page }) => {
   const state = await fixture(page);
   state.submitFailures.push(503);
   await page.goto("/form.html?event=native-today");
   await fillCore(page);
-  await page.locator("#registrationReceipt").setInputFiles({ name: "dekont.png", mimeType: "image/png", buffer: receiptBytes });
+  await page.locator("#registrationMediaConsent").check();
   await page.locator("#registrationSubmit").click();
   await expect(page.locator("#registrationFeedback")).toContainText("tekrar deneyin");
   await expect(page.locator("#registrationSuccess")).not.toBeVisible();
   await expect(page.locator("#registration-full_name")).toHaveValue("Yerel test katılımcısı");
   await expect(page.locator("#registration-class_year")).toHaveValue("2. Sınıf");
   await expect(page.locator("#registration-phone")).toHaveValue("05551234567");
-  expect(await page.locator("#registrationReceipt").evaluate(input => input.files[0]?.name)).toBe("dekont.png");
+  await expect(page.locator("#registrationMediaConsent")).toBeChecked();
   await page.locator("#registrationSubmit").click();
   await expect(page.locator("#registrationSuccess")).toBeVisible();
   expect(state.submissions).toHaveLength(2);
+  expect(state.submissions[1].mediaConsent).toBe("true");
   expect(state.submissions[1].requestId).toBe(state.submissions[0].requestId);
   expect(state.submissions[1].answers).toEqual(state.submissions[0].answers);
   expect(state.submissions[1].receipt).toEqual(state.submissions[0].receipt);
@@ -327,17 +277,16 @@ test("a full form shows the thank-you message and other events without inputs or
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
-test("when the last place fills while a form is open, submitting replaces inputs with the full message and never claims success", async ({ page }) => {
+test("when the last place fills while a form is open, the closed banner retains answers and never claims success", async ({ page }) => {
   const state = await fixture(page);
   state.forms.get("native-today").maxRegistrations = 4;
   state.submitFailures.push({ status: 409, error: fullMessage, code: "REGISTRATION_FULL" });
   await page.goto("/form.html?event=native-today#registrationSection");
   await fillCore(page);
-  await page.locator("#registrationReceipt").setInputFiles({ name: "dekont.png", mimeType: "image/png", buffer: receiptBytes });
   await page.locator("#registrationSubmit").click();
-  await expect(page.locator("#nativeRegistrationFull p")).toHaveText(fullMessage);
-  await expect(page.locator("#nativeRegistrationFull")).toBeFocused();
-  await expect(page.locator("#nativeRegistrationForm")).toHaveCount(0);
+  await expect(page.locator("#registrationAvailability")).toContainText(fullMessage);
+  await expect(page.locator("#registration-full_name")).toHaveValue("Yerel test katılımcısı");
+  await expect(page.locator("#registrationSubmit")).toBeDisabled();
   await expect(page.locator("#registrationSuccess")).toHaveCount(0);
   expect(state.submissions).toHaveLength(1);
 });
@@ -381,7 +330,7 @@ test("an admin configures the top description, optional core fields and required
   await page.locator("#registrationDescription").fill("Önce açıklamayı okuyun. Ücret ve ödeme bilgileri bu alanda.");
   await page.locator('[data-registration-field="class_year"] [data-field-prop="required"]').uncheck();
   await page.locator('[data-registration-field="phone"] [data-field-prop="required"]').uncheck();
-  await page.locator("#registrationReceiptRequired").check();
+  await page.locator("#registrationPaymentEnabled").check();
   await page.locator("#registrationAddField").click();
   const question = page.locator("#registrationFields [data-registration-field]").last();
   const id = await question.getAttribute("data-registration-field");
@@ -400,7 +349,8 @@ test("an admin configures the top description, optional core fields and required
   expect(saved.fields.find(field => field.id === "class_year").required).toBe(false);
   expect(saved.fields.find(field => field.id === "phone").required).toBe(false);
   expect(saved.fields.find(field => field.id === id)).toMatchObject({ label: "Katılım oturumu", type: "select", options: ["Sabah", "Akşam"], required: true });
-  expect(saved.receipt).toEqual({ enabled: true, required: true });
+  expect(saved.receipt).toEqual({ enabled: false, required: false });
+  expect(saved.payment).toEqual({ enabled: true });
   expect(saved.maxRegistrations).toBeNull();
   await page.locator("#registrationEvent").selectOption("native-next");
   await expect(page.locator("#registrationDescription")).toHaveValue("İkinci etkinliğin açıklaması.");
@@ -456,7 +406,8 @@ test("an admin filters registrations by class, reviews a private receipt and com
   await page.locator("#registrationClassFilter").selectOption("2. Sınıf");
   await expect(entries).toHaveCount(2);
   await expect(page.locator("#registrationStatusFilter")).toHaveCount(0);
-  await expect(page.locator("#registrationsTab")).not.toContainText(/onayla|reddet|beklemede/i);
+  await expect(page.locator("#registrationEntries")).not.toContainText(/reddet|beklemede/i);
+  await expect(page.locator("[data-registration-approve], [data-registration-reject]")).toHaveCount(0);
   await expect(entries.first()).toContainText("Test katılımcısı first");
   await entries.first().locator('[data-registration-receipt="first"]').click();
   await expect(page.locator("#registrationReceiptDialog")).toBeVisible();
@@ -540,4 +491,130 @@ test("class filters and totals include registrations beyond the API's first page
   await expect(page.locator("#registrationClassBreakdown")).toContainText("5. Sınıf: 1");
   // Filtering the entries must preserve the event-wide totals for comparison.
   await expect(page.locator("#registrationSummary")).toContainText("51");
+});
+
+test("paid main registration allows reversing the declaration before submit and keeps media consent optional", async ({ page }) => {
+  const state = await fixture(page);
+  state.forms.get("native-today").payment.enabled = true;
+  await page.goto("/form.html?event=native-today");
+  await fillCore(page);
+  const declaration = page.locator("#registrationPaymentDeclared");
+  await expect(declaration).toBeVisible();
+  await expect(declaration).not.toBeChecked();
+  await page.locator("#registrationSubmit").click();
+  await expect(page.locator("#registration-error-payment")).toContainText("işaretlemelisiniz");
+  expect(state.submissions).toHaveLength(0);
+  await declaration.check();
+  await declaration.uncheck();
+  await page.locator("#registrationSubmit").click();
+  expect(state.submissions).toHaveLength(0);
+  await declaration.check();
+  await page.locator("#registrationSubmit").click();
+  await expect(page.locator("#registrationSuccess")).toContainText("Asıl katılımcı listesi");
+  expect(state.submissions[0]).toMatchObject({ paymentDeclared: "true", mediaConsent: "false", receipt: null });
+});
+
+test("waitlisted applicants see a clear distinction from admission and never have to declare payment", async ({ page }) => {
+  const state = await fixture(page);
+  Object.assign(state.forms.get("native-today"), { maxRegistrations: 3, waitlist: { enabled: true, capacity: 2 }, payment: { enabled: true } });
+  await page.goto("/form.html?event=native-today");
+  await expect(page.locator("#registrationAvailability")).toContainText("Başvurunuz yedek listeye alınacaktır");
+  await expect(page.locator("#registrationPaymentDeclared")).toBeHidden();
+  await expect(page.locator("#registrationAvailability progress")).toHaveCount(0);
+  await fillCore(page);
+  await page.locator("#registrationMediaConsent").check();
+  await page.locator("#registrationSubmit").click();
+  await expect(page.locator("#registrationSuccess")).toContainText("Yedek kaydınız başarıyla oluşturuldu");
+  await expect(page.locator("#registrationSuccess")).toContainText("kesin katılım değildir");
+  expect(state.submissions[0]).toMatchObject({ paymentDeclared: "false", mediaConsent: "true" });
+});
+
+test("remaining capacity is opt-in and refreshes without clearing answers or choices", async ({ page }) => {
+  const state = await fixture(page);
+  Object.assign(state.forms.get("native-today"), { maxRegistrations: 15, showRemainingCapacity: true, waitlist: { enabled: true, capacity: 2 } });
+  await page.goto("/form.html?event=native-today");
+  await expect(page.locator("#registrationAvailability")).toContainText("12 kişilik yer kaldı");
+  await expect(page.locator("#registrationAvailability progress")).toHaveAttribute("max", "15");
+  await fillCore(page);
+  await page.locator("#registrationMediaConsent").check();
+  state.forms.get("native-today").maxRegistrations = 6;
+  await page.clock.runFor(30000);
+  await expect(page.locator("#registrationAvailability")).toContainText("Son 3 kişilik yer kaldı");
+  await expect(page.locator("#registration-full_name")).toHaveValue("Yerel test katılımcısı");
+  await expect(page.locator("#registrationMediaConsent")).toBeChecked();
+  state.forms.get("native-today").maxRegistrations = 3;
+  await page.clock.runFor(30000);
+  await expect(page.locator("#registrationAvailability")).toContainText("Yedek başvuru kesin katılım değildir");
+  await expect(page.locator("#registrationAvailability")).toContainText("Asıl kontenjan doldu");
+  await expect(page.locator("#registration-full_name")).toHaveValue("Yerel test katılımcısı");
+  state.forms.get("native-today").showRemainingCapacity = false;
+  await page.clock.runFor(30000);
+  await expect(page.locator("#registrationAvailability progress")).toHaveCount(0);
+  await expect(page.locator("#registrationAvailability")).not.toContainText(/kişilik|kalan/);
+});
+
+test("a full waitlist closes with its specific message and unlimited capacity has no artificial progress", async ({ page }) => {
+  const state = await fixture(page);
+  Object.assign(state.forms.get("native-today"), { maxRegistrations: 3, waitlist: { enabled: true, capacity: 1 } });
+  state.entries.get("native-today").push({ ...entry("wait", "1. Sınıf"), registrationStatus: "waitlisted", sequence: 4 });
+  await page.goto("/form.html?event=native-today");
+  await expect(page.locator("#nativeRegistrationFull")).toContainText("asıl ve yedek kontenjanları dolmuştur");
+  await expect(page.locator("#nativeRegistrationForm")).toHaveCount(0);
+  state.forms.get("native-next").showRemainingCapacity = true;
+  await page.goto("/form.html?event=native-next");
+  await expect(page.locator("#registrationAvailability")).toContainText("Kontenjan sınırsız");
+  await expect(page.locator("#registrationAvailability progress")).toHaveCount(0);
+});
+
+test("an admin independently enables waitlist, visible capacity and payment settings with guarded waitlist limits", async ({ page }) => {
+  const state = await fixture(page);
+  await openAdmin(page);
+  await expect(page.locator("#registrationWaitlistEnabled")).not.toBeChecked();
+  await expect(page.locator("#registrationShowRemaining")).not.toBeChecked();
+  await expect(page.locator("#registrationWaitlistCapacity")).toBeDisabled();
+  await page.locator("#registrationWaitlistEnabled").check();
+  await page.locator("#registrationWaitlistCapacity").fill("5");
+  await page.locator("#registrationSave").click();
+  await expect(page.locator("#registrationFeedback")).toContainText("asıl kontenjan");
+  expect(state.saves).toHaveLength(0);
+  await page.locator("#registrationMaxRegistrations").fill("40");
+  await page.locator("#registrationShowRemaining").check();
+  await page.locator("#registrationPaymentEnabled").check();
+  await page.locator("#registrationSave").click();
+  await expect.poll(() => state.saves.length).toBe(1);
+  expect(state.saves[0]).toMatchObject({ maxRegistrations: 40, waitlist: { enabled: true, capacity: 5 }, showRemainingCapacity: true, payment: { enabled: true } });
+  await page.locator("#registrationEvent").selectOption("native-next");
+  await expect(page.locator("#registrationWaitlistEnabled")).not.toBeChecked();
+  await expect(page.locator("#registrationShowRemaining")).not.toBeChecked();
+  await page.locator("#registrationEvent").selectOption("native-today");
+  await expect(page.locator("#registrationWaitlistEnabled")).toBeChecked();
+  await expect(page.locator("#registrationWaitlistCapacity")).toHaveValue("5");
+});
+
+test("admin groups admissions, keeps waitlist order and reviews payment independently before a cancellation promotes the next applicant", async ({ page }) => {
+  const state = await fixture(page);
+  state.entries.set("native-today", [
+    { ...entry("main", "1. Sınıf"), registrationStatus: "main", payment: { declared: true, reviewStatus: "pending" } },
+    { ...entry("wait-later", "2. Sınıf"), registrationStatus: "waitlisted", sequence: 5, payment: { declared: false, reviewStatus: "not_required" } },
+    { ...entry("wait-first", "2. Sınıf"), registrationStatus: "waitlisted", sequence: 4, payment: { declared: false, reviewStatus: "not_required" } },
+    { ...entry("cancelled", "3. Sınıf"), registrationStatus: "cancelled" },
+  ]);
+  await openAdmin(page);
+  const main = page.locator('[data-registration-entry="main"]');
+  await expect(main).toContainText("Ödeme onayı bekleniyor");
+  await expect(main.locator("[data-registration-ticket]")).toBeDisabled();
+  const queue = page.getByRole("region", { name: "Yedek katılımcı listesi" });
+  await expect(queue.locator(".registration-entry h4")).toHaveText(["Test katılımcısı wait-first", "Test katılımcısı wait-later"]);
+  await main.locator("[data-registration-payment]").click();
+  await expect(main).toContainText("Ödeme onaylandı");
+  await expect(main.locator("[data-registration-ticket]")).toBeEnabled();
+  expect(state.payments).toEqual([{ eventId: "native-today", id: "main", approved: true }]);
+  page.once("dialog", dialog => dialog.accept());
+  await main.locator("[data-registration-cancel]").click();
+  await expect(main).toHaveAttribute("data-registration-status", "cancelled");
+  await expect(page.locator('[data-registration-entry="wait-first"]')).toHaveAttribute("data-registration-status", "main");
+  await expect(page.locator('[data-registration-entry="wait-first"]')).toContainText("Asıl listeye yükseltildi");
+  await page.locator("#registrationRecordFilter").selectOption("waitlisted");
+  await expect(page.locator("#registrationEntries [data-registration-entry]")).toHaveCount(1);
+  expect(state.cancellations).toEqual([{ eventId: "native-today", id: "main" }]);
 });

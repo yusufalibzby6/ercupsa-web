@@ -25,9 +25,13 @@ function fixture() {
     events: [{ id: "event-one", title: "Current event name", date: "2026-11-22", time: "15:30",
       location: "Fakülte Salonu", published: false, description: "Private draft description",
       registrationUrl: "https://private-form.test", lastOperation: { actor: "private-owner" } }],
-    design: null,
+    design: null, registration: null, registrationReads: 0,
   };
   const handler = createPublicTicketHandler({
+    registrationStore: {
+      async get() { state.registrationReads++; return structuredClone(state.registration); },
+      async list() { return { blobs: [] }; },
+    },
     async read(path, options) {
       state.reads.push({ path, options });
       if (state.failDatabase) throw Error("Private database address and credential");
@@ -148,6 +152,33 @@ test("revocation immediately prevents guest viewing before batch, event or artwo
   assert.equal(state.reads.length, 1);
   assert.equal(state.eventReads, 0);
   assert.deepEqual(state.storeReads, []);
+});
+
+test("canonical cancellation and waitlist states block guest tickets while SQL revocation is still pending", async () => {
+  for (const registrationStatus of ["cancelled", "waitlisted"]) {
+    const { state, request } = fixture();
+    state.registration = { version: 1, eventId: "event-one", deleted: [], entries: [{ id: "entry-one",
+      eventId: "event-one", name: "Private registrant", createdAt: "2026-10-01T09:00:00Z", registrationStatus,
+      ticket: { batchId: "batch-one", code, status: "issued" } }] };
+    assert.equal(state.tickets[0].revoked, false);
+    const result = await request();
+    assert.equal(result.status, 410);
+    assert.equal(state.eventReads, 0);
+    assert.deepEqual(state.storeReads, []);
+    assert.ok(!JSON.stringify(result.data).includes("Private registrant"));
+  }
+});
+
+test("a deleted reservation blocks the exact ticket only, preserving unrelated manual batches", async () => {
+  const { state, request } = fixture();
+  state.registration = { version: 1, eventId: "event-one", entries: [], deleted: [{ id: "entry-one",
+    ticket: { batchId: "batch-one", code, status: "issued" } }] };
+  assert.equal((await request()).status, 410);
+  state.registration.deleted[0].ticket.batchId = "unrelated-batch";
+  assert.equal((await request()).status, 200);
+  state.registration.deleted[0].ticket.batchId = "batch-one";
+  state.registration.deleted[0].ticket.code = anotherCode;
+  assert.equal((await request()).status, 200);
 });
 
 test("the hash record must match one canonical persisted ticket before any other data is read", async () => {

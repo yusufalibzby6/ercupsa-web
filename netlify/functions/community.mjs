@@ -13,10 +13,11 @@ import { db, user } from "../lib/database.mjs";
 import { readEvents } from "./events.mjs";
 import { operationsStore, readCheckins } from "../lib/checkins.mjs";
 import { accountsStore, readModeration, isNameBlocked, publicBadgeBoard } from "../lib/accounts.mjs";
+import { readRegistrationTicketRestrictions, registrationTicketIsBlocked } from "../lib/registration-ticket-owners.mjs";
 const classes = ["Hazırlık", "1", "2", "3", "4", "5", "Mezun"];
 export const badge = (n) =>
   n >= 5 ? "Altın" : n >= 4 ? "Gümüş" : n >= 3 ? "Bronz" : null;
-async function rate(req, scope, max = 5, seconds = 3600) {
+async function rate(req, scope, max = 5, seconds = 3600, read = db) {
   const ip = req.headers.get("x-nf-client-connection-ip") || "local";
   const key = createHmac(
     "sha256",
@@ -27,7 +28,7 @@ async function rate(req, scope, max = 5, seconds = 3600) {
     .update(scope + ip)
     .digest("hex");
   if (
-    !(await db("rpc/check_rate", {
+    !(await read("rpc/check_rate", {
       method: "POST",
       data: { p_key: key, p_max: max, p_seconds: seconds },
     }))
@@ -35,7 +36,7 @@ async function rate(req, scope, max = 5, seconds = 3600) {
     fail(429, "Çok fazla deneme yapıldı. Lütfen biraz sonra tekrar dene.");
 }
 export function createCommunityHandler({ read = db, events = readEvents, store = operationsStore,
-  moderation = accountsStore, currentUser = user, adminStore } = {}) {
+  moderation = accountsStore, currentUser = user, adminStore, registrationStore } = {}) {
 return guarded(async (req) => {
   const db = read;
   const url = new URL(req.url),
@@ -68,7 +69,7 @@ return guarded(async (req) => {
       title: text(b.title, 150, true),
       content: text(b.content, 3000, true),
     };
-    await rate(req, "submit");
+    await rate(req, "submit", 5, 3600, db);
     await db("submissions", { method: "POST", data: record });
     return response({ ok: true }, 201);
   }
@@ -115,13 +116,27 @@ return guarded(async (req) => {
     const u = await currentUser(req),
       b = await body(req);
     const code = text(b.code, 40, true).toUpperCase().replace(/\s/g, "");
-    await rate(req, "claim:" + u.id, 20, 3600);
+    await rate(req, "claim:" + u.id, 20, 3600, db);
     if (!/^ERC-[A-F0-9]{24}$/.test(code)) fail(400, "Bilet kodunu kontrol et.");
+    const codeHash = createHash("sha256").update(code).digest("hex");
+    const tickets = await db(`tickets?code_hash=eq.${codeHash}&select=id,event_id,batch_id,code_hash,revoked&limit=2`);
+    if (!Array.isArray(tickets) || tickets.length > 1) fail(503, "Bilet durumu doğrulanamadı.");
+    if (tickets.length) {
+      const ticket = tickets[0];
+      if (!ticket || ticket.code_hash !== codeHash || typeof ticket.revoked !== "boolean")
+        fail(503, "Bilet durumu doğrulanamadı.");
+      try { identifier(ticket.id); identifier(ticket.event_id); identifier(ticket.batch_id); }
+      catch { fail(503, "Bilet durumu doğrulanamadı."); }
+      if (ticket.revoked) fail(409, "Bu bilet iptal edilmiş.");
+      const restrictions = await readRegistrationTicketRestrictions(ticket.event_id, { store: registrationStore });
+      if (registrationTicketIsBlocked(ticket, restrictions))
+        fail(409, "Bu kaydın bileti kullanılamıyor veya kayıt iptal edilmiş. Organizatörle iletişime geçin.");
+    }
     const result = await db("rpc/claim_ticket", {
       method: "POST",
       data: {
         p_user: u.id,
-        p_hash: createHash("sha256").update(code).digest("hex"),
+        p_hash: codeHash,
       },
     });
     if (result.error) fail(409, result.error);

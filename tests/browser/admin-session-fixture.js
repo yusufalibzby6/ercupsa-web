@@ -2,7 +2,7 @@ export const ownerFixtureSession = {
   id: "owner", username: "basadmin", name: "Baş yönetici", role: "owner",
   permissions: [
     "events.view", "events.manage", "events.publish", "registrations.view", "registrations.manage",
-    "registrations.receipts", "registrations.photos", "registrations.export", "tickets.view", "tickets.manage",
+    "registrations.receipts", "registrations.photos", "registrations.export", "payments.view", "payments.manage", "statistics.view", "audit.view", "yearbooks.view", "yearbooks.manage", "yearbooks.publish", "tickets.view", "tickets.manage",
     "raffles.view", "raffles.manage", "attendance.view", "attendance.manage", "accounts.view", "accounts.manage",
     "instagram.view", "instagram.manage",
   ],

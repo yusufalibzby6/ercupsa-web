@@ -6,7 +6,12 @@ import { JSON_READ, mutateJson } from "./blob-state.mjs";
 export const ADMIN_STORE = "ercupsa-admin-accounts";
 export const ADMIN_ACCOUNTS_KEY = "accounts/state.json";
 export const TREASURER_ID = "sayman";
-export const TREASURER_PERMISSIONS = Object.freeze(["registrations.view", "registrations.receipts"]);
+const LEGACY_TREASURER_PERMISSIONS = Object.freeze(["registrations.view", "registrations.receipts"]);
+// Retain legacy receipt viewing until an owner explicitly cleans old files.
+// The payment replacement grants viewing only, never approval or export.
+export const TREASURER_PERMISSIONS = Object.freeze(["registrations.view", "registrations.receipts", "payments.view"]);
+const legacyTreasurer = account => account?.role === "treasurer" && account.id === TREASURER_ID &&
+  JSON.stringify(account.permissions) === JSON.stringify(LEGACY_TREASURER_PERMISSIONS);
 export const adminStore = getStore => getStore ? getStore(ADMIN_STORE) : getBlobStore({ name: ADMIN_STORE, consistency: "strong" });
 export const timestamp = value => (typeof value === "function" ? value() : value) || new Date();
 export function normalizedUsername(value) {
@@ -60,7 +65,7 @@ export function accountState(value) {
     if (JSON.stringify(permissions) !== JSON.stringify(account.permissions)) fail(503, "Yönetici hesapları doğrulanamadı.");
     if (account.role === "treasurer" || account.id === TREASURER_ID || account.username === "sayman") {
       if (account.role !== "treasurer" || account.id !== TREASURER_ID || account.username !== "sayman" ||
-          account.fixedPreset !== true || JSON.stringify(account.permissions) !== JSON.stringify(TREASURER_PERMISSIONS))
+          account.fixedPreset !== true || (!legacyTreasurer(account) && JSON.stringify(account.permissions) !== JSON.stringify(TREASURER_PERMISSIONS)))
         fail(503, "Sayman hesabı doğrulanamadı.");
     } else if (account.fixedPreset) fail(503, "Yönetici hesapları doğrulanamadı.");
     if (account.salt != null || account.passwordHash != null) {
@@ -87,7 +92,20 @@ export function initialAccounts(now = new Date(), uuid = randomUUID) {
 }
 export async function ensureAccounts(storage, now = new Date(), uuid = randomUUID) {
   const existing = await storage.get(ADMIN_ACCOUNTS_KEY, JSON_READ);
-  if (existing) return structuredClone(accountState(existing));
+  if (existing) {
+    accountState(existing);
+    if (!existing.accounts.some(legacyTreasurer)) return structuredClone(existing);
+    return mutateJson(storage, ADMIN_ACCOUNTS_KEY, existing, state => {
+      accountState(state);
+      if (!state.accounts.some(legacyTreasurer)) return { write: false, result: structuredClone(state) };
+      for (const account of state.accounts.filter(legacyTreasurer)) {
+        account.permissions = [...TREASURER_PERMISSIONS];
+        account.version = uuid(); account.updatedAt = timestamp(now).toISOString();
+      }
+      state.revision = uuid();
+      return { result: structuredClone(accountState(state)) };
+    });
+  }
   const initial = initialAccounts(now, uuid);
   return mutateJson(storage, ADMIN_ACCOUNTS_KEY, initial, state => {
     accountState(state);

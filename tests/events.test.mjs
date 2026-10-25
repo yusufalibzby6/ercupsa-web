@@ -366,7 +366,9 @@ test("purging removes archived metadata permanently without deleting form or tic
   const purged = await f.request("POST", "/api/events?action=purge", { id: item.id, expectedRevision: item.revision, confirmation: item.event.title });
   assert.equal(purged.status, 200);
   const marker = f.state.events.find(event => event.id === item.id);
-  assert.deepEqual(Object.keys(marker).sort(), ["deleted", "deletedAt", "id", "purged", "purgedAt", "revision"]);
+  assert.deepEqual(Object.keys(marker).sort(), ["deleted", "deletedAt", "id", "lastOperation", "operations", "purged", "purgedAt", "revision"]);
+  assert.equal(marker.operations.at(-1).type, "purge");
+  assert.ok(marker.operations.every(operation => !Object.hasOwn(operation, "event")));
   assert.equal(marker.purged, true); assert.equal(marker.event, undefined);
   assert.ok(!JSON.stringify(f.state.events).includes(item.event.title));
   assert.deepEqual(f.state.registrations.get("state/first.json"), snapshot);
@@ -404,4 +406,31 @@ test("legacy logout revokes a delegated session instead of only removing the bro
   assert.equal((await f.request("GET", "/api/events?admin=true", undefined, headers)).status, 200);
   assert.equal((await f.request("POST", "/api/events?action=logout", undefined, headers)).status, 200);
   assert.equal((await f.request("GET", "/api/events?admin=true", undefined, headers)).status, 401);
+});
+
+test("ordinary editor saves audit publication changes alongside content edits in the same write", async () => {
+  const f = fixture(), original = f.event("first");
+  const result = await f.save({ ...original, published: false, title: "Yeni başlık" }, original.revision);
+  assert.equal(result.status, 200);
+  const stored = f.state.events.find(event => event.id === original.id);
+  assert.deepEqual(stored.operations.map(operation => operation.type), ["update", "unpublish"]);
+  assert.equal(new Set(stored.operations.map(operation => operation.id)).size, 2);
+  assert.equal(stored.lastOperation.type, "update");
+  assert.equal(f.state.writes, 1);
+});
+
+
+test("public catalog distinguishes display-only starter events from verified saved events", async () => {
+  const seed = fixture(null);
+  const fallback = await seed.request("GET", "/api/events", undefined, { Cookie: "" });
+  assert.equal(fallback.status, 200); assert.equal(fallback.data.verified, false);
+  assert.equal(fallback.data.events.length, 3);
+  assert.equal(seed.state.writes, 0);
+  for (const initial of [[], [example()]]) {
+    const saved = fixture(initial);
+    const result = await saved.request("GET", "/api/events", undefined, { Cookie: "" });
+    assert.equal(result.status, 200); assert.equal(result.data.verified, true);
+    assert.equal(result.data.events.length, initial.length);
+    assert.equal(saved.state.writes, 0);
+  }
 });

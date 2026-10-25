@@ -2,7 +2,6 @@ import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 const reference = "3c6db343-3a34-4a6d-84e2-c458e835bb24";
-const receipt = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=", "base64");
 const publicEvent = { id: "summary-test", title: "Yayınlanan etkinlik", date: "2026-10-12", time: "18:00", location: "Kayseri", images: [], published: true, registrationMode: "native", registrationEnabled: true };
 async function fixture(page, { result = { ok: true, reference }, event = publicEvent, failures = [], clipboardFails = false } = {}) {
   const state = { posts: [], otherRequests: [], failures: [...failures] };
@@ -51,7 +50,6 @@ async function fillAndSubmit(page) {
 test("successful registration uses the accepted event snapshot and saves only reference and public event details", async ({ page }) => {
   const snapshot = { id: publicEvent.id, title: "Kabul edilen <img src=x onerror=alert(1)> etkinlik", date: "2026-10-11", time: "16:30", location: "Eczacılık Fakültesi" };
   const state = await fixture(page, { result: { ok: true, reference, event: snapshot } });
-  await page.locator("#registrationReceipt").setInputFiles({ name: "ozel-dekont.png", mimeType: "image/png", buffer: receipt });
   await fillAndSubmit(page);
   await expect(page.locator("#registrationSummaryTitle")).toHaveText(snapshot.title);
   await expect(page.locator("#registrationSummaryTitle img")).toHaveCount(0);
@@ -88,15 +86,13 @@ test("legacy success metadata falls back to the selected event and does not inve
   await expect(page.locator("#registrationReference")).toHaveText(reference);
 });
 
-test("failed submission preserves fields, selected receipt and retry identity before showing the returned reference", async ({ page }) => {
+test("failed submission preserves fields and retry identity before showing the returned reference", async ({ page }) => {
   const state = await fixture(page, { failures: [503] });
-  await page.locator("#registrationReceipt").setInputFiles({ name: "dekont.png", mimeType: "image/png", buffer: receipt });
   await fillAndSubmit(page);
   await expect(page.locator("#registrationFeedback")).toContainText("Tekrar deneyebilirsin");
   await expect(page.locator("#registration-full_name")).toHaveValue("Özel katılımcı adı");
   await expect(page.locator("#registration-class_year")).toHaveValue("2. Sınıf");
   await expect(page.locator("#registration-phone")).toHaveValue("05551234567");
-  expect(await page.locator("#registrationReceipt").evaluate(input => input.files[0].name)).toBe("dekont.png");
   await page.locator("#registrationSubmit").click();
   await expect(page.locator("#registrationReference")).toHaveText(reference);
   expect(state.posts).toHaveLength(2);

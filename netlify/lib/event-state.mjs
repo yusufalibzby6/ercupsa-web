@@ -58,10 +58,13 @@ export function assertEventRevision(expected, actual) {
   if (typeof expected !== "string" || expected !== actual)
     fail(409, "Etkinlik başka bir işlemde değişmiş. Listeyi yenileyip tekrar deneyin.");
 }
-export function operationHistory(event, type, at, actor) {
+export function operationHistory(event, type, at, actor, operationId) {
   const previous = Array.isArray(event?.operations) ? event.operations.filter(operation =>
-    OPERATIONS.has(operation?.type) && dateStamp(operation.at)).slice(-19) : [];
-  return [...previous.map(operation => eventOperation(operation.type, operation.at, operation.actor)), eventOperation(type, at, actor)];
+    OPERATIONS.has(operation?.type) && dateStamp(operation.at)) : [];
+  if (previous.length >= 10000) fail(503, "Etkinlik işlem geçmişi arşivlenmeden yeni işlem kaydedilemiyor.");
+  return [...previous.map(operation => ({ ...eventOperation(operation.type, operation.at, operation.actor),
+    ...(typeof operation.id === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(operation.id) ? { id: operation.id } : {}) })),
+    { ...eventOperation(type, at, actor), ...(operationId ? { id: identifier(operationId) } : {}) }];
 }
 
 // Only the dedicated event snapshot is used. Participant names, answers,

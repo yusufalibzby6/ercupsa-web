@@ -7,19 +7,20 @@ const fields = [
   { id: "phone", type: "tel", label: "Telefon", required: true },
 ];
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZioAAAAASUVORK5CYII=", "base64");
-const treasurer = { id: "sayman", username: "sayman", name: "Sayman", role: "treasurer", permissions: ["registrations.view", "registrations.receipts"] };
+const treasurer = { id: "sayman", username: "sayman", name: "Sayman", role: "treasurer", permissions: ["registrations.view", "registrations.receipts", "payments.view"] };
 const account = permissions => ({ id: "custom-admin", username: "yetkili", name: "Yetkili", role: "admin", permissions });
 
-async function fixture(page, session) {
+async function fixture(page, session, { issued = true } = {}) {
   const state = { requests: [], saves: [], receipts: [], session };
   const form = { eventId: event.id, enabled: true, maxRegistrations: 40, description: "Özel form açıklaması", fields: structuredClone(fields), receipt: { enabled: true, required: false } };
   const entry = { id: "record-one", eventId: event.id, name: "Deniz Katılımcı", classYear: "2. Sınıf", phone: "05551234567", createdAt: "2026-10-14T12:00:00Z",
     fields: [...fields, { id: "portrait", type: "photo", label: "Fotoğraf", required: false }],
     answers: { full_name: "Deniz Katılımcı", class_year: "2. Sınıf", phone: "05551234567", portrait: "private-photo.png" },
     receipt: { name: "dekont.png", mime: "image/png", size: png.length },
+    payment: { declared: true, reviewStatus: "pending" }, ticketEligible: false,
     // The UI must still respect current permissions if it sees an old response.
     photos: { portrait: { name: "private-photo.png", mime: "image/png", size: png.length } },
-    ticket: { batchId: "private-batch", status: "issued" } };
+    ticket: issued ? { batchId: "private-batch", status: "issued" } : null };
   await page.route("https://**/*", route => route.abort());
   await page.route("**/api/**", route => {
     state.requests.push(new URL(route.request().url()).pathname);
@@ -47,12 +48,13 @@ test("Sayman sees records and receipts with no form, photo, ticket, export or de
   await page.locator('[data-tab="registrations"]').click();
   const record = page.locator('[data-registration-entry="record-one"]');
   await expect(record).toContainText("Deniz Katılımcı");
-  await expect(page.locator("#registrationSummary")).toContainText("Toplam kayıt");
+  await expect(record).toContainText("Ödeme onayı bekleniyor");
+  await expect(page.locator("#registrationSummary")).toContainText("Toplam başvuru");
   await expect(page.locator("#registrationReadOnlyNotice")).toBeVisible();
   await expect(page.locator("#registrationConfigForm")).toBeHidden();
   await expect(page.locator("#registrationExport")).toBeHidden();
   await expect(page.locator("#registrationDeleteHelp")).toBeHidden();
-  await expect(record.locator("[data-registration-ticket], [data-registration-delete], [data-registration-photo]")).toHaveCount(0);
+  await expect(record.locator("[data-registration-ticket], [data-registration-delete], [data-registration-photo], [data-registration-payment], [data-registration-cancel]")).toHaveCount(0);
   await expect(page.locator("[data-registration-cleanup]")).toHaveCount(0);
   await record.locator("summary").click();
   await expect(record).not.toContainText("private-photo.png");
@@ -89,4 +91,22 @@ test("admins without registration view do not eagerly request records even when 
   await page.locator("#registrationReload").evaluate(button => button.dispatchEvent(new Event("click", { bubbles: true })));
   expect(state.requests.filter(value => value.startsWith("registrations:"))).toEqual([]);
   await expect(page.locator("#registrationEntries")).not.toContainText("Deniz Katılımcı");
+});
+
+
+test("record-only managers see no payment status or review controls from an overbroad old response", async ({ page }) => {
+  await fixture(page, account(["registrations.view"]));
+  await page.locator('[data-tab="registrations"]').click();
+  const record = page.locator('[data-registration-entry="record-one"]');
+  await expect(record).toBeVisible();
+  await expect(record).not.toContainText("Ödeme onayı bekleniyor");
+  await expect(record.locator("[data-registration-payment], [data-registration-cancel]")).toHaveCount(0);
+});
+
+test("ticket managers honor server eligibility without needing private payment review metadata", async ({ page }) => {
+  await fixture(page, account(["registrations.view", "tickets.manage"]), { issued: false });
+  await page.locator('[data-tab="registrations"]').click();
+  const record = page.locator('[data-registration-entry="record-one"]');
+  await expect(record.locator("[data-registration-ticket]")).toBeDisabled();
+  await expect(record).not.toContainText("Ödeme onayı bekleniyor");
 });

@@ -8,6 +8,7 @@ const adminState = globalThis[Symbol.for("ercupsa.admin.state")] ||= {
 };
 const permissions = new Set([
   "events.view", "events.manage", "events.publish", "registrations.view", "registrations.manage", "registrations.receipts", "registrations.photos", "registrations.export",
+  "payments.view", "payments.manage", "statistics.view", "audit.view", "yearbooks.view", "yearbooks.manage", "yearbooks.publish",
   "tickets.view", "tickets.manage", "raffles.view", "raffles.manage", "attendance.view", "attendance.manage", "accounts.view", "accounts.manage", "instagram.view", "instagram.manage",
 ]);
 export function getAdminSession() { return adminState.session ? structuredClone(adminState.session) : null; }

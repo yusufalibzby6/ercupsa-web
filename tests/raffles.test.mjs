@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
 import { participantsFor, poolVersion, drawChances, weightedWinners, drawInput, saveDraw, deleteDraw, updatePrize, paged, raffleFail } from '../netlify/lib/raffles.mjs';
-import { createHandler } from '../netlify/functions/raffles.mjs';
+import { createHandler as createRaffleHandler } from '../netlify/functions/raffles.mjs';
+// Existing account-only fixtures have no form registrations or restrictions.
+const createHandler = options => createRaffleHandler({ ticketRestrictions: async () => [], ...options });
 import { adminLogin } from '../netlify/lib/security.mjs';
 import { readRegistrationParticipants } from '../netlify/lib/raffle-registrations.mjs';
 import { registrationStateKey, entryKey } from '../netlify/lib/registrations.mjs';

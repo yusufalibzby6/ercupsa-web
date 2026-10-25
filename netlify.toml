@@ -52,6 +52,27 @@
   to = "/.netlify/functions/team"
   status = 200
 
+[[redirects]]
+  from = "/api/statistics"
+  to = "/.netlify/functions/statistics"
+  status = 200
+
+[[redirects]]
+  from = "/api/event-audit"
+  to = "/.netlify/functions/event-audit"
+  status = 200
+
+[[redirects]]
+  from = "/api/yearbooks"
+  to = "/.netlify/functions/yearbooks"
+  status = 200
+
+[[redirects]]
+  from = "/yillik/:yearbookId"
+  to = "/.netlify/functions/yearbooks?action=readable&id=:yearbookId"
+  status = 200
+  force = true
+
 [[headers]]
   for = "/bilet.html"
   [headers.values]
