@@ -92,9 +92,9 @@ test('no upcoming event uses a short empty state instead of a large placeholder 
   await expect(page.locator('#homeSpotlight')).toContainText('Yeni etkinliklerimiz çok yakında');
   await expect(page.locator('#homeSpotlight img')).toHaveCount(0);
   expect((await page.locator('#homeSpotlight').boundingBox()).height).toBeLessThan(220);
-  await expect(page.locator('#homeSpotlight a')).toHaveAttribute('href', '#homeRecentSection');
-  await page.locator('#homeSpotlight a').click();
-  await expect(page.locator('#homeRecentSection')).toBeInViewport();
+  await expect(page.locator('#homeSpotlight a')).toHaveAttribute('href', 'galeri.html');
+  await expect(page.locator('#homeRecentSection, #homeRecentEvents')).toHaveCount(0);
+  await expect(page.locator('a[href^="form.html?event=past"]')).toHaveCount(0);
   await expect(page.locator('body')).not.toContainText('Eczacılık Buluşması draft');
 });
 

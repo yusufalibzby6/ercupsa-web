@@ -1,0 +1,14 @@
+/* Existing workspace and permissions stay intact. Only its old blue shell changes. */
+@media screen {
+  .admin-body {
+    --admin-ink: #30232c; --admin-muted: #756a70; --admin-border: #e8dcd5;
+    --admin-red: #7c2039; --admin-red-hover: #4d162a; --admin-canvas: #fcf9f5; --admin-navy: #4d162a;
+  }
+  .admin-body .admin-sidebar { background: linear-gradient(160deg, #4d162a, #57172c 75%); }
+  .admin-body .admin-nav-label, .admin-body .admin-sidebar-caption { color: #edbecb; }
+  .admin-body .admin-nav-button, .admin-body .admin-sidebar-link { color: #e7d0d7; }
+  .admin-body .admin-nav-button > i:first-child { color: #edbecb; }
+  .admin-body .admin-nav-button.is-active, .admin-body .admin-nav-button[aria-current=page] { background: #7c2039; border-color: #a63c59; color: #fffdfa; }
+  .admin-body .admin-nav-button.is-active > i, .admin-body .admin-nav-button[aria-current=page] > i { color: #fffdfa; }
+  .admin-body .admin-login-intro > p, .admin-body .admin-login-note { color: #e7d0d7; }
+}

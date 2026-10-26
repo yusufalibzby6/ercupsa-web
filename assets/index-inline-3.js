@@ -3,8 +3,6 @@ import { usableEvents, upcomingEvents, countdownParts, eventDateLabel, publicIma
 const spotlight = document.getElementById('homeSpotlight');
 const upcomingHost = document.getElementById('home-events');
 const upcomingSection = document.getElementById('homeUpcomingSection');
-const recentHost = document.getElementById('homeRecentEvents');
-const recentSection = document.getElementById('homeRecentSection');
 const photoHost = document.getElementById('home-photos');
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 let events = [], loaded = false, catalogBusy = false, renderKey = '', featuredId = '', timer;
@@ -40,7 +38,7 @@ function renderFeature(event) {
   spotlight.removeAttribute('aria-live');
   if (!event) {
     delete spotlight.dataset.eventId;
-    spotlight.innerHTML = `<div class="home-spotlight-empty"><span class="home-empty-icon" aria-hidden="true">→</span><div><h2>Yeni etkinliklerimiz çok yakında!</h2><a href="${events.length ? '#homeRecentSection' : 'galeri.html'}">Geçmiş etkinliklerimizi keşfet <span aria-hidden="true">→</span></a></div></div>`;
+    spotlight.innerHTML = '<div class="home-spotlight-empty"><span class="home-empty-icon" aria-hidden="true">→</span><div><h2>Yeni etkinliklerimiz çok yakında!</h2><a href="galeri.html">Geçmiş etkinliklerimizi keşfet <span aria-hidden="true">→</span></a></div></div>';
     return;
   }
   const action = registration(event), poster = publicImage(event.poster), countdown = countdownParts(event);
@@ -58,12 +56,8 @@ function renderUpcoming(list) {
   }).join('');
 }
 
-function renderMemories(renderPhotos = true) {
-  const future = new Set(upcomingEvents(events).map(event => event.id));
-  const past = [...events].filter(event => !future.has(event.id)).sort((a, b) => b.date.localeCompare(a.date) || (b.time || '').localeCompare(a.time || ''));
-  if (recentHost) recentHost.innerHTML = past.slice(0, 2).map(event => `<a class="home-recent-card" href="${detailsUrl(event)}"><div><span>${escape(event.category || 'Etkinlik')}</span><h3>${escape(event.title)}</h3><time datetime="${escape(event.date)}">${escape(eventDateLabel(event.date))}</time></div><span class="home-recent-arrow" aria-hidden="true">→</span></a>`).join('');
-  if (recentSection) recentSection.hidden = !past.length;
-  if (!photoHost || !renderPhotos) return;
+function renderPhotos() {
+  if (!photoHost) return;
   const photos = [], urls = new Set();
   for (const event of [...events].sort((a, b) => b.date.localeCompare(a.date))) {
     for (const image of (Array.isArray(event.images) ? event.images : []).slice(0, 2)) {
@@ -95,7 +89,6 @@ function render() {
     const previous = featuredId;
     renderKey = key; featuredId = upcoming[0]?.id || '';
     renderFeature(upcoming[0]); renderUpcoming(upcoming.slice(1, 3));
-    if (previous !== featuredId) renderMemories(false);
     if (previous && previous !== featuredId) {
       const status = document.getElementById('homeEventAnnouncement');
       if (status) status.textContent = upcoming[0] ? `Sıradaki etkinlik: ${upcoming[0].title}` : 'Yaklaşan etkinliklerin tamamı başladı. Yeni etkinlikler yakında.';
@@ -132,7 +125,7 @@ async function load() {
     if (!response.ok) throw Error();
     const data = await response.json();
     if (!Array.isArray(data.events)) throw Error();
-    events = usableEvents(data.events); loaded = true; renderKey = ''; renderMemories(); render(); startClock();
+    events = usableEvents(data.events); loaded = true; renderKey = ''; renderPhotos(); render(); startClock();
   } catch {
     if (spotlight) spotlight.innerHTML = '<div class="home-spotlight-empty"><div><h2>Etkinlikler şu anda yüklenemedi.</h2><p>Biraz sonra tekrar deneyebilirsin.</p><button class="home-event-retry" type="button" id="homeEventsRetry">Yeniden dene</button> <a href="etkinlikler.html">Etkinliklere göz at →</a></div></div>';
   } finally { catalogBusy = false; }

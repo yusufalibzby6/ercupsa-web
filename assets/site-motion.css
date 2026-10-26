@@ -1,0 +1,117 @@
+/* Shared motion language; no hidden-before-JS content, no scroll interception. */
+@media screen {
+  .motion-page {
+    --motion-ease: cubic-bezier(.2, .7, .2, 1);
+    --motion-fast: 180ms;
+    --motion-reveal: 460ms;
+  }
+  .motion-page .motion-toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px;
+    border: 1px solid var(--home-line, var(--brand-line, #e8dcd5));
+    border-radius: 50%; color: var(--home-burgundy, var(--brand-burgundy, #7c2039));
+    background: transparent; cursor: pointer;
+  }
+  .motion-page .motion-toggle svg { width: 21px; height: 21px; }
+  .motion-page .motion-play-icon, .motion-page .motion-toggle[aria-pressed=true] .motion-pause-icon { display: none; }
+  .motion-page .motion-toggle[aria-pressed=true] .motion-play-icon { display: block; }
+  .motion-page .motion-toggle:hover { background: var(--home-ground, var(--brand-wash, #f5efe8)); }
+  html.dark .motion-page .motion-toggle { color: #edb1c4; border-color: #60414e; }
+  html.dark .motion-page .motion-toggle:hover { background: #3a2732; }
+  .motion-page .home-title-line { display: inline-block; }
+
+  /* The artwork is one original image. Its surrounding vector layers move independently. */
+  .motion-page .home-pharmacy-art { transition: transform 350ms var(--motion-ease); }
+  .motion-page .motion-dust { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #edbecb; opacity: .45; pointer-events: none; }
+  .motion-page .motion-dust-one { left: 18%; top: 20%; }
+  .motion-page .motion-dust-two { right: 12%; top: 68%; width: 4px; height: 4px; }
+  .motion-page .motion-dust-three { left: 24%; bottom: 10%; width: 2px; height: 2px; }
+  .motion-page .motion-dust-four { right: 28%; top: 13%; width: 2px; height: 2px; }
+  .motion-page[data-motion-mode=full] .home-pharmacy-art { --motion-play: paused; }
+  .motion-page[data-motion-mode=full][data-motion-running=true] .home-pharmacy-art[data-motion-visible=true] { --motion-play: running; }
+  .motion-page[data-motion-mode=full] .home-pharmacy-art > img { animation: capsule-drift 9s ease-in-out infinite; animation-play-state: var(--motion-play); }
+  .motion-page[data-motion-mode=full] .home-art-orbit-one { animation: orbit-breathe 12s ease-in-out infinite; animation-play-state: var(--motion-play); }
+  .motion-page[data-motion-mode=full] .home-art-orbit-two { animation: orbit-breathe-two 14s ease-in-out infinite; animation-play-state: var(--motion-play); }
+  .motion-page[data-motion-mode=full] .home-art-molecule circle { animation: molecule-light 5s ease-in-out infinite; animation-play-state: var(--motion-play); }
+  .motion-page[data-motion-mode=full] .home-art-molecule circle:nth-of-type(2n) { animation-delay: -2.5s; }
+  .motion-page[data-motion-mode=full] .motion-dust { animation: science-dust 7s ease-in-out infinite; animation-play-state: var(--motion-play); }
+  .motion-page[data-motion-mode=full] .motion-dust-two { animation-delay: -3s; }
+  .motion-page[data-motion-mode=full] .motion-dust-three { animation-delay: -5s; }
+  .motion-page[data-motion-mode=full] .motion-dust-four { animation-delay: -1s; }
+
+  /* Inputs and feedback remain immediately interactive; semantic colors stay intact. */
+  .motion-page .registration-control, .motion-page .registration-file,
+  .motion-page #contactForm input, .motion-page #contactForm textarea,
+  .motion-page #loginForm input, .motion-page #signupForm input {
+    transition: border-color var(--motion-fast), box-shadow var(--motion-fast), background-color var(--motion-fast);
+  }
+  .motion-page .registration-control:focus-visible, .motion-page #contactForm input:focus-visible,
+  .motion-page #contactForm textarea:focus-visible { box-shadow: 0 0 0 4px #7c20390d; }
+  .motion-page .option-btn { transition: border-color var(--motion-fast), background-color var(--motion-fast), box-shadow var(--motion-fast); }
+  .motion-page .option-btn:hover, .motion-page #teamCards > .group:hover { transform: none; }
+  .motion-page #progressBar { transition: width 250ms var(--motion-ease); }
+  .motion-page main details > summary { min-height: 44px; }
+  .motion-page .home-countdown-unit strong { min-width: 2ch; font-variant-numeric: tabular-nums; }
+
+  /* Keep the existing shared menu behavior, including 44px controls on tablets. */
+  .motion-page > nav > div { gap: 16px; }
+  .motion-page > nav #siteMenu a { display: flex; align-items: center; min-height: 44px; padding: 8px; border-radius: 10px; }
+  .motion-page > nav #siteMenuButton { display: inline-flex; align-items: center; justify-content: center; min-width: 72px; min-height: 44px; }
+  .motion-page > nav .theme-toggle { width: 44px; height: 44px; min-height: 44px; flex-shrink: 0; }
+  @media (max-width: 899px) {
+    .motion-page > nav #siteMenu { display: none; }
+    .motion-page > nav #siteMenu:not(.hidden) {
+      display: flex; position: absolute; top: calc(100% + 6px); left: 16px; right: 16px;
+      align-items: stretch; flex-direction: column; gap: 3px; padding: 12px;
+      max-height: calc(100dvh - 110px); overflow-y: auto; border-radius: 18px;
+      background: var(--brand-paper, #fffdfa); border: 1px solid var(--brand-line, #e8dcd5); box-shadow: 0 15px 35px #4d162a12;
+    }
+    .motion-page > nav #siteMenu a { width: 100%; }
+    html.dark .motion-page > nav #siteMenu:not(.hidden) { background: #2b2027; border-color: #60414e; }
+  }
+  @media (min-width: 900px) {
+    .motion-page > nav #siteMenuButton { display: none; }
+    .motion-page > nav #siteMenu { display: flex; align-items: center; gap: 3px; }
+    .motion-page > nav #siteMenu a { font-size: 13px; }
+  }
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .motion-page:not([data-motion-mode=paused]):not([data-motion-mode=reduced]) .home-button,
+    .motion-page:not([data-motion-mode=paused]):not([data-motion-mode=reduced]) .home-spotlight-action,
+    .motion-page:not([data-motion-mode=paused]):not([data-motion-mode=reduced]) .home-spotlight-detail { transition: transform var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast), background var(--motion-fast); }
+    .motion-page:not([data-motion-mode=paused]):not([data-motion-mode=reduced]) .home-button:hover,
+    .motion-page:not([data-motion-mode=paused]):not([data-motion-mode=reduced]) .home-spotlight-action:hover,
+    .motion-page:not([data-motion-mode=paused]):not([data-motion-mode=reduced]) .home-spotlight-detail:hover { transform: translateY(-2px); }
+    .motion-page .home-button > span, .motion-page .home-event-cta > span { transition: transform var(--motion-fast) var(--motion-ease); }
+    .motion-page:not([data-motion-mode=paused]):not([data-motion-mode=reduced]) .home-button:hover > span,
+    .motion-page:not([data-motion-mode=paused]):not([data-motion-mode=reduced]) .home-event-cta:hover > span { transform: translateX(3px); }
+    .motion-page .event-card-poster img, .motion-page .home-event-media img { transition: transform 500ms var(--motion-ease); }
+    .motion-page:not([data-motion-mode=paused]):not([data-motion-mode=reduced]) .event-card-poster:hover img,
+    .motion-page:not([data-motion-mode=paused]):not([data-motion-mode=reduced]) .home-event-media:hover img { transform: scale(1.025); }
+    .motion-page .option-btn:hover { border-color: var(--brand-burgundy); box-shadow: 0 4px 14px #4d162a0a; }
+    .motion-page #teamCards > .group { transition: transform var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast); }
+    .motion-page:not([data-motion-mode=paused]):not([data-motion-mode=reduced]) #teamCards > .group:hover { transform: translateY(-3px); }
+  }
+  .motion-page .home-button:active, .motion-page .home-spotlight-action:active, .motion-page .option-btn:active { box-shadow: inset 0 0 0 2px #7c203922; }
+  .motion-page[data-motion-mode=paused] .home-photo-card:hover img,
+  .motion-page[data-motion-mode=reduced] .home-photo-card:hover img { transform: none; }
+  @media (max-width: 600px) {
+    .motion-page[data-motion-mode=full] .home-pharmacy-art > img { animation-name: capsule-drift-mobile; animation-duration: 10s; }
+    .motion-page[data-motion-mode=full] .home-art-orbit, .motion-page[data-motion-mode=full] .home-art-molecule circle { animation: none; }
+    .motion-page .motion-dust-three, .motion-page .motion-dust-four { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .motion-page .home-pharmacy-art, .motion-page .option-btn, .motion-page #progressBar,
+    .motion-page .registration-control, .motion-page .registration-file,
+    .motion-page #contactForm input, .motion-page #contactForm textarea { transition: none; }
+    .motion-page .home-pharmacy-art *, .motion-page .motion-dust { animation: none !important; }
+  }
+  .motion-page[data-motion-mode=paused] .home-pharmacy-art,
+  .motion-page[data-motion-mode=reduced] .home-pharmacy-art { transition: none; }
+  .motion-page[data-motion-mode=paused] *, .motion-page[data-motion-mode=reduced] * { animation: none !important; transition: none !important; }
+}
+@keyframes capsule-drift { 0%,100% { transform: translateX(-50%) translateY(0) rotate(-.3deg); } 50% { transform: translateX(-50%) translateY(-7px) rotate(.3deg); } }
+@keyframes capsule-drift-mobile { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-3px); } }
+@keyframes orbit-breathe { 0%,100% { transform: rotate(-17deg); } 50% { transform: rotate(-10deg); } }
+@keyframes orbit-breathe-two { 0%,100% { transform: rotate(19deg); } 50% { transform: rotate(12deg); } }
+@keyframes molecule-light { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+@keyframes science-dust { 0%,100% { opacity: .2; transform: translateY(4px); } 50% { opacity: .6; transform: translateY(-9px); } }

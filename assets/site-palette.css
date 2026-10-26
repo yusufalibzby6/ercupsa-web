@@ -1,0 +1,228 @@
+/* Explicit public-page opt-in. Gallery, admin, gate, ticket artwork and print
+   layouts keep their existing styles and do not load this stylesheet. */
+@media screen {
+  body.brand-page {
+    --brand-burgundy: #7c2039;
+    --brand-deep: #4d162a;
+    --brand-accent: #a63c59;
+    --brand-paper: #fffdfa;
+    --brand-ground: #fcf9f5;
+    --brand-wash: #f5efe8;
+    --brand-line: #e8dcd5;
+    --brand-ink: #30232c;
+    --brand-muted: #756a70;
+    background: var(--brand-ground);
+    color: var(--brand-ink);
+  }
+  .brand-page > nav.glass-panel {
+    background: #fcf9f5f5;
+    border-color: var(--brand-line);
+    box-shadow: 0 3px 16px #4d162a06;
+  }
+  .brand-page > nav #logoLink { color: var(--brand-burgundy); }
+  .brand-page > nav #siteMenuButton { background: var(--brand-paper); border-color: #dcc7bf; color: var(--brand-ink); }
+  .brand-page > nav #siteMenu a[aria-current="page"] { color: var(--brand-burgundy); }
+  .brand-page .theme-toggle { background: var(--brand-wash); color: var(--brand-burgundy); }
+  .brand-page .theme-toggle:hover { background: #ecdcd6; }
+  .brand-page > footer {
+    background: #f2e9e1;
+    color: var(--brand-ink);
+    border-color: #e5d4ca;
+  }
+  .brand-page > footer a { color: var(--brand-burgundy); }
+  .brand-page .glass-panel,
+  .brand-page .glass {
+    background: var(--brand-paper);
+    border-color: var(--brand-line);
+    box-shadow: 0 9px 28px #4d162a07;
+  }
+  .brand-page main h1 { color: var(--brand-burgundy); }
+  .brand-page .text-ercupsaRed,
+  .brand-page .text-ercupsaAccent,
+  .brand-page .redtext { color: var(--brand-burgundy); }
+  .brand-page .text-ercupsaDark { color: var(--brand-ink); }
+  .brand-page .text-gray-600,
+  .brand-page .text-gray-500,
+  .brand-page .text-gray-400 { color: var(--brand-muted); }
+  .brand-page .border-ercupsaRed { border-color: var(--brand-burgundy); }
+  .brand-page .bg-ercupsaRed,
+  .brand-page .red { background-color: var(--brand-burgundy); }
+  .brand-page .bg-ercupsaAccent { background-color: var(--brand-accent); }
+  .brand-page .from-ercupsaRed { --tw-gradient-from: #7c2039 var(--tw-gradient-from-position); --tw-gradient-to: rgb(124 32 57 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .brand-page .to-ercupsaAccent { --tw-gradient-to: #a63c59 var(--tw-gradient-to-position); }
+  .brand-page .btn-primary,
+  .brand-page .btn,
+  .brand-page .icon-box {
+    background: linear-gradient(135deg, var(--brand-burgundy), var(--brand-accent));
+    color: #fffaf5;
+    box-shadow: 0 6px 18px #7c203922;
+  }
+  .brand-page .btn-primary:hover,
+  .brand-page .btn:hover { background: linear-gradient(135deg, var(--brand-deep), #8d2d49); box-shadow: 0 9px 23px #7c20392b; }
+  .brand-page .badge-chip { background: linear-gradient(100deg, #efe0da, #f8efe7); color: var(--brand-burgundy); border-color: #dcc3b9; }
+  .brand-page .badge-chip-dark { background: #fff5e811; color: #f0d0c8; border-color: #edc4cc40; }
+  .brand-page .title-accent::after { background: linear-gradient(90deg, var(--brand-deep), var(--brand-accent), #d6a996); }
+  .brand-page .band-dark { background: linear-gradient(135deg, #321421, var(--brand-deep), #5e1a31); }
+  .brand-page .band-vivid { background: linear-gradient(125deg, var(--brand-deep), var(--brand-burgundy), var(--brand-accent)); }
+  .brand-page .bg-gradient-to-b:not(.bg-clip-text),
+  .brand-page .bg-gradient-to-br:not(.bg-clip-text),
+  .brand-page .bg-gradient-to-bl:not(.bg-clip-text) { background-image: linear-gradient(145deg, var(--brand-ground), var(--brand-wash)); }
+  .brand-page .event-card-category,
+  .brand-page .form-catalog-category { color: var(--brand-burgundy); }
+  .brand-page .event-card-category { background: #f1e3dc; border-color: #e2cfc4; }
+  .brand-page .event-card-poster { background: linear-gradient(145deg, #f3e8df, #fcf9f5); border-color: var(--brand-line); }
+  .brand-page .event-card--past .event-card-poster { background: #f1e9e2; }
+  .brand-page .event-card .event-card-facts { border-color: var(--brand-line); }
+  .brand-page .event-card h2 a:hover,
+  .brand-page .event-list-state > i,
+  .brand-page .event-secondary-action,
+  .brand-page .native-event-details > summary { color: var(--brand-burgundy); }
+  .brand-page .event-secondary-action { border-color: #dcc4bb; background: var(--brand-paper); }
+  .brand-page .event-secondary-action:hover { background: var(--brand-wash); }
+  .brand-page .event-follow-card { background: var(--brand-wash); border-color: var(--brand-line); }
+  .brand-page .event-card-description,
+  .brand-page .event-facts dt,
+  .brand-page .event-list-state { color: var(--brand-muted); }
+  .brand-page .event-list-state h2 { color: var(--brand-ink); }
+  .brand-page .registration-form,
+  .brand-page .registration-success,
+  .brand-page .registration-full,
+  .brand-page .registration-unavailable,
+  .brand-page .registration-load-error,
+  .brand-page .registration-loading { background: var(--brand-paper); border-color: var(--brand-line); }
+  .brand-page .registration-intro { border-color: var(--brand-line); }
+  .brand-page .registration-label { color: var(--brand-ink); }
+  .brand-page .registration-description,
+  .brand-page .registration-help,
+  .brand-page .registration-privacy,
+  .brand-page .registration-required-note,
+  .brand-page .registration-upload-budget { color: var(--brand-muted); }
+  .brand-page .registration-control,
+  .brand-page .registration-choice,
+  .brand-page .registration-photo,
+  .brand-page .registration-declaration { background: var(--brand-ground); border-color: #ddcec7; color: var(--brand-ink); }
+  .brand-page .registration-payment { background: #faf0e9; }
+  .brand-page .registration-choice:has(input:checked) { border-color: var(--brand-burgundy); background: #f5e7e5; }
+  .brand-page .registration-choice-media,
+  .brand-page .registration-photo-preview img { background: var(--brand-wash); }
+  .brand-page .registration-control:focus,
+  .brand-page .registration-file:focus { border-color: var(--brand-burgundy); outline-color: #7c203926; }
+  .brand-page .registration-choice:focus-within { border-color: var(--brand-burgundy); outline-color: #7c203926; }
+  .brand-page .registration-control[aria-invalid="true"],
+  .brand-page .registration-file[aria-invalid="true"] { border-color: #b62b36; }
+  .brand-page .registration-choice input,
+  .brand-page .registration-declaration input[type=checkbox],
+  .brand-page .registration-capacity-progress { accent-color: var(--brand-burgundy); }
+  .brand-page .registration-capacity-progress::-webkit-progress-value { background: var(--brand-burgundy); }
+  .brand-page .registration-capacity-progress::-moz-progress-bar { background: var(--brand-burgundy); }
+  .brand-page .registration-file::file-selector-button,
+  .brand-page .registration-photo-remove,
+  .brand-page .registration-choice-clear { background: var(--brand-paper); color: var(--brand-burgundy); border-color: #ddc8be; }
+  .brand-page .participation-hero h1,
+  .brand-page .participation-eyebrow,
+  .brand-page .participation-link,
+  .brand-page .participation-rewards strong,
+  .brand-page .participation-progress-message { color: var(--brand-burgundy); }
+  .brand-page .participation-intro,
+  .brand-page .participation-guide li p,
+  .brand-page .participation-note { color: var(--brand-muted); }
+  .brand-page .participation-rewards { background: radial-gradient(ellipse at top, #fff5e6, #f1e1da); border-color: #e2c9bd; }
+  .brand-page .participation-guide,
+  .brand-page .participation-attendance,
+  .brand-page .participation-progress-card { background: var(--brand-paper); border-color: var(--brand-line); }
+  .brand-page .participation-completion:not(.is-complete) { background: linear-gradient(140deg, var(--brand-paper), #f8eae4); border-color: var(--brand-burgundy); }
+  .brand-page .participation-completion:not(.is-complete) h2,
+  .brand-page .participation-note a { color: var(--brand-burgundy); }
+  .brand-page .participation-step,
+  .brand-page .participation-attendance-mark { background: #f0e0da; color: var(--brand-burgundy); }
+  .brand-page #badgeProgress::-webkit-progress-value { background: linear-gradient(90deg, var(--brand-burgundy), var(--brand-accent)); }
+  .brand-page #badgeProgress::-moz-progress-bar { background: linear-gradient(90deg, var(--brand-burgundy), var(--brand-accent)); }
+  .brand-page #teamCards > .group > div[style*="linear-gradient"] { background: linear-gradient(135deg, var(--brand-deep), var(--brand-accent)) !important; }
+  .brand-page .option-btn:hover { border-color: var(--brand-burgundy); }
+  .brand-page .privacy-preferences { background: var(--brand-paper); border-color: var(--brand-line); color: var(--brand-ink); }
+  .brand-page .privacy-preferences p { color: var(--brand-muted); }
+  .brand-page .privacy-preferences button { border-color: #cfb8ae; background: var(--brand-ground); color: var(--brand-burgundy); }
+  .brand-page .privacy-preferences [data-privacy-allow] { background: var(--brand-burgundy); color: #fffaf5; border-color: var(--brand-burgundy); }
+  .brand-page .privacy-preferences a,
+  .brand-page.privacy-info-page a,
+  .brand-page.privacy-info-page h1 { color: var(--brand-burgundy); }
+  .brand-page.privacy-info-page header { border-color: var(--brand-line); background: var(--brand-paper); }
+  .brand-page a:focus-visible,
+  .brand-page button:focus-visible,
+  .brand-page summary:focus-visible { outline-color: #b5654e; }
+
+  html.dark body.brand-page {
+    --brand-burgundy: #edb1c4;
+    --brand-deep: #4d162a;
+    --brand-accent: #a63c59;
+    --brand-paper: #2b2027;
+    --brand-ground: #21191f;
+    --brand-wash: #3a2732;
+    --brand-line: #60414e;
+    --brand-ink: #f3e6eb;
+    --brand-muted: #c5b2bc;
+    background: var(--brand-ground);
+    color: var(--brand-ink) !important;
+  }
+  /* Shared legacy dark utility rules use !important; keep these opt-in too. */
+  html.dark .brand-page > nav.glass-panel { background: #241b22f5 !important; border-color: #513844 !important; }
+  html.dark .brand-page > nav #siteMenu { background: var(--brand-paper); }
+  html.dark .brand-page > nav #siteMenuButton,
+  html.dark .brand-page .theme-toggle { background: var(--brand-wash); border-color: var(--brand-line); color: var(--brand-burgundy); }
+  html.dark .brand-page > footer { background: #281c24; border-color: var(--brand-line); color: var(--brand-muted); }
+  html.dark .brand-page .glass-panel,
+  html.dark .brand-page .glass { background: var(--brand-paper); border-color: var(--brand-line); }
+  html.dark .brand-page .bg-white,
+  html.dark .brand-page .bg-white\/90,
+  html.dark .brand-page .bg-white\/95 { background-color: var(--brand-paper) !important; }
+  html.dark .brand-page .bg-slate-50,
+  html.dark .brand-page .bg-gray-50,
+  html.dark .brand-page .bg-gray-100 { background-color: var(--brand-wash) !important; }
+  html.dark .brand-page .text-gray-800,
+  html.dark .brand-page .text-gray-700,
+  html.dark .brand-page .text-ercupsaDark { color: var(--brand-ink) !important; }
+  html.dark .brand-page .text-gray-600,
+  html.dark .brand-page .text-gray-500,
+  html.dark .brand-page .text-gray-400 { color: var(--brand-muted) !important; }
+  html.dark .brand-page .bg-gradient-to-b:not(.bg-clip-text),
+  html.dark .brand-page .bg-gradient-to-br:not(.bg-clip-text),
+  html.dark .brand-page .bg-gradient-to-bl:not(.bg-clip-text) { background-color: var(--brand-ground) !important; background-image: none !important; }
+  html.dark .brand-page .btn-primary,
+  html.dark .brand-page .btn,
+  html.dark .brand-page .icon-box { background: linear-gradient(135deg, #7c2039, #a63c59); color: #fffaf5; }
+  html.dark .brand-page .bg-ercupsaRed,
+  html.dark .brand-page .red { background-color: #7c2039; }
+  html.dark .brand-page .from-ercupsaRed { --tw-gradient-from: #efb6c8 var(--tw-gradient-from-position); --tw-gradient-to: rgb(239 182 200 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  html.dark .brand-page .to-ercupsaAccent { --tw-gradient-to: #d593a7 var(--tw-gradient-to-position); }
+  html.dark .brand-page .badge-chip { background: #4a2c39; color: #f0b9ca; border-color: #775060; }
+  html.dark .brand-page .event-card-poster,
+  html.dark .brand-page .event-card--past .event-card-poster { background: var(--brand-wash); border-color: var(--brand-line); }
+  html.dark .brand-page .event-secondary-action { background: var(--brand-paper); border-color: var(--brand-line); }
+  html.dark .brand-page .event-follow-card { background: var(--brand-wash); border-color: var(--brand-line); }
+  html.dark .brand-page input,
+  html.dark .brand-page textarea,
+  html.dark .brand-page select { background-color: var(--brand-wash); color: var(--brand-ink); }
+  html.dark .brand-page .registration-control,
+  html.dark .brand-page .registration-choice,
+  html.dark .brand-page .registration-photo,
+  html.dark .brand-page .registration-declaration { background: var(--brand-wash); border-color: var(--brand-line); color: var(--brand-ink); }
+  html.dark .brand-page input[aria-invalid="true"],
+  html.dark .brand-page textarea[aria-invalid="true"],
+  html.dark .brand-page select[aria-invalid="true"] { border-color: #ffb3bb !important; }
+  html.dark .brand-page .registration-choice:has(input:checked),
+  html.dark .brand-page .registration-payment { background: #4a2b3a; }
+  html.dark .brand-page .registration-choice-media,
+  html.dark .brand-page .registration-photo-preview img { background: var(--brand-ground); }
+  html.dark .brand-page .registration-file::file-selector-button,
+  html.dark .brand-page .registration-photo-remove,
+  html.dark .brand-page .registration-choice-clear { background: var(--brand-paper); color: var(--brand-burgundy); border-color: var(--brand-line); }
+  html.dark .brand-page .participation-rewards { background: radial-gradient(ellipse at top, #4d2c35, #35232d); border-color: #765160; }
+  html.dark .brand-page .participation-completion:not(.is-complete) { background: #39232e; border-color: #b8778b; }
+  html.dark .brand-page .participation-step,
+  html.dark .brand-page .participation-attendance-mark { background: #492c3a; }
+  html.dark .brand-page .privacy-preferences { background: var(--brand-paper); border-color: var(--brand-line); }
+  html.dark .brand-page .privacy-preferences [data-privacy-allow] { background: #7c2039; color: #fffaf5; border-color: #a16377; }
+  @media (max-width: 767px) {
+    .brand-page > nav #siteMenu { background: var(--brand-paper); border-color: var(--brand-line); }
+  }
+}

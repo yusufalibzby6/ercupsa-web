@@ -96,7 +96,7 @@
 .home-page .home-section-heading h2 { font-size: 25px; line-height: 1.15; font-weight: 780; letter-spacing: -.8px; margin-top: 5px; }
 .home-page .home-section-heading .home-eyebrow { font-size: 9px; letter-spacing: .8px; }
 .home-page .home-text-link { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 44px; padding: 5px 0 5px 9px; color: var(--home-burgundy); font-size: 11px; font-weight: 750; line-height: 1.4; text-align: right; }
-.home-page .home-event-list, .home-page .home-recent-list { display: grid; gap: 10px; }
+.home-page .home-event-list { display: grid; gap: 10px; }
 .home-page .home-event-card { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 13px; min-width: 0; border: 1px solid var(--home-line); border-radius: 14px; overflow: hidden; background: var(--home-paper); }
 .home-page .home-event-card:not(.has-poster) { grid-template-columns: minmax(0, 1fr); }
 .home-page .home-event-poster { width: 100%; height: 100%; min-height: 112px; max-height: 190px; object-fit: contain; background: var(--home-ground); }
@@ -111,7 +111,6 @@
 .home-page .home-event-status { color: var(--home-burgundy); font-size: 11px; font-weight: 650; }
 .home-page .home-spotlight-copy,
 .home-page .home-event-copy,
-.home-page .home-recent-card > div,
 .home-page .home-yearbook > div { min-width: 0; overflow-wrap: anywhere; }
 .home-page .home-event-category,
 .home-page .home-event-facts > *,
@@ -119,12 +118,6 @@
 .home-page .home-yearbook p { min-width: 0; overflow-wrap: anywhere; }
 .home-page .home-event-cta { display: inline-flex; align-items: center; min-height: 44px; gap: 6px; color: var(--home-burgundy); font-size: 12px; font-weight: 750; }
 .home-page .home-event-state { padding: 12px 0; color: var(--home-muted); font-size: 13px; line-height: 1.6; }
-.home-page .home-recent-card { display: flex; align-items: center; gap: 13px; min-width: 0; min-height: 78px; padding: 13px 15px; border: 1px solid var(--home-line); border-radius: 13px; background: var(--home-paper); }
-.home-page .home-recent-date { display: grid; place-items: center; align-self: stretch; min-width: 40px; color: var(--home-burgundy); font-size: 11px; line-height: 1.4; }
-.home-page .home-recent-card > div > span { color: var(--home-burgundy); font-size: 10px; font-weight: 700; }
-.home-page .home-recent-card h3, .home-page .home-recent-title { font-size: 14px; font-weight: 750; line-height: 1.4; overflow-wrap: anywhere; }
-.home-page .home-recent-card p, .home-page .home-recent-card time { font-size: 12px; color: var(--home-muted); }
-.home-page .home-recent-card > span:last-child { color: var(--home-burgundy); margin-left: auto; }
 
 .home-page .home-photo-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(145px, 44%); align-items: stretch; gap: 10px; overflow-x: auto; overscroll-behavior-inline: contain; scroll-snap-type: x proximity; padding: 1px 1px 8px; scrollbar-width: thin; scrollbar-color: #d6bfc0 transparent; }
 .home-page .home-photo-card { display: block; min-width: 0; scroll-snap-align: start; border: 1px solid var(--home-line); border-radius: 13px; overflow: hidden; background: var(--home-ground); }
@@ -181,7 +174,7 @@ html.dark .home-page .home-yearbook { border-color: #68414e; }
   .home-page .home-section { padding-top: 34px; }
   .home-page .home-section-heading h2 { font-size: 31px; }
   .home-page .home-text-link { font-size: 13px; }
-  .home-page .home-event-list, .home-page .home-recent-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-page .home-event-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .home-page .home-photo-strip { grid-auto-columns: minmax(160px, 28%); }
   .home-page .home-photo-card img { height: 155px; }
   .home-page .home-photo-card span, .home-page .home-photo-card figcaption { font-size: 12px; }
@@ -216,9 +209,6 @@ html.dark .home-page .home-yearbook { border-color: #68414e; }
   .home-page .home-event-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
   .home-page .home-event-card { grid-template-columns: 85px minmax(0, 1fr); }
   .home-page .home-event-copy { padding-top: 16px; padding-bottom: 16px; }
-  .home-page .home-recent-list { gap: 16px; }
-  .home-page .home-recent-card { padding: 17px 20px; }
-  .home-page .home-recent-card h3, .home-page .home-recent-title { font-size: 16px; }
   .home-page .home-photo-strip { grid-auto-columns: minmax(0, calc((100% - 48px) / 5)); gap: 12px; }
   .home-page .home-photo-card img { height: 160px; }
   .home-page .home-yearbook { margin-top: 32px; padding: 23px 27px; justify-content: space-between; }
@@ -333,8 +323,6 @@ html.dark .home-page .home-yearbook { border-color: #68414e; }
 .home-page .home-section-heading .home-eyebrow { color: #9b6878; letter-spacing: 1.15px; font-size: 9px; }
 .home-page .home-section-heading h2 { font-weight: 800; letter-spacing: -1px; }
 .home-page .home-event-card { border-color: #e6d6cd; border-radius: 17px; background: #fffcf7; box-shadow: 0 5px 17px #59273c05; }
-.home-page .home-recent-card { background: #fffaf5; border-color: #e8d9d0; border-radius: 15px; }
-.home-page .home-recent-card > span:last-child { display: grid; place-items: center; min-width: 32px; height: 32px; border-radius: 50%; background: #f1e4de; color: #8f3851; }
 .home-page .home-photo-card { border-radius: 15px; background: #f1e7dd; border-color: #e7d8ce; }
 .home-page .home-photo-card span { padding: 11px 12px; }
 .home-page .home-gallery-section { position: relative; }
@@ -356,8 +344,6 @@ html.dark .home-page .home-spotlight-detail { border-color: #684052; color: #efb
 html.dark .home-page .home-spotlight-empty { background: #2d2028; border-color: #684052; }
 html.dark .home-page .home-spotlight-empty h2 { color: #f0dbe3; }
 html.dark .home-page .home-spotlight-empty a { color: #e0a6b8; }
-html.dark .home-page .home-event-card, html.dark .home-page .home-recent-card { background: #2b2027; border-color: #5b3c4c; }
-html.dark .home-page .home-recent-card > span:last-child { background: #432b38; color: #d7a7b9; }
 html.dark .home-page .home-photo-card { background: #33252e; border-color: #5e3e4d; }
 html.dark .home-page .home-yearbook { background: #3a2730; border-color: #6a414f; }
 html.dark .home-page .home-footer { background: #281c24; border-color: #593747; }

@@ -1,0 +1,21 @@
+/* Gallery header only: no album, toolbar, photo, lightbox or shared-color changes. */
+@media screen {
+  .gallery-brand-page > nav { background: #fcf9f5f5; border-color: #e8dcd5; }
+  .gallery-brand-page > nav #logoLink, .gallery-brand-page > nav #siteMenu a[aria-current=page] { color: #7c2039; }
+  .gallery-brand-page > nav #siteMenuButton { background: #fffdfa; border-color: #dcc7bf; color: #30232c; }
+  .gallery-brand-page > nav .theme-toggle { background: #f5efe8; color: #7c2039; }
+  .gallery-brand-page .gallery-intro { border-bottom-color: #e8dcd5; }
+  .gallery-brand-page .gallery-intro h1 { color: #4d162a; }
+  .gallery-brand-page .gallery-intro h1 span, .gallery-brand-page .gallery-eyebrow { color: #7c2039; }
+  .gallery-brand-page .gallery-intro-copy, .gallery-brand-page .gallery-summary { color: #756a70; }
+  .gallery-brand-page .gallery-summary strong { color: #4d162a; }
+  html.dark .gallery-brand-page > nav { background: #241b22f5 !important; border-color: #513844 !important; }
+  html.dark .gallery-brand-page > nav #logoLink,
+  html.dark .gallery-brand-page > nav #siteMenu a[aria-current=page],
+  html.dark .gallery-brand-page .gallery-intro h1 span,
+  html.dark .gallery-brand-page .gallery-eyebrow { color: #edb1c4; }
+  html.dark .gallery-brand-page > nav #siteMenuButton { background: #2b2027; color: #f3e6eb; border-color: #60414e; }
+  html.dark .gallery-brand-page .gallery-intro { border-bottom-color: #60414e; }
+  html.dark .gallery-brand-page .gallery-intro h1, html.dark .gallery-brand-page .gallery-summary strong { color: #f3e6eb; }
+  html.dark .gallery-brand-page .gallery-intro-copy, html.dark .gallery-brand-page .gallery-summary { color: #c5b2bc; }
+}

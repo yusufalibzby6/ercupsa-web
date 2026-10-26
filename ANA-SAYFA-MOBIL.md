@@ -12,6 +12,16 @@ Bu revizyonda 32/32 ana sayfa/gizlilik tarayıcı testi yeniden geçti. Sekiz ge
 
 Yeni ekranlar `/workspace/ercupsa-home-review/pharmacy-*.png`, ölçümler `pharmacy-qa-metrics.json` altındadır. Aşağıdaki 6.270 → 1.482 px karşılaştırması önceki kompakt tasarımın ölçümüdür; görsel revizyonun güncel yüksekliği olarak kullanılmamalıdır. Yeni görsel ağırlıklı sürüm, yaklaşan örnek etkinlik ve geçmiş albümlerle 390 px genişlikte 1.843 px ölçülmüştür.
 
+## Son buluşmaların kaldırılması ve diğer sayfaların renkleri
+
+“Son buluşmalar” ana sayfadan HTML, JavaScript ve kullanılmayan stilleriyle tamamen kaldırıldı. Geçmiş kayıt formlarına giden kart üretilmez. Yaklaşan etkinlik yokken gösterilen bağlantı doğrudan `galeri.html` sayfasını açar; kaldırılmış bir bölüm kimliğine gitmez. Galerinin mevcut fotoğraf şeridi ve albüm bağlantıları korunur. Etkinlik veya katılımcı verisi silinmedi.
+
+Etkinlikler, Formlar, Biletlerim, Ekibimiz, Hakkımızda, SSS, İletişim, Test, Topluluk ve içerik tercihleri sayfaları `assets/site-palette.css` ile ana sayfanın bordo/krem paletine geçirildi. Stil açıkça `brand-page` sınıfıyla etkinleşir ve yalnızca ekranda uygulanır. Ortak `style.css`, galeri, yönetim paneli, kapı görevlisi sayfası ve dijital bilet görseli/çıktıları değiştirilmedi.
+
+Bu düzenlemede 64 tarayıcı testi ve 66 sayfa/genişlik/tema kontrolü geçti; taşma, JavaScript hatası veya eksik kaynak saptanmadı.
+
+Yeni palette açık/koyu tema, hata alanlarının kırmızı çerçevesi ve başarı durumları korunur. İçerik tercihleri sayfası da mevcut güvenli tema başlangıç betiğiyle kayıtlı tema tercihini okur. Bu sayfalarda içerik, form alanları, hesap işlemleri ve kayıt sistemi değiştirilmedi. Yeni ana sayfa JS/CSS sürüm parametreleri eski önbellekte kaldırılmış bölüme bağlantı kalmasını önler.
+
 ## İçerik sırası ve tasarım
 
 1. 64 px mobil başlık ve açılır menü.
@@ -19,7 +29,7 @@ Yeni ekranlar `/workspace/ercupsa-home-review/pharmacy-*.png`, ölçümler `phar
 3. En yakın etkinliğin kompakt afişi, adı, tarih/saat/konumu, doğrulanmış kayıt durumu ve geri sayım.
 4. Bilim / Deneyim / Dayanışma için tek satırda üç küçük bağlantı.
 5. Varsa sıradaki en fazla iki etkinlik. Öne çıkan etkinlik burada tekrar edilmez.
-6. Son iki geçmiş buluşma ve mevcut albümlere giden, en fazla altı fotoğraflı yatay şerit.
+6. Mevcut albümlere giden, en fazla altı fotoğraflı yatay şerit. “Son buluşmalar” kart listesi kaldırıldı; geçmiş içerikler kayıt formu yerine galeriye yönlenir.
 7. Yalnızca yayımlanmış yıllık için kısa duyuru.
 8. İstenince açılan Instagram bölümü ve footer’da birer Instagram, WhatsApp, LinkedIn ikon bağlantısı.
 
@@ -39,7 +49,7 @@ Kayıt/yedek/dolu durumu mevcut native kayıt API’sinden doğrulanır. Doğrul
 
 ## Galeri, Instagram ve performans
 
-`galeri.html`, `assets/gallery.css`, `assets/galeri-inline-*.js`, `style.css`, `fun.js`, `assets/shell.js` ve `assets/events-common.js` korunur. Ana sayfanın fotoğraf kartları mevcut Cloudinary URL’leri ve `galeri.html#event-…` albüm bağlantılarını kullanır. Dosya taşıma, silme veya yükleme yapılmadı.
+`assets/gallery.css`, `assets/galeri-inline-*.js`, `style.css`, `fun.js`, `assets/shell.js` ve `assets/events-common.js` korunur. Ana sayfanın fotoğraf kartları mevcut Cloudinary URL’leri ve `galeri.html#event-…` albüm bağlantılarını kullanır. Dosya taşıma, silme veya yükleme yapılmadı. Sonraki sinematik geliştirmede `galeri.html` yalnızca üst başlık/menü stili ve kısa başlık hareketi için opt-in bağlantıları aldı; albüm ve fotoğraf düzeni korundu. Ayrıntılar [SINEMATIK-TASARIM.md](SINEMATIK-TASARIM.md) dosyasındadır.
 
 Fotoğraf şeridi elle kaydırılır; otomatik döngü kaldırıldı. Ekran dışı görseller lazy-loading kullanır. Ağır kütüphane veya video eklenmedi. Ana sayfa artık genel shell/efekt/karşılama betiklerini yüklemez; diğer sayfalardaki davranış değişmez.
 
@@ -88,4 +98,4 @@ Mobilde yaklaşık %76 daha kısa. Ayrı bir örnek yaklaşan etkinlik senaryosu
 - Mevcut form, native/yedek/dolu durumları, Google Forms yönlendirmesi, galeri arama/filtre/ışık kutusu, Instagram yönetimi ve izinleri, genel gezinme, QR bilet çıktı kontrolleri.
 - Korunan galeri/ortak dosyaların SHA-256 kontrolü ve `git diff --check`: temiz.
 
-GitHub ve üretim dağıtımı son kullanıcı onayını bekler. Bilinen uygulama engeli yok; gerçek Cloudinary ağ performansı bu ortamda ölçülemedi.
+Kullanıcı 26 Ekim 2026 tarihinde GitHub üzerinden yayımlamayı onayladı. Bilinen uygulama engeli yok; gerçek Cloudinary ağ performansı bu ortamda ölçülemedi.
