@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getStore as getBlobStore } from '@netlify/blobs';
-import { body, fail, guarded, requirePermission, response, text } from '../lib/security.mjs';
+import { body, fail, guarded, requireOwner, requirePermission, response, text } from '../lib/security.mjs';
 import { CONTENT_STORE, EVENTS_KEY, activeEvents, eventArray } from '../lib/event-state.mjs';
 import { YEARBOOK_STORE, yearbookKey, yearbookId, defaultYearbookDraft, normalizeYearbookDraft, projectYearbook, yearbookSummary } from '../lib/yearbooks.mjs';
 import { readYearbookStatistics } from '../lib/statistics.mjs';
@@ -14,8 +14,9 @@ export function createYearbooksHandler({ getStore = getBlobStore, readEvents, st
   const handler = guarded(async req => {
     const url = new URL(req.url), action = url.searchParams.get('action') || '';
     const publicRead = req.method === 'GET' && ['', 'readable'].includes(action);
-    const session = publicRead ? null : await requirePermission(req, req.method === 'GET' ? 'yearbooks.view' : ['publish', 'unpublish'].includes(action) ? 'yearbooks.publish' : 'yearbooks.manage', { getStore: adminStore });
-    if (!['GET', 'POST', 'PUT'].includes(req.method) || req.method === 'GET' && !['', 'admin', 'preview', 'readable'].includes(action) || req.method === 'PUT' && action || req.method === 'POST' && !['', 'publish', 'unpublish'].includes(action)) fail(405, 'Desteklenmeyen yıllık işlemi.');
+    const session = publicRead ? null : req.method === 'DELETE' ? await requireOwner(req, { getStore: adminStore })
+      : await requirePermission(req, req.method === 'GET' ? 'yearbooks.view' : ['publish', 'unpublish'].includes(action) ? 'yearbooks.publish' : 'yearbooks.manage', { getStore: adminStore });
+    if (!['GET', 'POST', 'PUT', 'DELETE'].includes(req.method) || req.method === 'GET' && !['', 'admin', 'preview', 'readable'].includes(action) || ['PUT', 'DELETE'].includes(req.method) && action || req.method === 'POST' && !['', 'publish', 'unpublish'].includes(action)) fail(405, 'Desteklenmeyen yıllık işlemi.');
     const store = getStore(YEARBOOK_STORE);
     async function records() {
       const listed = await store.list({ prefix: 'years/' });
@@ -26,13 +27,13 @@ export function createYearbooksHandler({ getStore = getBlobStore, readEvents, st
         if (!match) fail(503, 'Yıllık arşivi doğrulanamadı.');
         const record = await store.get(item.key, READ);
         if (!record || record.id !== yearbookId(match[1]) || record.version !== 1) fail(503, 'Yıllık arşivi doğrulanamadı.');
-        result.push(record);
+        if (record.deleted !== true) result.push(record);
       }
       return result.sort((a, b) => b.id.localeCompare(a.id));
     }
     async function saved(id) {
       const value = await store.get(yearbookKey(id), READ);
-      if (!value || value.version !== 1 || value.id !== id) fail(404, 'Yıllık bulunamadı.');
+      if (!value || value.deleted === true || value.version !== 1 || value.id !== id) fail(404, 'Yıllık bulunamadı.');
       return value;
     }
     async function snapshot(record, forPublication) {
@@ -77,8 +78,12 @@ export function createYearbooksHandler({ getStore = getBlobStore, readEvents, st
     }
     const input = await body(req), id = yearbookId(input.id || input.period), key = yearbookKey(id), at = now().toISOString(), nextRevision = revision();
     if (req.method === 'POST' && !action) {
-      const initial = { version: 1, id, period: id, revision: nextRevision, createdAt: at, updatedAt: at, draft: defaultYearbookDraft(id), visibility: 'draft', publishedSnapshot: null, publicationRevision: 0, operations: [{ id: revision(), type: 'create', at, actor: actor(session) }] };
-      const result = await store.setJSON(key, initial, { onlyIfNew: true });
+      const previous = await store.getWithMetadata(key, READ);
+      if (previous?.data && previous.data.deleted !== true) fail(409, 'Bu dönem için zaten bir yıllık var.');
+      if (previous?.data && (previous.data.version !== 1 || previous.data.id !== id || !previous.etag)) fail(503, 'Yıllık arşivi doğrulanamadı.');
+      const initial = { version: 1, id, period: id, revision: nextRevision, createdAt: at, updatedAt: at, draft: defaultYearbookDraft(id), visibility: 'draft', publishedSnapshot: null, publicationRevision: 0,
+        operations: [...(previous?.data?.operations || []), { id: revision(), type: 'create', at, actor: actor(session) }].slice(-200) };
+      const result = await store.setJSON(key, initial, previous?.data ? { onlyIfMatch: previous.etag } : { onlyIfNew: true });
       if (!result.modified) fail(409, 'Bu dönem için zaten bir yıllık var.');
       return response({ ok: true, yearbook: initial }, 201);
     }
@@ -88,7 +93,18 @@ export function createYearbooksHandler({ getStore = getBlobStore, readEvents, st
       if (!stored?.data || !stored.etag) fail(404, 'Yıllık bulunamadı.');
       const current = stored.data;
       if (current.version !== 1 || current.id !== id) fail(503, 'Yıllık doğrulanamadı.');
+      if (current.deleted === true) fail(404, 'Yıllık silinmiş.');
       if (current.revision !== expected) fail(409, 'Yıllık başka bir pencerede değişti. Taslağı kopyalayıp kaydedileni yükleyin.');
+      if (req.method === 'DELETE') {
+        // Blobs has no conditional delete. Replace the contents with an atomic
+        // deletion marker so an in-flight editor cannot restore a removed book.
+        // Only the operation history remains; gallery assets are never touched.
+        const deleted = { version: 1, id, period: current.period, revision: nextRevision, deleted: true, createdAt: current.createdAt, updatedAt: at, deletedAt: at,
+          operations: [...(current.operations || []), { id: nextRevision, type: 'delete', at, actor: actor(session) }].slice(-200) };
+        const result = await store.setJSON(key, deleted, { onlyIfMatch: stored.etag });
+        if (result.modified) return response({ ok: true, id, deleted: true });
+        continue;
+      }
       let changed;
       if (draft) changed = { draft };
       else if (action === 'publish') changed = { visibility: 'published', publishedSnapshot: await snapshot(current, true), publicationRevision: (current.publicationRevision || 0) + 1,

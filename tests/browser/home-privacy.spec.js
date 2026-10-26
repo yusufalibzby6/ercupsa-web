@@ -148,7 +148,7 @@ test('closed or unavailable native forms keep safe discovery links and unpublish
   await fixture(page, { events: [event], form: { available: false, stage: 'closed' }, yearbooks: [{ id: 'draft', title: 'Yayımlanmamış yıllık' }] });
   await page.goto(`${origin}/`);
   await expect(page.locator('#homeSpotlight .home-spotlight-action')).toContainText('Detayları gör');
-  await expect(page.locator('#homeSpotlight .home-spotlight-action')).toHaveAttribute('href', 'form.html?event=next');
+  await expect(page.locator('#homeSpotlight .home-spotlight-action')).toHaveAttribute('href', '/etkinlik/next');
   await expect(page.locator('#homeYearbookAnnouncement')).toBeHidden();
   await expect(page.locator('#home-events')).not.toContainText('kaydet');
 });

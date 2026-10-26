@@ -1,5 +1,13 @@
-/* Gallery header only: no album, toolbar, photo, lightbox or shared-color changes. */
+/* Gallery colors only: preserve album layout, images, filters and lightbox behavior. */
 @media screen {
+  .gallery-brand-page .gallery-page { --gallery-accent: #7c2039; }
+  .gallery-brand-page .gallery-filter[aria-pressed="true"], .gallery-brand-page .gallery-retry { background: #7c2039; border-color: #7c2039; color: #fffdfa; }
+  .gallery-brand-page .gallery-album-category { background: #7c20390b; border-color: #7c203926; }
+  .gallery-brand-page :is(.gallery-photo,.gallery-retry,.gallery-control,.gallery-filter,.gallery-search):focus-visible { outline-color: #a63c59; }
+  html.dark .gallery-brand-page .gallery-page { --gallery-accent: #edb1c4; }
+  html.dark .gallery-brand-page .gallery-filter[aria-pressed="true"], html.dark .gallery-brand-page .gallery-retry { background: #7c2039; border-color: #7c2039; color: #fffdfa; }
+  html.dark .gallery-brand-page .gallery-album-category { background: #edb1c40f; border-color: #edb1c42a; }
+  html.dark .gallery-brand-page :is(.gallery-photo,.gallery-retry,.gallery-control,.gallery-filter,.gallery-search):focus-visible { outline-color: #edb1c4; }
   .gallery-brand-page > nav { background: #fcf9f5f5; border-color: #e8dcd5; }
   .gallery-brand-page > nav #logoLink, .gallery-brand-page > nav #siteMenu a[aria-current=page] { color: #7c2039; }
   .gallery-brand-page > nav #siteMenuButton { background: #fffdfa; border-color: #dcc7bf; color: #30232c; }

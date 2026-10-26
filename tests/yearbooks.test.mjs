@@ -160,3 +160,78 @@ test('renderer escapes editorial content and labels missing statistics without i
   const html=renderYearbook(data.yearbook,{preview:true}); assert.equal(html.includes('<script>'),false); assert.match(html,/&lt;script&gt;/); assert.match(html,/Doğrulanmış veri bulunmuyor/); assert.match(html,/Yönetici önizlemesi/); assert.match(yearbookDocument(data.yearbook),/yearbook\.css/);
   assert.match(renderYearbookArchive([]),/Hikâyemiz birikiyor/);
 });
+
+test('only the owner may delete a published yearbook; deletion removes public and draft content without touching gallery data', async () => {
+  const f = fixture(); let record = await f.save(await f.create());
+  record = (await (await f.publish(record)).json()).yearbook;
+  const input = { id: record.id, revision: record.revision };
+  const before = structuredClone(f.store.values.get(yearbookKey(record.id)));
+  assert.equal((await f.request('DELETE', '', input)).status, 401);
+  const editor = await f.delegate(['yearbooks.view', 'yearbooks.manage', 'yearbooks.publish']);
+  assert.equal((await f.request('DELETE', '', input, editor)).status, 403);
+  assert.equal((await f.request('DELETE', '', input, owner(), { Origin: 'https://other.test' })).status, 403);
+  assert.equal((await f.request('DELETE', '', { ...input, revision: 'stale' }, owner())).status, 409);
+  assert.deepEqual(f.store.values.get(yearbookKey(record.id)), before);
+  const result = await f.request('DELETE', '', input, owner());
+  assert.equal(result.status, 200);
+  assert.deepEqual(await result.json(), { ok: true, id: record.id, deleted: true });
+  const tombstone = f.store.values.get(yearbookKey(record.id)).data;
+  assert.equal(tombstone.deleted, true);
+  assert.equal(tombstone.draft, undefined); assert.equal(tombstone.publishedSnapshot, undefined);
+  assert.equal(tombstone.rightsReview, undefined);
+  assert.equal(tombstone.operations.at(-1).type, 'delete');
+  assert.deepEqual(await (await f.request()).json(), { yearbooks: [] });
+  const admin = await (await f.request('GET', '?action=admin', undefined, owner())).json();
+  assert.deepEqual(admin.catalog, []);
+  for (const query of ['?id=2026-2027', '?action=readable&id=2026-2027', '?action=preview&id=2026-2027', '?action=admin&id=2026-2027']) {
+    assert.equal((await f.request('GET', query, undefined, query.includes('action=preview') || query.includes('action=admin') ? owner() : '')).status, 404);
+  }
+  assert.ok(f.store.writes.every(key => key === yearbookKey(record.id)));
+});
+
+test('a deleted period can be recreated once and old editor revisions cannot change the replacement', async () => {
+  const f = fixture(), original = await f.save(await f.create());
+  assert.equal((await f.request('DELETE', '', { id: original.id, revision: original.revision }, owner())).status, 200);
+  const responses = await Promise.all([1, 2].map(() => f.request('POST', '', { period: original.id }, owner())));
+  assert.deepEqual(responses.map(result => result.status).sort(), [201, 409]);
+  const replacement = (await (await f.request('GET', '?action=admin&id=2026-2027', undefined, owner())).json()).yearbook;
+  assert.equal(replacement.visibility, 'draft'); assert.deepEqual(replacement.draft.events, []);
+  assert.equal(replacement.publishedSnapshot, null);
+  for (const [method, query, extra] of [['PUT', '', { draft: original.draft }], ['POST', '?action=publish', {}], ['DELETE', '', {}]]) {
+    const response = await f.request(method, query, { id: original.id, revision: original.revision, ...extra }, owner());
+    assert.equal(response.status, 409);
+  }
+  assert.equal(f.store.values.get(yearbookKey(original.id)).data.revision, replacement.revision);
+});
+
+test('publication in flight cannot restore a yearbook deleted after its snapshot was read', async () => {
+  const f = fixture(), record = await f.save(await f.create());
+  const key = yearbookKey(record.id), input = { id: record.id, revision: record.revision };
+  let release, reached;
+  const gate = new Promise(resolve => { release = resolve; });
+  const entered = new Promise(resolve => { reached = resolve; });
+  f.store.beforeSet = async (writtenKey, value) => { if (writtenKey === key && value.visibility === 'published') { reached(); await gate; } };
+  const publishing = f.publish(record);
+  await entered;
+  assert.equal((await f.request('DELETE', '', input, owner())).status, 200);
+  release();
+  assert.equal((await publishing).status, 404);
+  assert.equal(f.store.values.get(key).data.deleted, true);
+  assert.deepEqual(await (await f.request()).json(), { yearbooks: [] });
+});
+
+test('a concurrent edit prevents a pending deletion from erasing the newly saved draft', async () => {
+  const f = fixture(), record = await f.save(await f.create()), key = yearbookKey(record.id);
+  let release, reached;
+  const gate = new Promise(resolve => { release = resolve; });
+  const entered = new Promise(resolve => { reached = resolve; });
+  f.store.beforeSet = async (writtenKey, value) => { if (writtenKey === key && value.deleted) { reached(); await gate; } };
+  const deleting = f.request('DELETE', '', { id: record.id, revision: record.revision }, owner());
+  await entered;
+  const draft = { ...record.draft, title: 'Son kaydedilen yıllık başlığı' };
+  assert.equal((await f.request('PUT', '', { id: record.id, revision: record.revision, draft }, owner())).status, 200);
+  release();
+  assert.equal((await deleting).status, 409);
+  assert.equal(f.store.values.get(key).data.draft.title, draft.title);
+  assert.equal(f.store.values.get(key).data.deleted, undefined);
+});

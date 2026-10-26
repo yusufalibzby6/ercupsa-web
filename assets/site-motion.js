@@ -45,7 +45,20 @@ function init(scope) {
   toggle.setAttribute('aria-label', 'Animasyonları duraklat');
   toggle.setAttribute('aria-pressed', 'false');
   toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path class="motion-pause-icon" d="M9 5v14M15 5v14"/><path class="motion-play-icon" d="m9 5 10 7-10 7Z"/></svg>';
-  document.getElementById('siteMenu')?.append(toggle);
+  const menu = document.getElementById('siteMenu');
+  if (menu) {
+    let preferences = menu.querySelector('.site-preferences');
+    if (!preferences) {
+      preferences = document.createElement('div');
+      preferences.className = 'site-preferences';
+      preferences.setAttribute('role', 'group');
+      preferences.setAttribute('aria-label', 'Görünüm ve hareket tercihleri');
+      const theme = menu.querySelector('.theme-toggle');
+      if (theme) { theme.before(preferences); preferences.append(theme); }
+      else menu.append(preferences);
+    }
+    preferences.append(toggle);
+  }
 
   function cancel(element) {
     const animation = animations.get(element);
@@ -159,7 +172,7 @@ function init(scope) {
       if (!sceneVisible) { if (pointerFrame) cancelAnimationFrame(pointerFrame); pointerFrame = 0; art.style.removeProperty('transform'); }
     }, { threshold: 0 }) : null;
     scene?.observe(art);
-    art.dataset.motionVisible = 'true';
+    art.dataset.motionVisible = String(!!scene);
     hero.addEventListener('pointermove', event => {
       if (mode !== 'full' || !pointer.matches || !sceneVisible || document.hidden || suspended || pointerFrame) return;
       const x = event.clientX / innerWidth - .5, y = event.clientY / innerHeight - .5;

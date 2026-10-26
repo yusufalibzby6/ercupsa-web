@@ -8,8 +8,8 @@ const events = [{ id: 'motion-event', title: 'Bilim buluşması', date, time: '1
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
-    Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => window.motionTestHardware || 8 });
+    Object.defineProperty(navigator, 'deviceMemory', { get: () => window.motionTestMemory || 8 });
   });
   await page.route('https://**/*', route => route.abort());
   await page.route('https://res.cloudinary.com/**', route => route.fulfill({ body: photo, contentType: 'image/png' }));
@@ -112,4 +112,43 @@ test('hero effects pause off screen and countdown digit changes do not move the 
   const offscreenSeconds = await page.locator('[data-countdown-part=seconds]').textContent();
   await expect.poll(() => page.locator('[data-countdown-part=seconds]').textContent()).not.toBe(offscreenSeconds);
   expect(await page.locator('[data-countdown-part=seconds]').evaluate(element => element.getAnimations().length)).toBe(0);
+});
+
+test('theme and motion controls stay alongside each other and both work on narrow menus', async ({ page }) => {
+  for (const path of ['/', '/galeri.html']) for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(path);
+    await page.getByRole('button', { name: 'Menü', exact: true }).click();
+    await expect(page.locator('#siteMenu a[href="ekip.html"]')).toBeVisible();
+    const theme = page.locator('#siteMenu .theme-toggle'), motion = page.locator('#siteMenu .motion-toggle');
+    const a = await theme.boundingBox(), b = await motion.boundingBox();
+    expect(a.height).toBeGreaterThanOrEqual(44); expect(b.height).toBeGreaterThanOrEqual(44);
+    expect(Math.abs(a.y - b.y)).toBeLessThan(1);
+    expect(b.x - a.x - a.width).toBeGreaterThanOrEqual(8);
+    const dark = await page.locator('html').evaluate(element => element.classList.contains('dark'));
+    await theme.click();
+    expect(await page.locator('html').evaluate(element => element.classList.contains('dark'))).toBe(!dark);
+    await motion.click();
+    await expect(page.locator('body')).toHaveAttribute('data-motion-mode', 'paused');
+    await motion.click();
+    await expect(page.locator('body')).toHaveAttribute('data-motion-mode', 'full');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  }
+});
+
+test('a four-core phone retains a light visible capsule motion and still honours pause and reduced motion', async ({ page }) => {
+  await page.addInitScript(() => { window.motionTestHardware = 4; window.motionTestMemory = 4; });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.locator('body')).toHaveAttribute('data-motion-mode', 'lite');
+  const image = page.locator('.home-pharmacy-art > img');
+  await expect.poll(() => image.evaluate(element => getComputedStyle(element).animationPlayState)).toBe('running');
+  const initial = await image.evaluate(element => getComputedStyle(element).transform);
+  await expect.poll(() => image.evaluate(element => getComputedStyle(element).transform)).not.toBe(initial);
+  await page.getByRole('button', { name: 'Menü', exact: true }).click();
+  await page.locator('.motion-toggle').click();
+  expect(await image.evaluate(element => element.getAnimations().length)).toBe(0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('body')).toHaveAttribute('data-motion-mode', 'reduced');
+  expect(await image.evaluate(element => element.getAnimations().length)).toBe(0);
 });

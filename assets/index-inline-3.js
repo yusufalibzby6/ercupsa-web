@@ -7,19 +7,20 @@ const photoHost = document.getElementById('home-photos');
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 let events = [], loaded = false, catalogBusy = false, renderKey = '', featuredId = '', timer;
 const availability = new Map(), pending = new Map();
-const detailsUrl = event => `form.html?event=${encodeURIComponent(event.id)}`;
+const detailsUrl = event => `/etkinlik/${encodeURIComponent(event.id)}`;
+const registrationUrl = event => `form.html?event=${encodeURIComponent(event.id)}#registrationSection`;
 
 function registration(event) {
   if (event.registrationMode !== 'native') {
     return publicImage(event.registrationUrl)
-      ? { state: 'open', label: 'Kayıt ol', status: 'Kayıtlar açık', href: detailsUrl(event) + '#registrationSection' }
+      ? { state: 'open', label: 'Kayıt ol', status: 'Kayıtlar açık', href: registrationUrl(event) }
       : { state: 'closed', label: 'Detayları gör', status: 'Etkinlik bilgileri', href: detailsUrl(event) };
   }
   if (event.registrationEnabled !== true) return { state: 'closed', label: 'Detayları gör', status: 'Kayıt kapalı', href: detailsUrl(event) };
   const saved = availability.get(event.id);
   if (saved?.available === true && saved.stage !== 'closed') return {
     state: saved.stage === 'waitlist' ? 'waitlist' : 'open', label: saved.stage === 'waitlist' ? 'Yedek kayıt' : 'Kayıt ol',
-    status: saved.stage === 'waitlist' ? 'Yedek kayıtlar açık' : 'Kayıtlar açık', href: detailsUrl(event) + '#registrationSection',
+    status: saved.stage === 'waitlist' ? 'Yedek kayıtlar açık' : 'Kayıtlar açık', href: registrationUrl(event),
   };
   return { state: saved ? 'closed' : 'checking', label: 'Detayları gör', href: detailsUrl(event),
     status: !saved ? 'Kayıt durumu kontrol ediliyor' : saved.error ? 'Kayıt durumu doğrulanamadı' : saved.full ? 'Kontenjan dolu' : 'Kayıt kapalı' };
@@ -59,8 +60,14 @@ function renderUpcoming(list) {
 function renderPhotos() {
   if (!photoHost) return;
   const photos = [], urls = new Set();
-  for (const event of [...events].sort((a, b) => b.date.localeCompare(a.date))) {
-    for (const image of (Array.isArray(event.images) ? event.images : []).slice(0, 2)) {
+  const lastUpdated = event => {
+    const updated = Date.parse(event.updatedAt);
+    return Number.isFinite(updated) ? updated : Date.parse(`${event.date}T00:00:00+03:00`);
+  };
+  // Uploads are appended by the existing editor. Keep album data untouched and
+  // pick its last valid images, prioritising the server's saved update time.
+  for (const event of [...events].sort((a, b) => lastUpdated(b) - lastUpdated(a) || b.date.localeCompare(a.date))) {
+    for (const image of (Array.isArray(event.images) ? event.images : []).filter(image => publicImage(image?.url)).slice(-2).reverse()) {
       const url = publicImage(image?.url);
       if (url && !urls.has(url)) { urls.add(url); photos.push({ url, event }); }
     }

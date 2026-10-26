@@ -5,6 +5,8 @@
     --motion-fast: 180ms;
     --motion-reveal: 460ms;
   }
+  .motion-page .site-preferences { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; min-height: 44px; padding: 4px 6px; }
+  .motion-page .site-preferences .theme-toggle, .motion-page .site-preferences .motion-toggle { flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; margin: 0; }
   .motion-page .motion-toggle {
     display: inline-flex; align-items: center; justify-content: center;
     flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px;
@@ -27,9 +29,10 @@
   .motion-page .motion-dust-two { right: 12%; top: 68%; width: 4px; height: 4px; }
   .motion-page .motion-dust-three { left: 24%; bottom: 10%; width: 2px; height: 2px; }
   .motion-page .motion-dust-four { right: 28%; top: 13%; width: 2px; height: 2px; }
-  .motion-page[data-motion-mode=full] .home-pharmacy-art { --motion-play: paused; }
-  .motion-page[data-motion-mode=full][data-motion-running=true] .home-pharmacy-art[data-motion-visible=true] { --motion-play: running; }
-  .motion-page[data-motion-mode=full] .home-pharmacy-art > img { animation: capsule-drift 9s ease-in-out infinite; animation-play-state: var(--motion-play); }
+  .motion-page:is([data-motion-mode=full],[data-motion-mode=lite]) .home-pharmacy-art { --motion-play: paused; }
+  .motion-page:is([data-motion-mode=full],[data-motion-mode=lite])[data-motion-running=true] .home-pharmacy-art[data-motion-visible=true] { --motion-play: running; }
+  .motion-page:is([data-motion-mode=full],[data-motion-mode=lite]) .home-pharmacy-art > img { animation: capsule-drift 9s ease-in-out infinite; animation-play-state: var(--motion-play); }
+  .motion-page[data-motion-mode=lite] .home-pharmacy-art > img { animation-name: capsule-drift-lite; animation-duration: 8s; }
   .motion-page[data-motion-mode=full] .home-art-orbit-one { animation: orbit-breathe 12s ease-in-out infinite; animation-play-state: var(--motion-play); }
   .motion-page[data-motion-mode=full] .home-art-orbit-two { animation: orbit-breathe-two 14s ease-in-out infinite; animation-play-state: var(--motion-play); }
   .motion-page[data-motion-mode=full] .home-art-molecule circle { animation: molecule-light 5s ease-in-out infinite; animation-play-state: var(--motion-play); }
@@ -95,7 +98,7 @@
   .motion-page[data-motion-mode=paused] .home-photo-card:hover img,
   .motion-page[data-motion-mode=reduced] .home-photo-card:hover img { transform: none; }
   @media (max-width: 600px) {
-    .motion-page[data-motion-mode=full] .home-pharmacy-art > img { animation-name: capsule-drift-mobile; animation-duration: 10s; }
+    .motion-page[data-motion-mode=full] .home-pharmacy-art > img { animation-name: capsule-drift-mobile; animation-duration: 7s; }
     .motion-page[data-motion-mode=full] .home-art-orbit, .motion-page[data-motion-mode=full] .home-art-molecule circle { animation: none; }
     .motion-page .motion-dust-three, .motion-page .motion-dust-four { display: none; }
   }
@@ -110,7 +113,8 @@
   .motion-page[data-motion-mode=paused] *, .motion-page[data-motion-mode=reduced] * { animation: none !important; transition: none !important; }
 }
 @keyframes capsule-drift { 0%,100% { transform: translateX(-50%) translateY(0) rotate(-.3deg); } 50% { transform: translateX(-50%) translateY(-7px) rotate(.3deg); } }
-@keyframes capsule-drift-mobile { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-3px); } }
+@keyframes capsule-drift-mobile { 0%,100% { transform: translateX(-50%) translateY(0) rotate(-.3deg); } 50% { transform: translateX(-50%) translateY(-8px) rotate(.3deg); } }
+@keyframes capsule-drift-lite { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-4px); } }
 @keyframes orbit-breathe { 0%,100% { transform: rotate(-17deg); } 50% { transform: rotate(-10deg); } }
 @keyframes orbit-breathe-two { 0%,100% { transform: rotate(19deg); } 50% { transform: rotate(12deg); } }
 @keyframes molecule-light { 0%,100% { opacity: .35; } 50% { opacity: 1; } }

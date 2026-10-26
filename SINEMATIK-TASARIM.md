@@ -1,5 +1,7 @@
 # ERCUPSA — sinematik tasarım ve hareket incelemesi
 
+26 Ekim 2026 tarihindeki ek düzenlemeler bu raporun son bölümündedir; bu ek sürüm yerelde doğrulandı ve kullanıcı GitHub üzerinden yayımlanmasını onayladı. Önceki performans ölçümleri yayımlanan `8214f0f` sürümüne aittir.
+
 Çalışma yerelde tamamlanıp doğrulandı; kullanıcı 26 Ekim 2026 tarihinde GitHub üzerinden yayımlanmasını onayladı. Üretim verilerine doğrudan müdahale edilmez. Önceden hazırlanmış “Son buluşmalar” kaldırma ve genel sayfa paleti düzenlemeleri korundu.
 
 ## Koddan önce yapılan inceleme
@@ -68,7 +70,7 @@ Bu hareket geliştirmesinde:
 | `tests/browser/motion.spec.js` | Beş yeni davranış testi |
 | `ANA-SAYFA-MOBIL.md`, `SINEMATIK-TASARIM.md` | Uygulama ve doğrulama raporları |
 
-Önceki, henüz yayımlanmamış düzenlemelerin `assets/site-palette.css`, `assets/home-v2.css`, `assets/index-inline-3.js` ve `tests/browser/home-mobile.spec.js` değişiklikleri de çalışma ağacındadır. “Son buluşmalar” kaldırılmıştır; geçmiş içerik bağlantısı galeriye gider.
+`assets/site-palette.css`, `assets/home-v2.css`, `assets/index-inline-3.js` ve `tests/browser/home-mobile.spec.js` dosyalarındaki önceki düzenlemeler `8214f0f` sürümünde yayımlandı. “Son buluşmalar” kaldırılmıştır; geçmiş içerik bağlantısı galeriye gider.
 
 ## Testler
 
@@ -105,3 +107,32 @@ Ortak hareket JS/CSS’i toplam 19.710 bayt; gzip ile yaklaşık **5,6 KB**. Gal
 - Başlangıç/final ekran görüntüleri, `matrix.json` ve `performance-paired.json` aynı klasördedir.
 
 Önizleme ve kayıtlar örnek etkinlikler kullanır. Önizleme sunucusu üretim verilerine bağlanmaz; kayıt/yönetim POST işlemlerini reddeder. Önizleme dosyaları ve videolar depo/Netlify dağıtımına eklenmemiştir. Ortam kapatılırsa `/tmp/ercupsa-cinematic-preview.py` ile yerel sunucu yeniden başlatılabilir.
+
+## 26 Ekim — bağlantılar, mobil kontroller ve güncel fotoğraflar
+
+- Ana sayfadaki afiş/başlık ve “Detayları gör” bağlantıları, adminin “Etkinliği paylaş” işlemiyle aynı `/etkinlik/<id>` sayfasını açar. “Kayıt ol” ve “Yedek kayıt” doğrudan ilgili kayıt formuna gitmeye devam eder. Etkinlik kimliği gerçek kayıttan alınır; örnek bağlantı sabit yazılmadı.
+- Ekibimiz, ana sayfanın ve ortak ziyaretçi menüsünün üst bağlantılarına eklendi.
+- Tema ve animasyon düğmeleri tek bir erişilebilir grup içinde yan yana, aralarında boşlukla ve en az 44 × 44 px boyutta tutulur. Eski menü betiği önbellekte olsa da hareket modülü mevcut tema düğmesini gruplar.
+- Galerinin kategori filtreleri, kategori rozetleri, albüm numaraları ve odak renkleri mevcut bordo paletine uyarlandı. Albüm/fotoğraf düzeni, arama, filtreleme ve ışık kutusu kodu değiştirilmedi.
+- Normal mobil görünümde kapsülün hareketi 3 px/10 saniyeden 8 px/7 saniyeye çıkarıldı. Hafif moddaki cihazlarda da yalnızca kapsül için 4 px/8 saniyelik hareket korunur. Hareket azaltma, veri tasarrufu, kullanıcı duraklatması ve ekran dışında durma kuralları korunur. Gözlemci desteği olmayan tarayıcıda dekoratif sahne durur.
+- Ana sayfanın en fazla altı fotoğrafı, son kaydedilen albümlerden seçilir. Sıralama mevcut sunucu `updatedAt` verisine, eski kayıtlarda etkinlik tarihine dayanır. Her albümün son iki geçerli fotoğrafı kullanılır; galeri kayıtlarının sırası değiştirilmez. Bu, fotoğraflara uydurma yükleme tarihi eklemez. Fotoğraflar panelde kaydedildikten sonra ana sayfa yeniden açılınca/yenilenince yeni veriler okunur.
+- İlgili CSS/JS sürüm parametreleri yenilendi; eski önbellekteki menü ve bağlantıların yeni stillerle karışması önlenir.
+
+Doğrulama: **61 tarayıcı testi**, **10 ilgili birim testi**, başarılı üretim build'i. Ayrıca ana sayfa, galeri, SSS ve ekip sayfalarında iki tema ve 320/360/375/390/430/768/899/900/1024/1440 px genişliklerle **80 görünüm** kontrol edildi; taşma veya düğmelerde üst üste binme bulunmadı. Yeni testler paylaşım sayfasına gerçek geçişi, kayıt formunun ayrı kalmasını, albüme yeni fotoğraf eklenip sayfa yenilenmesini ve hafif modda görünür hareketi kapsar.
+
+Ekran kayıtları yerine bu ek sürümün kontrol görüntüleri `/workspace/ercupsa-followup-review/` altındadır. Kullanıcı ek sürümün GitHub üzerinden yayımlanmasını onayladı; üretim verilerine doğrudan müdahale edilmez.
+
+## 26 Ekim — yıllığın yayın görünürlüğü ve silinmesi
+
+Yıllık arşivi `/yilliklar.html`, tek yıllığın paylaşım adresi `/yillik/2026-2027` biçimindedir. Yayımlanan kopyalar mevcut ana sayfa duyurusunda da gösterilir. Canlı API'ye yalnızca okuma yapılarak bakıldığında arşiv boştu ve 2026–2027 için “Yıllık henüz yayımlanmamış” yanıtı alındı; taslak içerikleri okunmadı veya değiştirilmedi. Kullanıcı yalnızca onay penceresini gördüğünü bildirdi. Hangi doğrulamanın yayını engellediği özel taslak okunmadan kesinleştirilmedi.
+
+- Yayın sonucu ve hata mesajı hem üstte hem işlem butonlarının hemen yanında gösterilir. Başarılı cevap yayımlanmış kopya içermedikçe arayüz “yayımlandı” demez.
+- Başarılı yayında “Yayımlanan yıllığı aç” ve arşiv bağlantıları görünür. Kaydetme, etkinlik seçimi ve fotoğraf yayın kontrolü gereklilikleri butonların yanında açıklanır. Gelecekteki etkinlik ve fotoğraf uygunluğu denetimleri korunur; özel önizleme için yönetici bağlantısı kullanılabilir.
+- Ana sayfanın ve ortak sayfaların alt bağlantılarına “Yıllıklar” eklendi.
+- Baş admin, taslak veya yayımlanmış yıllığı onay vererek silebilir. Diğer yönetici izinleri silme yetkisi vermez; sunucu `requireOwner` kontrolü uygular. “Yayından kaldır” taslağı korumaya devam eder.
+- Silme yıllığın taslağını, yayımlanan metin/fotoğraf referanslarını ve istatistik kopyasını kaldırır; etkinlikler, katılımcı kayıtları, biletler ve Cloudinary/galeri dosyaları korunur. Aynı dönem için yeniden boş taslak oluşturulabilir.
+- Silme, mevcut kaydın ETag ve revision bilgileriyle koşullu yazılır. Eski bir düzenleme/sürmekte olan yayın silinmiş içeriği geri getiremez; eşzamanlı yeni düzenleme varsa eski silme isteği reddedilir.
+
+Veri geçişi: Önceden var olan `version: 1` yıllıklar değişmeden okunur; toplu göç veya üretim temizliği yapılmaz. Silme anında aynı anahtara yalnızca kimlik, tarih, revision ve sınırlı işlem geçmişi içeren bir silme işareti yazılır; ayrı veri altyapısı kurulmaz. İşaret, aynı dönem yeniden oluşturulurken de koşullu yazmayla değiştirilir. Olası eski sürüme dönüşte silme işaretlerini anlayan yıllık API'si korunmalıdır.
+
+Doğrulama: **315 birim testi** ve **44 ilgili tarayıcı testi** başarılı, üretim build'i başarılı. Yayının ana sayfa/arşiv görünümü, buton yanında hata, baş admin silme/onaydan vazgeçme, yetki sınırları, silinen bağlantının kapanması, aynı dönemi yeniden oluşturma ve eşzamanlı yayın/düzenleme/silme yarışları test edildi. Kullanıcı bu yazılım değişikliklerinin GitHub üzerinden yayımlanmasını onayladı; gerçek bir yıllık yayımlanmadı veya silinmedi.

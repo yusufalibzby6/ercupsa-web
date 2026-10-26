@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { createEventShareHandler } from '../../netlify/functions/event-share.mjs';
 
 // A device outside Türkiye must still see the event's Türkiye start time.
 test.use({ timezoneId: 'America/Los_Angeles' });
@@ -116,6 +117,42 @@ test('homepage gallery is a compact manual photo strip that preserves existing a
   await expect(page.getByRole('link', { name: /^Tüm fotoğraflar/i })).toHaveAttribute('href', 'galeri.html');
 });
 
+test('event details open the same public share page as the admin, with a separate path to registration', async ({ page }) => {
+  const value = event('da1dc054-4e58-4c35-bfd8-85dcc0a9aafe', { description: 'Etkinliğin açıklaması burada.' });
+  const handler = createEventShareHandler({ events: async () => [value] });
+  await page.route('**/etkinlik/' + value.id, async route => {
+    const response = await handler(new Request(route.request().url()));
+    await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
+  });
+  await fixture(page, { events: [value] });
+  await expect(page.locator('.home-spotlight-action')).toHaveAttribute('href', `form.html?event=${value.id}#registrationSection`);
+  await page.locator('.home-spotlight-detail').click();
+  await expect(page).toHaveURL(new RegExp(`/etkinlik/${value.id}$`));
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(value.title);
+  await expect(page.locator('main')).toContainText(value.description);
+  await expect(page.locator('form, #nativeRegistrationForm')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Etkinlik detayları ve kayıt formu' })).toHaveAttribute('href', `/form.html?event=${value.id}#registrationSection`);
+});
+
+test('the photo strip uses the last saved albums and updates on reload after an upload without changing gallery data', async ({ page }) => {
+  const edited = event('older-album', { date: '2026-02-01', updatedAt: '2026-10-25T11:00:00Z', images: [0, 1, 2, 3].map(n => ({ url: `${image}?older=${n}` })) });
+  const newer = event('newer-album', { date: '2026-10-24', updatedAt: '2026-10-24T11:00:00Z', images: [{ url: `${image}?newer=0` }] });
+  const records = [event('next'), newer, edited];
+  const original = structuredClone(records);
+  await fixture(page, { events: records });
+  const strip = page.locator('#home-photos');
+  await expect(strip.locator('a').first()).toHaveAttribute('href', 'galeri.html#event-older-album');
+  await expect(strip.locator('img').nth(0)).toHaveAttribute('src', `${image}?older=3`);
+  await expect(strip.locator('img').nth(1)).toHaveAttribute('src', `${image}?older=2`);
+  expect(records).toEqual(original);
+  edited.images.push({ url: `${image}?latest-upload=1` });
+  edited.updatedAt = '2026-10-25T12:00:00Z';
+  await page.reload();
+  await expect(strip.locator('img').first()).toHaveAttribute('src', `${image}?latest-upload=1`);
+  await expect(strip.locator('img').nth(1)).toHaveAttribute('src', `${image}?older=3`);
+  expect(edited.images).toHaveLength(5);
+});
+
 test('mobile menu supports touch, Escape, outside dismissal and focus without moving the main content', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = await fixture(page);
@@ -218,15 +255,15 @@ for (const [label, form, action, hash] of [
   const state = await fixture(page, { forms: { next: form } });
   const link = page.locator('#homeSpotlight .home-spotlight-action');
   await expect(link).toContainText(action);
-  await expect(link).toHaveAttribute('href', `form.html?event=next${hash ? '#registrationSection' : ''}`);
-  if (hash) await expect(page.locator('#homeSpotlight .home-spotlight-detail')).toHaveAttribute('href', 'form.html?event=next');
+  await expect(link).toHaveAttribute('href', hash ? 'form.html?event=next#registrationSection' : '/etkinlik/next');
+  if (hash) await expect(page.locator('#homeSpotlight .home-spotlight-detail')).toHaveAttribute('href', '/etkinlik/next');
   else await expect(page.locator('#homeSpotlight .home-spotlight-detail')).toHaveCount(0);
   expect(state.formReads).toContain('next');
 });
 
 test('a disabled native form never silently falls back to its legacy Google Forms link', async ({ page }) => {
   const state = await fixture(page, { events: [event('disabled', { registrationEnabled: false, registrationUrl: 'https://docs.google.com/forms/legacy' })] });
-  await expect(page.locator('#homeSpotlight .home-spotlight-action')).toHaveAttribute('href', 'form.html?event=disabled');
+  await expect(page.locator('#homeSpotlight .home-spotlight-action')).toHaveAttribute('href', '/etkinlik/disabled');
   expect(state.formReads).not.toContain('disabled');
   await expect(page.locator('#homeSpotlight a[href*="docs.google.com"]')).toHaveCount(0);
 });
