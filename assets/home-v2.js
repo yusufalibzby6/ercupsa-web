@@ -11,7 +11,8 @@ if (announcement) {
     if (!books.length) return;
     const book = books[0];
     document.getElementById('homeYearbookTitle').textContent = book.title;
-    document.getElementById('homeYearbookDescription').textContent = typeof book.description === 'string' ? book.description.slice(0, 500) : '';
+    const description = typeof book.description === 'string' ? book.description.trim() : '';
+    document.getElementById('homeYearbookDescription').textContent = description.length > 140 ? description.slice(0, 137).replace(/\s+\S*$/, '') + '…' : description;
     document.getElementById('homeYearbookLink').href = `yillik.html?donem=${encodeURIComponent(book.id)}`;
     announcement.hidden = false;
   }).catch(() => { /* No announcement is shown when publication cannot be verified. */ });

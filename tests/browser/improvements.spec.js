@@ -11,19 +11,14 @@ const events = [
   { id: "past", title: "Geçmiş etkinlik", date: "2026-09-01", time: "18:00", category: "Gezi", description: "Gezi açıklaması", location: "Kayseri", registrationUrl: "https://docs.google.com/forms/d/e/old-form/viewform", images: [] },
 ];
 
-test("social welcome stays, 187 stays fixed, public member links disappear, and the new sponsor follows Dileknaz", async ({ page }) => {
+test("homepage content is immediate without promotional counters and the new sponsor still follows Dileknaz", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("#welcomeModal")).toBeVisible();
-  await expect(page.locator('#welcomeModal a[href*="instagram.com"]')).toBeVisible();
-  await expect(page.locator('#welcomeModal a[href*="chat.whatsapp.com"]')).toBeVisible();
-  await page.getByRole("button", { name: "Siteye devam et →" }).click();
+  await expect(page.locator("#welcomeModal")).toHaveCount(0);
+  await expect(page.locator('#discoverEvents')).toBeVisible();
   await expect(page.locator('nav a[href="uyeler.html"]')).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Topluluğa üye ol/i })).toHaveCount(0);
-  const memberCount = page.locator('.counter-glow').filter({ hasText: /^187$/ });
-  await expect(memberCount).toHaveCount(1);
-  await memberCount.scrollIntoViewIfNeeded();
-  await expect(memberCount).toHaveText("187");
-  await expect(page.locator("#countdownWrap")).toHaveCount(0);
+  await expect(page.locator('.counter-glow, #eventCounter')).toHaveCount(0);
+  await expect(page.locator('.home-social-links a')).toHaveCount(3);
   await page.goto("/ekip.html");
   const names = await page.locator("main h3").allTextContents();
   expect(names[names.indexOf("Dileknaz Ergül") + 1]).toBe("Belinay Daş");
@@ -36,9 +31,12 @@ test("nearby events come first, location is safe, and Google Forms keeps its own
   await page.clock.install({ time: new Date("2026-10-04T15:00:00+03:00") });
   await page.route("**/api/events*", route => route.fulfill({ json: { events } }));
   await page.goto("/");
-  await page.getByRole("button", { name: "Siteye devam et →" }).click();
-  await expect(page.locator("#home-events")).toContainText(events[1].location);
-  await expect(page.locator('#home-events img[src="x"]')).toHaveCount(0);
+  await expect(page.locator("#homeSpotlight")).toContainText(events[1].title);
+  await expect(page.locator("#homeSpotlight")).toContainText(events[1].location);
+  await expect(page.locator('#homeSpotlight img[src="x"]')).toHaveCount(0);
+  await expect(page.locator('#homeSpotlight .home-spotlight-action')).toHaveAttribute('href', 'form.html?event=near#registrationSection');
+  await expect(page.locator('#home-events')).toContainText(events[0].title);
+  await expect(page.locator('#home-events')).not.toContainText(events[1].title);
   expect(await page.evaluate(() => window.locationInjected)).toBeUndefined();
   await page.goto("/etkinlikler.html");
   await expect(page.locator("#events article h2").first()).toHaveText("Bugünkü buluşma");

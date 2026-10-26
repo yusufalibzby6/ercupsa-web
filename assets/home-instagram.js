@@ -1,8 +1,12 @@
 import { instagramAllowed, mountPrivacyPreferences } from './privacy-preferences.js';
+
 const grid = document.getElementById('homeInstagramCards');
 if (grid) {
+  const disclosure = document.getElementById('homeInstagramDisclosure');
   const defaults = [...grid.querySelectorAll('[data-instgrm-permalink]')].map(card => card.dataset.instgrmPermalink);
   let posts = [...defaults], requested = false, script;
+  const expanded = () => !disclosure || disclosure.open;
+  const canEmbed = () => expanded() && instagramAllowed();
   function normalize(value) {
     if (typeof value !== 'string' || value.length > 2048) throw Error();
     const url = new URL(value), match = url.pathname.match(/^\/(p|reel)\/([A-Za-z0-9_-]{1,100})\/?$/);
@@ -10,10 +14,12 @@ if (grid) {
     return `https://www.instagram.com/${match[1]}/${match[2]}/`;
   }
   function processEmbeds() {
-    if (!instagramAllowed()) return;
+    if (!canEmbed()) return;
+    grid.classList.add('is-embeddable');
     try { window.instgrm?.Embeds?.process(); } catch { /* Direct links remain available. */ }
   }
   function render() {
+    grid.classList.toggle('is-embeddable', canEmbed());
     grid.replaceChildren(...posts.map((url, index) => {
       const card = document.createElement('article'); card.className = 'home-instagram-card';
       const heading = document.createElement('div'); heading.className = 'home-instagram-card-heading';
@@ -22,35 +28,48 @@ if (grid) {
       const number = document.createElement('span'); number.textContent = String(index + 1).padStart(2, '0');
       heading.append(icon, brand, number);
       const embed = document.createElement('div'); embed.className = 'home-instagram-embed';
-      const quote = document.createElement('blockquote'); quote.className = 'instagram-media'; quote.dataset.instgrmPermalink = url; quote.dataset.instgrmVersion = '14';
-      const fallback = document.createElement('a'); fallback.href = url; fallback.target = '_blank'; fallback.rel = 'noopener noreferrer';
-      const symbol = document.createElement('i'); symbol.className = 'fa-brands fa-instagram'; symbol.setAttribute('aria-hidden', 'true');
-      const label = document.createElement('span'); label.textContent = 'Bu paylaşımı Instagram’da keşfet';
-      fallback.append(symbol, label); quote.append(fallback); embed.append(quote);
-      const link = document.createElement('a'); link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.className = 'home-instagram-open'; link.textContent = 'Instagram’da aç ↗';
+      if (canEmbed()) {
+        const quote = document.createElement('blockquote'); quote.className = 'instagram-media'; quote.dataset.instgrmPermalink = url; quote.dataset.instgrmVersion = '14';
+        const fallback = document.createElement('a'); fallback.href = url; fallback.target = '_blank'; fallback.rel = 'noopener noreferrer';
+        fallback.textContent = 'Paylaşımı Instagram’da gör ↗';
+        quote.append(fallback); embed.append(quote);
+      }
+      const link = document.createElement('a'); link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.className = 'home-instagram-open'; link.textContent = 'Instagram’da gör ↗';
+      link.setAttribute('aria-label', `${index + 1}. ERCUPSA paylaşımını Instagram’da gör`);
       card.append(heading, embed, link); return card;
     }));
     processEmbeds();
   }
   function loadEmbeds() {
-    if (!instagramAllowed() || requested) return;
+    if (!canEmbed()) return;
+    if (requested) { processEmbeds(); return; }
     requested = true;
+    grid.classList.add('is-embeddable');
     script = document.createElement('script'); script.src = 'https://www.instagram.com/embed.js'; script.async = true; script.dataset.ercupsaInstagram = 'true';
     script.addEventListener('load', processEmbeds);
     document.head.append(script);
   }
   mountPrivacyPreferences(document.getElementById('instagramPrivacy'));
+  disclosure?.addEventListener('toggle', () => {
+    if (expanded()) { render(); loadEmbeds(); }
+    else if (requested) {
+      // Collapsing the optional section releases embedded frames. The SDK is
+      // reused only when the visitor expands the section again with consent.
+      render();
+    }
+  });
   window.addEventListener('ercupsa-privacy-change', () => {
-    if (instagramAllowed()) loadEmbeds();
+    if (instagramAllowed()) { render(); loadEmbeds(); }
     else {
       grid.querySelectorAll('iframe').forEach(frame => frame.remove());
       script?.remove();
       render();
-      // Removing a script element cannot stop code already run by a third party.
-      // A clean navigation starts without loading that SDK under the saved choice.
+      // Removing an element cannot stop a third-party script already executed.
+      // Reload under the withdrawn preference to start without that SDK.
       if (requested) location.reload();
     }
   });
+  render();
   loadEmbeds();
   try {
     const response = await fetch('/api/site-content', { cache: 'no-store', signal: AbortSignal.timeout(15000) });

@@ -48,7 +48,6 @@ test("new public pages are accessible and gracefully explain missing setup", asy
 test("mobile navigation opens and closes", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("button", { name: "Siteye devam et →" }).click();
   await page.getByRole("button", { name: "Menü", exact: true }).click();
   await expect(page.getByRole("link", { name: "Topluluk", exact: true })).toHaveCount(0);
   await expect(
@@ -209,7 +208,7 @@ test("logo is restored and public footers contain no admin entry", async ({
     );
     await expect(page.locator("footer a[href='admin.html']")).toHaveCount(0);
     await expect(page.locator("footer")).toContainText(
-      "Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu",
+      path === "/" ? "Erciyes Üniversitesi Eczacılık Fakültesi" : "Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu",
     );
   }
 });
