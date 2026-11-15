@@ -42,7 +42,7 @@ html.dark .event-list-state h2 { color:#e2e8f0; }
   .event-card-poster { grid-column:1; grid-row:1 / span 2; align-self:start; border:1px solid #a62b2b0c; border-radius:12px; min-height:128px; }
   .event-card-poster img { height:128px; min-height:0; max-height:128px; padding:5px; }
   .event-card-heading { grid-column:2; align-self:end; }
-  .event-card-category { font-size:10px; padding:3px 8px; margin-bottom:6px; }
+  .event-card-category { font-size: 11px; padding:3px 8px; margin-bottom:6px; }
   .event-card h2 { font-size:1.07rem; }
   .event-card-description { grid-column:2; align-self:start; margin:0; font-size:.77rem; line-height:1.55; }
   .event-card .event-card-facts { grid-column:1 / -1; grid-template-columns:minmax(0,1fr) minmax(0,1fr); margin-top:0; gap:11px; padding-top:12px; }
