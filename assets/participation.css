@@ -49,6 +49,10 @@ html.dark .participation-field-feedback { color:#ffc1c7; }
 .participation-code-row { display:flex; gap:.7rem; }
 .participation-code-row input { flex:1; min-width:0; }
 .participation-code-row button { flex:none; }
+/* Dokunma hedefleri: form ve sekme düğmeleri en az 44 px yükseklikte olur. */
+.participation-code-entry button,
+.participation-cancel,
+.participation-code-row button { min-height: 44px; }
 .participation-pending { padding:.8rem 1rem; margin:-.2rem 0 1.5rem; border:1px solid #bbdbc9; border-radius:.7rem; background:#f0faf5; color:#256345; font-size:.9rem; line-height:1.6; }
 .participation-progress-card { border:1px solid #eadcda; background:linear-gradient(120deg,#fff,#fff6f4); border-radius:1.5rem; padding:1.8rem; }
 .participation-account-heading { display:flex; gap:1.3rem; align-items:center; }

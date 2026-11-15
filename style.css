@@ -143,6 +143,19 @@ button:disabled { opacity:.6; cursor:wait; }
 @media print{body.printing-tickets main>*,body.printing-tickets #app>*,body.printing-tickets #ticketsTab>*{display:none!important}body.printing-tickets #app,body.printing-tickets #ticketsTab,body.printing-tickets #ticketOutput,body.printing-tickets main{display:block!important;padding:0!important}body.printing-tickets #ticketOutput .no-print{display:none!important}}
 [hidden] {display:none!important;}
 
+/* Dokunma hedefleri: gezinme ve alt bilgi bağlantıları en az 44 px yükseklikte olur. */
+body > footer a,
+body:not(.home-page) #siteMenu a,
+body:not(.home-page) > nav > a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 10px 12px;
+}
+/* Logo bağlantısı zaten 48 px görsel içerir; ekstra dolgu büyütmesin. */
+body:not(.home-page) > nav > a:first-child,
+body:not(.home-page) #siteMenu a:first-child { padding: 6px 8px; }
+
 /* Public event details and social discovery. */
 .home-primary-actions,.home-social-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-top:26px; }
 .home-gallery-action { display:inline-flex; align-items:center; gap:10px; padding:16px 24px; border:1px solid #ffffff35; border-radius:16px; font-weight:700; color:#fff; }

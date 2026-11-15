@@ -43,7 +43,7 @@
 /* First screen: identity, registration routes, then an actual event. */
 .home-page .home-hero { padding: 28px 0 20px; background: var(--home-ground); border-bottom: 1px solid var(--home-line); }
 .home-page .home-hero-layout { display: grid; gap: 23px; align-items: center; }
-.home-page .home-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #8b5863; font-size: 10px; font-weight: 750; letter-spacing: 1.2px; line-height: 1.5; }
+.home-page .home-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #8b5863; font-size: 11px; font-weight: 750; letter-spacing: 1.2px; line-height: 1.5; }
 .home-page .home-eyebrow > span { width: 6px; height: 6px; background: var(--home-burgundy); border-radius: 50%; }
 .home-page .home-hero h1 { font-size: clamp(30px, 8.3vw, 39px); font-weight: 820; line-height: 1.1; letter-spacing: -1.5px; margin: 12px 0; }
 .home-page .home-hero h1 em, .home-page .home-section-heading h2 em { font-family: Georgia, "Times New Roman", serif; font-weight: 400; color: var(--home-burgundy); }
@@ -64,7 +64,7 @@
 .home-page .home-spotlight-media img, .home-page .home-spotlight-poster { width: 100%; height: 100%; object-fit: contain; max-height: 190px; }
 .home-page .home-spotlight-card:not(.has-poster) .home-spotlight-media img { width: 60px; height: 60px; }
 .home-page .home-spotlight-copy { min-width: 0; align-self: center; }
-.home-page .home-spotlight-tag { display: block; font-size: 10px; font-weight: 800; letter-spacing: .7px; color: var(--home-burgundy); text-transform: uppercase; margin-bottom: 5px; }
+.home-page .home-spotlight-tag { display: block; font-size: 11px; font-weight: 800; letter-spacing: .7px; color: var(--home-burgundy); text-transform: uppercase; margin-bottom: 5px; }
 .home-page .home-spotlight-copy h2 { font-size: 17px; font-weight: 800; line-height: 1.3; letter-spacing: -.45px; overflow-wrap: anywhere; }
 .home-page .home-spotlight-facts { display: grid; gap: 4px; font-size: 12px; line-height: 1.5; color: var(--home-muted); margin-top: 8px; }
 .home-page .home-spotlight-facts > * { min-width: 0; overflow-wrap: anywhere; }
@@ -74,7 +74,7 @@
 .home-page #homeCountdownLabel { grid-column: 1 / -1; color: var(--home-muted); font-size: 11px; line-height: 1.5; margin-bottom: 3px; }
 .home-page .home-countdown-unit { min-width: 0; padding: 6px 4px; border: 1px solid #e6d6d0; border-radius: 9px; background: var(--home-ground); text-align: center; }
 .home-page .home-countdown-unit strong { display: block; font-size: clamp(17px, 5.4vw, 23px); line-height: 1.15; font-weight: 780; letter-spacing: -.5px; color: var(--home-burgundy); font-variant-numeric: tabular-nums; min-width: 2ch; }
-.home-page .home-countdown-unit span { display: block; margin-top: 3px; color: var(--home-muted); font-size: 10px; line-height: 1.3; }
+.home-page .home-countdown-unit span { display: block; margin-top: 3px; color: var(--home-muted); font-size: 11px; line-height: 1.3; }
 .home-page .home-spotlight-actions { grid-column: 1 / -1; display: flex; gap: 8px; align-items: stretch; }
 .home-page .home-spotlight-action, .home-page .home-spotlight-detail { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 44px; padding: 10px 13px; font-size: 13px; line-height: 1.4; font-weight: 750; border-radius: 10px; text-align: center; }
 .home-page .home-spotlight-action { flex: 1; background: var(--home-burgundy); color: #fff; }
@@ -94,7 +94,7 @@
 .home-page .home-section { padding-block: 26px 0; }
 .home-page .home-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .home-page .home-section-heading h2 { font-size: 25px; line-height: 1.15; font-weight: 780; letter-spacing: -.8px; margin-top: 5px; }
-.home-page .home-section-heading .home-eyebrow { font-size: 9px; letter-spacing: .8px; }
+.home-page .home-section-heading .home-eyebrow { font-size: 11px; letter-spacing: .8px; }
 .home-page .home-text-link { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 44px; padding: 5px 0 5px 9px; color: var(--home-burgundy); font-size: 11px; font-weight: 750; line-height: 1.4; text-align: right; }
 .home-page .home-event-list { display: grid; gap: 10px; }
 .home-page .home-event-card { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 13px; min-width: 0; border: 1px solid var(--home-line); border-radius: 14px; overflow: hidden; background: var(--home-paper); }
@@ -102,12 +102,12 @@
 .home-page .home-event-poster { width: 100%; height: 100%; min-height: 112px; max-height: 190px; object-fit: contain; background: var(--home-ground); }
 .home-page .home-event-copy { min-width: 0; padding: 13px 13px 13px 0; }
 .home-page .home-event-card:not(.has-poster) .home-event-copy { padding-left: 14px; }
-.home-page .home-event-category { color: var(--home-burgundy); font-size: 10px; font-weight: 750; }
+.home-page .home-event-category { color: var(--home-burgundy); font-size: 11px; font-weight: 750; }
 .home-page .home-event-copy h3 { font-size: 15px; font-weight: 760; line-height: 1.35; letter-spacing: -.25px; margin: 3px 0 6px; overflow-wrap: anywhere; }
 .home-page .home-event-copy h3 a { display: inline-flex; align-items: center; min-height: 44px; }
 .home-page .home-event-copy p { font-size: 12px; line-height: 1.6; color: var(--home-muted); overflow-wrap: anywhere; }
 .home-page .home-event-facts { display: grid; gap: 3px; color: var(--home-muted); font-size: 12px; line-height: 1.5; }
-.home-page .home-timezone { font-size: 10px; }
+.home-page .home-timezone { font-size: 11px; }
 .home-page .home-event-status { color: var(--home-burgundy); font-size: 11px; font-weight: 650; }
 .home-page .home-spotlight-copy,
 .home-page .home-event-copy,
@@ -131,7 +131,7 @@
 .home-page .home-yearbook { display: flex; align-items: center; gap: 14px; padding: 18px; margin-block: 25px 0; border: 1px solid #dec5bf; border-radius: 16px; background: var(--home-wash); }
 .home-page .home-yearbook h2 { font-size: 20px; line-height: 1.3; font-weight: 800; margin: 4px 0; }
 .home-page .home-yearbook p { font-size: 12px; line-height: 1.5; color: var(--home-muted); }
-.home-page .home-yearbook .home-eyebrow { font-size: 9px; }
+.home-page .home-yearbook .home-eyebrow { font-size: 11px; }
 .home-page .home-yearbook .home-button { flex-shrink: 0; min-width: 102px; padding: 10px; font-size: 11px; }
 .home-page .home-instagram-section { margin-block: 26px; }
 
@@ -139,7 +139,7 @@
 .home-page .home-footer-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
 .home-page .home-footer-brand .home-brand { min-height: 44px; gap: 8px; font-size: 14px; }
 .home-page .home-footer-brand .home-brand img { width: 32px; height: 32px; }
-.home-page .home-footer-brand p { font-size: 10px; line-height: 1.6; color: var(--home-muted); margin-top: 5px; }
+.home-page .home-footer-brand p { font-size: 11px; line-height: 1.6; color: var(--home-muted); margin-top: 5px; }
 .home-page .home-social-links { display: flex; gap: 5px; align-items: center; }
 .home-page .home-social-links a { display: inline-grid; place-items: center; width: 44px; min-height: 44px; border: 1px solid #decdc7; border-radius: 50%; background: var(--home-paper); color: var(--home-burgundy); font-size: 17px; }
 .home-page .home-footer-links { display: flex; flex-wrap: wrap; grid-column: 1 / -1; justify-content: flex-start; gap: 0 16px; border-top: 1px solid var(--home-line); padding-top: 7px; }
@@ -196,7 +196,7 @@ html.dark .home-page .home-yearbook { border-color: #68414e; }
   .home-page .home-button { font-size: 13px; min-height: 48px; }
   .home-page .home-spotlight-card { grid-template-columns: 114px minmax(0, 1fr); padding: 22px; gap: 17px 20px; border-radius: 22px; box-shadow: 0 20px 55px #6f32430d; }
   .home-page .home-spotlight-copy h2 { font-size: 23px; }
-  .home-page .home-spotlight-tag { font-size: 10px; }
+  .home-page .home-spotlight-tag { font-size: 11px; }
   .home-page .home-countdown { gap: 9px; padding-top: 15px; }
   .home-page .home-countdown-unit { padding: 8px; }
   .home-page .home-spotlight-empty { padding: 26px; border-radius: 20px; }
@@ -235,7 +235,7 @@ html.dark .home-page .home-yearbook { border-color: #68414e; }
   .home-page .home-pillar span { font-size: 11px; }
   .home-page .home-pillar i { font-size: 13px; }
   .home-page .home-section-heading h2 { font-size: 23px; }
-  .home-page .home-text-link { font-size: 10px; max-width: 106px; }
+  .home-page .home-text-link { font-size: 11px; max-width: 106px; }
   .home-page .home-yearbook { flex-direction: column; align-items: flex-start; }
   .home-page .home-yearbook .home-button { align-self: stretch; }
   .home-page .home-footer-inner { grid-template-columns: minmax(0, 1fr); }
@@ -278,7 +278,7 @@ html.dark .home-page .home-yearbook { border-color: #68414e; }
 .home-page .home-hero::after { content: ""; position: absolute; width: 350px; height: 350px; border: 1px solid #f5d7d91c; border-radius: 50%; top: -250px; left: -220px; pointer-events: none; }
 .home-page .home-hero-layout { grid-template-areas: "copy" "art" "event"; gap: 0; align-items: center; }
 .home-page .home-hero-copy { grid-area: copy; position: relative; z-index: 2; }
-.home-page .home-hero .home-eyebrow { color: #edbecb; font-size: 9px; font-weight: 750; letter-spacing: 1.05px; }
+.home-page .home-hero .home-eyebrow { color: #edbecb; font-size: 11px; font-weight: 750; letter-spacing: 1.05px; }
 .home-page .home-hero .home-eyebrow > span { background: #edb7a5; box-shadow: 0 0 0 4px #ecb6a211; }
 .home-page .home-hero h1 { color: #fff9f0; font-weight: 820; font-size: clamp(31px, 8.5vw, 40px); line-height: 1.06; letter-spacing: -1.6px; margin: 15px 0; }
 .home-page .home-hero h1 em { color: #e9bba9; font-weight: 400; }
@@ -301,12 +301,12 @@ html.dark .home-page .home-yearbook { border-color: #68414e; }
 .home-page .home-spotlight-card { border: 1px solid #fff4ec; border-radius: 23px; padding: 18px; gap: 15px; background: #fffdf9; box-shadow: 0 22px 44px #280b202e; }
 .home-page .home-spotlight-media { background: #f1e7df; border-radius: 12px; }
 .home-page .home-spotlight-copy h2 { color: #38222f; letter-spacing: -.5px; }
-.home-page .home-spotlight-tag { color: #8c3550; letter-spacing: 1px; font-size: 9px; }
+.home-page .home-spotlight-tag { color: #8c3550; letter-spacing: 1px; font-size: 11px; }
 .home-page .home-spotlight-facts { color: #7e7075; }
 .home-page .home-spotlight-status { color: #842e47; }
 .home-page .home-spotlight-status > span { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #9c566b; margin-right: 6px; vertical-align: 2px; }
 .home-page .home-countdown { border-top-color: #ebdfd9; padding-top: 12px; }
-.home-page #homeCountdownLabel { color: #745b66; text-transform: uppercase; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
+.home-page #homeCountdownLabel { color: #745b66; text-transform: uppercase; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
 .home-page .home-countdown-unit { padding: 7px 4px; border-color: #ebddd5; background: #f8f1e9; border-radius: 10px; }
 .home-page .home-countdown-unit strong { color: #812942; font-weight: 800; }
 .home-page .home-countdown-unit span { color: #745b66; }
@@ -320,7 +320,7 @@ html.dark .home-page .home-yearbook { border-color: #68414e; }
 .home-page .home-pillar i { color: #e7b8a3; }
 .home-page .home-pillar span { font-size: 11px; }
 .home-page .home-section { padding-top: 30px; }
-.home-page .home-section-heading .home-eyebrow { color: #9b6878; letter-spacing: 1.15px; font-size: 9px; }
+.home-page .home-section-heading .home-eyebrow { color: #9b6878; letter-spacing: 1.15px; font-size: 11px; }
 .home-page .home-section-heading h2 { font-weight: 800; letter-spacing: -1px; }
 .home-page .home-event-card { border-color: #e6d6cd; border-radius: 17px; background: #fffcf7; box-shadow: 0 5px 17px #59273c05; }
 .home-page .home-photo-card { border-radius: 15px; background: #f1e7dd; border-color: #e7d8ce; }
@@ -353,7 +353,7 @@ html.dark .home-page .home-footer .home-social-links a { background: #33222d; bo
   .home-page .home-hero { padding-top: 40px; }
   .home-page .home-hero-layout { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-areas: "copy art" "event event"; gap: 24px 25px; }
   .home-page .home-hero h1 { font-size: 46px; }
-  .home-page .home-hero .home-eyebrow { font-size: 9px; max-width: 330px; }
+  .home-page .home-hero .home-eyebrow { font-size: 11px; max-width: 330px; }
   .home-page .home-pharmacy-art { height: 260px; margin: 0; }
   .home-page .home-pharmacy-art > img { width: 360px; height: 340px; inset: -25px auto auto 50%; }
   .home-page .home-art-orbit { top: 90px; }
@@ -371,7 +371,7 @@ html.dark .home-page .home-footer .home-social-links a { background: #33222d; bo
   .home-page .home-hero-layout { grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr); grid-template-areas: "copy art" "copy event"; gap: 0 60px; }
   .home-page .home-hero-copy { align-self: center; padding-bottom: 20px; }
   .home-page .home-hero h1 { font-size: clamp(52px, 4.9vw, 72px); line-height: 1.03; letter-spacing: -3px; margin: 24px 0; }
-  .home-page .home-hero .home-eyebrow { max-width: 390px; font-size: 10px; }
+  .home-page .home-hero .home-eyebrow { max-width: 390px; font-size: 11px; }
   .home-page .home-hero-copy > p { font-size: 16px; max-width: 450px; line-height: 1.8; }
   .home-page .home-primary-actions { margin-top: 28px; max-width: 410px; }
   .home-page .home-pharmacy-art { height: 228px; margin: 0 0 -34px; }
@@ -399,5 +399,5 @@ html.dark .home-page .home-footer .home-social-links a { background: #33222d; bo
   .home-page .home-spotlight-card { padding: 15px; gap: 13px 12px; grid-template-columns: 76px minmax(0, 1fr); }
   .home-page .home-spotlight-copy h2 { font-size: 16px; }
   .home-page .home-pillar { gap: 5px; }
-  .home-page .home-pillar span { font-size: 10px; }
+  .home-page .home-pillar span { font-size: 11px; }
 }
