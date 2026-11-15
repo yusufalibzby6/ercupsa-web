@@ -1,0 +1,20 @@
+/* Eczacılık SVG ikon seti: Font Awesome ölçüleriyle uyumlu boyutlandırma.
+   i.fa-* yerine geçen .ercupsa-icon öğeleri bağlamdaki font boyutunu korur. */
+@media screen {
+  .ercupsa-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1em;
+    height: 1em;
+    vertical-align: -.125em;
+    line-height: 1;
+  }
+  .ercupsa-icon svg { width: 100%; height: 100%; display: block; }
+  /* Yükleniyor göstergesi dönmeye devam eder. */
+  .ercupsa-icon.fa-spin svg, .ercupsa-icon.faa-spin svg { animation: ercupsa-icon-spin 1s linear infinite; }
+  @keyframes ercupsa-icon-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .ercupsa-icon.fa-spin svg { animation: none; } }
+  @media print { .ercupsa-icon.fa-spin svg { animation: none; } }
+}

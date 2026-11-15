@@ -1,0 +1,82 @@
+/* Eczacılık sahnesi: hafif ve hareketli bir arka plan katmanı.
+   Yalnızca transform/opacity animasyonları kullanır; görüntü dosyası yoktur,
+   bant genişliği maliyeti sıfıra yakındır. Mevcut hareket sistemiyle uyumludur:
+   data-motion-mode / data-motion-running üzerinden duraklatılır,
+   prefers-reduced-motion globalsel kuralıyla tamamen kapanır. */
+@media screen {
+  .pharmacy-field {
+    --field-play: paused;
+    --field-strength: .4;
+    --field-ink: #9c4f62;
+    --field-ink-soft: #c08a94;
+    --field-line: #9c4f6238;
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  body.home-page .pharmacy-field { --field-strength: .6; }
+  html.dark .pharmacy-field {
+    --field-ink: #a06377;
+    --field-ink-soft: #6d4351;
+    --field-line: #a0637730;
+  }
+  /* Hareket sistemi olmayan sayfalarda sahne varsayılan olarak akar;
+     sistemi olan sayfalalarda yalnızca tam modda ve görünürken akar. */
+  .pharmacy-field { --field-play: running; }
+  body[data-motion-mode]:not([data-motion-mode="full"]) .pharmacy-field { --field-play: paused; }
+  body[data-motion-mode="full"]:not([data-motion-running="true"]) .pharmacy-field { --field-play: paused; }
+
+  .pharmacy-layer { position: absolute; inset: -14%; will-change: transform; }
+  .pharmacy-shape {
+    position: absolute;
+    opacity: calc(var(--field-strength) * var(--shape-weight, 1));
+    animation-play-state: var(--field-play);
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+  }
+  .pharmacy-shape svg { display: block; width: 100%; height: 100%; }
+
+  /* Yavaş süzülen formlar: üç ayrı hareket dili, hepsi GPU dostu. */
+  @keyframes pharmacy-drift-a {
+    from { transform: translate3d(0, -12px, 0) rotate(-2deg); }
+    to { transform: translate3d(10px, 12px, 0) rotate(2deg); }
+  }
+  @keyframes pharmacy-drift-b {
+    from { transform: translate3d(8px, 10px, 0) rotate(3deg); }
+    to { transform: translate3d(-10px, -14px, 0) rotate(-3deg); }
+  }
+  @keyframes pharmacy-drift-c {
+    from { transform: translate3d(-6px, 14px, 0); }
+    to { transform: translate3d(6px, -10px, 0); }
+  }
+  @keyframes pharmacy-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes pharmacy-pulse {
+    from { opacity: calc(var(--field-strength) * .35); }
+    to { opacity: calc(var(--field-strength) * .95); }
+  }
+  .pharmacy-shape[data-drift="a"] { animation-name: pharmacy-drift-a; animation-duration: 19s; }
+  .pharmacy-shape[data-drift="b"] { animation-name: pharmacy-drift-b; animation-duration: 26s; }
+  .pharmacy-shape[data-drift="c"] { animation-name: pharmacy-drift-c; animation-duration: 32s; }
+  .pharmacy-shape[data-spin="slow"] { animation-name: pharmacy-spin; animation-duration: 110s; animation-direction: normal; }
+  .pharmacy-shape[data-pulse="1"] { animation-name: pharmacy-pulse; animation-duration: 9s; }
+
+  /* Derinlik: arka katman soluk ve yavaş, ön katman belirgin. */
+  .pharmacy-layer-back .pharmacy-shape { --shape-weight: .5; }
+  .pharmacy-layer-mid .pharmacy-shape { --shape-weight: .8; }
+  .pharmacy-layer-front .pharmacy-shape { --shape-weight: 1; }
+
+  /* Baskı ve küçük ekranlarda sahne sadeleşir. */
+  @media print { .pharmacy-field { display: none; } }
+  @media (max-width: 640px) {
+    .pharmacy-layer-back .pharmacy-shape { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pharmacy-field, .pharmacy-shape { animation: none !important; }
+  }
+}
