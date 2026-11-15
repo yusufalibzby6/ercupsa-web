@@ -51,7 +51,7 @@ test("the server preview is readable without JavaScript, fits mobile and links d
   await expect(page.getByRole("heading", { level: 1 })).toHaveText('<script>alert(1)</script> Bilim');
   await expect(page.getByRole("main")).toContainText("12 Ekim 2026");
   await expect(page.getByRole("main")).toContainText("18:30 · Türkiye saati");
-  await expect(page.getByRole("link", { name: "Etkinlik detayları ve kayıt formu" })).toHaveAttribute("href", "/form.html?event=share-one#registrationSection");
+  await expect(page.getByRole("link", { name: "Etkinlik detayları ve kayıt formu" })).toHaveAttribute("href", "/form?event=share-one#registrationSection");
   await expect(page.locator('meta[property="og:url"]')).toHaveAttribute("content", shareUrl);
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", event.poster);
   await expect(page.locator("script")).toHaveCount(0);

@@ -20,6 +20,32 @@ function publicImage(value) {
   return fallbackImage;
 }
 
+// Paylaşım önizleyicileri (WhatsApp vb.) büyük görselleri reddeder; afişler
+// Cloudinary'den 2 MB üstü PNG olarak gelebiliyor. Cloudinary türevi ile
+// görseli ~250 KB JPEG'e küçültürüz; sürüm ve klasör bölümleri korunur.
+function shareImage(value) {
+  const url = publicImage(value);
+  if (url === fallbackImage) return url;
+  try {
+    const parsed = new URL(url);
+    const marker = "/image/upload/";
+    const at = parsed.pathname.indexOf(marker);
+    if (parsed.hostname !== "res.cloudinary.com" || at === -1) return url;
+    const rest = parsed.pathname.slice(at + marker.length);
+    const slash = rest.indexOf("/");
+    if (slash === -1) return url;
+    const head = rest.slice(0, slash);
+    // Alt çizgi içeren ilk bölüm bir dönüştürme kümesidir; sürümler "v" + rakamlarla başlar.
+    const transformed = head.includes("_") && !/^v\d+/.test(head)
+      ? `${head},c_limit,w_1200,q_auto,f_jpg${rest.slice(slash)}`
+      : `c_limit,w_1200,q_auto,f_jpg/${rest}`;
+    parsed.pathname = parsed.pathname.slice(0, at + marker.length) + transformed;
+    return parsed.href;
+  } catch {
+    return url;
+  }
+}
+
 function eventDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return "";
   const date = new Date(`${value}T12:00:00+03:00`);
@@ -41,7 +67,7 @@ ${canonical ? `<link rel="canonical" href="${escapeHtml(canonical)}"><meta prope
 <meta property="og:image" content="${escapeHtml(image)}"><meta property="og:image:alt" content="${escapeHtml(title)}">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(description)}"><meta name="twitter:image" content="${escapeHtml(image)}">
-<style>${styles}</style></head><body><header><a href="/index.html">ERCUPSA</a></header>
+<style>${styles}</style></head><body><header><a href="/">ERCUPSA</a></header>
 <main>${content}</main><footer>Erciyes Üniversitesi Eczacılık Fakültesi Öğrenci Topluluğu</footer></body></html>`;
 }
 
@@ -60,7 +86,7 @@ function htmlResponse(html, status, head = false, extraHeaders = {}) {
 
 const notFound = () => documentHtml({ title: "Etkinlik bulunamadı | ERCUPSA",
   description: "Bu etkinlik bağlantısı şu anda kullanılamıyor.", indexable: false,
-  content: '<article class="card no-poster"><div class="content"><h1>Etkinlik bulunamadı</h1><p>Bu etkinlik bağlantısı şu anda kullanılamıyor.</p><a class="action" href="/etkinlikler.html">Etkinlikleri keşfet</a></div></article>',
+  content: '<article class="card no-poster"><div class="content"><h1>Etkinlik bulunamadı</h1><p>Bu etkinlik bağlantısı şu anda kullanılamıyor.</p><a class="action" href="/etkinlikler">Etkinlikleri keşfet</a></div></article>',
 });
 
 export function createEventShareHandler({ events = readEvents } = {}) {
@@ -81,10 +107,10 @@ export function createEventShareHandler({ events = readEvents } = {}) {
       const event = (await events()).find((entry) => entry.id === eventId && entry.published !== false && entry.archived !== true);
       if (!event) return htmlResponse(notFound(), 404, head);
       const canonical = `${origin}/etkinlik/${encodeURIComponent(eventId)}`;
-      const registrationPath = `/form.html?event=${encodeURIComponent(eventId)}#registrationSection`;
+      const registrationPath = `/form?event=${encodeURIComponent(eventId)}#registrationSection`;
       const date = eventDate(event.date), time = /^([01]\d|2[0-3]):[0-5]\d$/.test(event.time || "") ? event.time : "";
       const location = compact(event.location, 200), title = `${compact(event.title, 150)} | ERCUPSA`;
-      const image = publicImage(event.poster), hasPoster = image !== fallbackImage;
+      const image = shareImage(event.poster), hasPoster = image !== fallbackImage;
       const facts = [date, time ? `${time} · Türkiye saati` : "", location].filter(Boolean).join(" · ");
       const description = compact([facts, compact(event.description, 220)].filter(Boolean).join(" — "), 500);
       // Registration availability is deliberately checked on the form page:
@@ -95,13 +121,13 @@ ${hasPoster ? `<img class="poster" src="${escapeHtml(image)}" alt="${escapeHtml(
 <dl><div><dt>Tarih</dt><dd>${escapeHtml(date || "Tarih bilgisi paylaşılmadı.")}</dd></div><div><dt>Saat</dt><dd>${escapeHtml(time ? `${time} · Türkiye saati` : "Saat bilgisi paylaşılmadı.")}</dd></div><div><dt>Konum</dt><dd>${escapeHtml(location || "Konum bilgisi paylaşılmadı.")}</dd></div></dl>
 ${event.description ? `<p class="description">${escapeHtml(String(event.description).slice(0, 5000))}</p>` : ""}
 <a class="action" href="${registrationPath}">Etkinlik detayları ve kayıt formu</a><p class="hint">Kayıt formu paylaşıldıysa ve kayıtlar açıksa bu bağlantıdan ulaşabilirsin.</p>
-<a class="secondary" href="/etkinlikler.html">Tüm etkinlikler</a></div></article>`;
+<a class="secondary" href="/etkinlikler">Tüm etkinlikler</a></div></article>`;
       return htmlResponse(documentHtml({ title, description, image, canonical, content }), 200, head);
     } catch (error) {
       console.error("Event preview unavailable:", error.name);
       return htmlResponse(documentHtml({ title: "Etkinlik bilgileri | ERCUPSA",
         description: "Etkinlik bilgileri şu anda yüklenemiyor.", indexable: false,
-        content: '<article class="card no-poster"><div class="content"><h1>Etkinlik bilgileri yüklenemedi</h1><p>Lütfen biraz sonra tekrar deneyin.</p><a class="action" href="/etkinlikler.html">Etkinlikleri keşfet</a></div></article>',
+        content: '<article class="card no-poster"><div class="content"><h1>Etkinlik bilgileri yüklenemedi</h1><p>Lütfen biraz sonra tekrar deneyin.</p><a class="action" href="/etkinlikler">Etkinlikleri keşfet</a></div></article>',
       }), 503, head);
     }
   };

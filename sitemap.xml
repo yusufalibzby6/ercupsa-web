@@ -6,46 +6,58 @@
         <priority>1.0</priority>
     </url>
     <url>
-        <loc>https://ercupsa.com.tr/hakkimizda.html</loc>
-        <changefreq>monthly</changefreq>
-        <priority>0.8</priority>
-    </url>
-    <url>
-        <loc>https://ercupsa.com.tr/ekip.html</loc>
-        <changefreq>monthly</changefreq>
-        <priority>0.7</priority>
-    </url>
-    <url>
-        <loc>https://ercupsa.com.tr/etkinlikler.html</loc>
+        <loc>https://ercupsa.com.tr/etkinlikler</loc>
         <changefreq>weekly</changefreq>
         <priority>0.9</priority>
     </url>
     <url>
-        <loc>https://ercupsa.com.tr/galeri.html</loc>
-        <changefreq>weekly</changefreq>
-        <priority>0.6</priority>
-    </url>
-    <url>
-        <loc>https://ercupsa.com.tr/sss.html</loc>
+        <loc>https://ercupsa.com.tr/hakkimizda</loc>
         <changefreq>monthly</changefreq>
-        <priority>0.6</priority>
+        <priority>0.8</priority>
     </url>
     <url>
-        <loc>https://ercupsa.com.tr/form.html</loc>
+        <loc>https://ercupsa.com.tr/ekip</loc>
+        <changefreq>monthly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    <url>
+        <loc>https://ercupsa.com.tr/form</loc>
         <changefreq>weekly</changefreq>
         <priority>0.7</priority>
     </url>
     <url>
-        <loc>https://ercupsa.com.tr/test.html</loc>
+        <loc>https://ercupsa.com.tr/galeri</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.6</priority>
+    </url>
+    <url>
+        <loc>https://ercupsa.com.tr/sss</loc>
+        <changefreq>monthly</changefreq>
+        <priority>0.6</priority>
+    </url>
+    <url>
+        <loc>https://ercupsa.com.tr/iletisim</loc>
+        <changefreq>monthly</changefreq>
+        <priority>0.6</priority>
+    </url>
+    <url>
+        <loc>https://ercupsa.com.tr/biletler</loc>
+        <changefreq>monthly</changefreq>
+        <priority>0.6</priority>
+    </url>
+    <url>
+        <loc>https://ercupsa.com.tr/test</loc>
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
     </url>
     <url>
-        <loc>https://ercupsa.com.tr/iletisim.html</loc>
+        <loc>https://ercupsa.com.tr/yilliklar</loc>
         <changefreq>monthly</changefreq>
-        <priority>0.6</priority>
+        <priority>0.5</priority>
     </url>
-
-    <url><loc>https://ercupsa.com.tr/topluluk.html</loc></url>
-    <url><loc>https://ercupsa.com.tr/biletler.html</loc></url>
+    <url>
+        <loc>https://ercupsa.com.tr/cerezler</loc>
+        <changefreq>yearly</changefreq>
+        <priority>0.3</priority>
+    </url>
 </urlset>

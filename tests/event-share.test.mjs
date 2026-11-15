@@ -30,7 +30,7 @@ test("published event previews render event metadata on the server and use a fix
   assert.match(html, /<meta property="og:description" content="12 Ekim 2026 · 18:30 · Türkiye saati · Kayseri Eczacılık Fakültesi/);
   assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
   assert.match(html, /<link rel="canonical" href="https:\/\/ercupsa\.com\.tr\/etkinlik\/share-one">/);
-  assert.match(html, /href="\/form\.html\?event=share-one#registrationSection">Etkinlik detayları ve kayıt formu/);
+  assert.match(html, /href="\/form\?event=share-one#registrationSection">Etkinlik detayları ve kayıt formu/);
   assert.ok(!html.includes("attacker.test"));
   assert.ok(!html.includes("private-field"));
   assert.ok(!html.includes("Özel form alanı"));
@@ -38,6 +38,15 @@ test("published event previews render event metadata on the server and use a fix
   assert.ok(!html.includes("<script"));
   assert.ok(!html.includes("http-equiv=\"refresh\""));
   assert.equal(f.state.reads, 1);
+});
+
+test("cloudinary posters are downscaled for link previews so WhatsApp keeps showing them", async () => {
+  const f = fixture([{ ...event, poster: "https://res.cloudinary.com/w2trki15/image/upload/v1794693662/ercupsa/ntaallqmtot4wlmbxjtu.png" }]);
+  const html = await (await f.request()).text();
+  const optimized = "https:\\/\\/res\\.cloudinary\\.com\\/w2trki15\\/image\\/upload\\/c_limit,w_1200,q_auto,f_jpg\\/v1794693662\\/ercupsa\\/ntaallqmtot4wlmbxjtu\\.png";
+  assert.match(html, new RegExp(`og:image" content="${optimized}"`));
+  assert.match(html, new RegExp(`twitter:image" content="${optimized}"`));
+  assert.match(html, new RegExp(`class="poster" src="${optimized}"`));
 });
 
 test("Netlify function query routing and original event paths resolve the same canonical event", async () => {

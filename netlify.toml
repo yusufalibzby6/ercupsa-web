@@ -8,9 +8,96 @@
 
 [[redirects]]
   from = "/uyeler.html"
-  to = "/etkinlikler.html"
+  to = "/etkinlikler"
   status = 301
   force = true
+
+# Temiz URL konsolidasyonu: .html adresleri kalıcı olarak uzantısız adrese yönlenir.
+# admin.html (robots.txt) ve bilet.html (özel başlıklar + basılı QR) bilinçli olarak hariç tutuldu.
+[[redirects]]
+  from = "/index.html"
+  to = "/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/hakkimizda.html"
+  to = "/hakkimizda"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/ekip.html"
+  to = "/ekip"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/etkinlikler.html"
+  to = "/etkinlikler"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/galeri.html"
+  to = "/galeri"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/sss.html"
+  to = "/sss"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/form.html"
+  to = "/form"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/iletisim.html"
+  to = "/iletisim"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/test.html"
+  to = "/test"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/yilliklar.html"
+  to = "/yilliklar"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/yillik.html"
+  to = "/yillik"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/cerezler.html"
+  to = "/cerezler"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/biletler.html"
+  to = "/biletler"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/giris.html"
+  to = "/giris"
+  status = 301
+  force = true
+
 
 [[redirects]]
   from = "/api/events"
